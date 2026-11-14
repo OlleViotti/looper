@@ -15,4 +15,6 @@ Everything lives in `index.html`. The page must be opened over https for the mic
 Todo:
 - Save projects
 - Solo button on main screen
-- Overdub recording?
+- Add several tracks beforehand with different settings (name, effects) and arm the one that should take the recording
+- Add pan to the effects
+- Make the interface more live-centered with bigger buttons for Mute, solo, arm and other which will be used live
