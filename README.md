@@ -10,14 +10,14 @@
 
 ## Three views
 
-The app has three views, reached by swiping or with the two buttons in the header.
+The app has three views, reached by swiping or with the buttons in the top bar: edit on the left, settings on the right. Tapping the Varv logo in the middle always brings you back to play.
 
 - **Play** is the live view. Each track is a name and a tape strip showing its waveform.
   - **Tap a strip** to mute or unmute the track.
   - **Hold a strip** to arm it; a red fill shows the hold, and the armed track gets a red frame.
   - **Tap a name** to solo the track.
 - **Swipe right for Edit.** The track names travel to the right edge and the edit window comes in from the left. Tap a name to edit that track, or tap Master for the master effects. Swipe left on the names, or tap the edit button, to go back.
-- **Swipe left for Settings:** loop length, tempo, latency, project, click, recording, mute timing and microphone. Swipe right or tap Done to go back.
+- **Swipe left for Settings,** which slide in under the top bar: loop length, tempo, latency, project, performance recording, click, recording, mute timing and microphone. Swipe right, tap Done or tap the logo to go back.
 
 ## Latency correction
 
@@ -33,10 +33,13 @@ The app has three views, reached by swiping or with the two buttons in the heade
 
 ## Recording
 
+- **One button.** Tap Record to record the next pass. Tap again while it records to keep going: the following passes stack up as takes in the same track until you tap once more for the last one. Hold Record to start or stop playback. This all works from a single pedal button.
+
 - **One lap** records a single lap. **Continuous** records every lap until you tap again; silent laps are thrown away.
 - **Capture last** keeps the lap you just played even if you never pressed Record.
 - **Undo** removes the latest recording. Removed recordings and deleted tracks stay in a bar at the bottom with a Restore button until you dismiss it.
-- A level meter and a live strip show what the microphone hears, already shifted by the current latency.
+- **Levels.** Input gain (−12 to +30 dB) and an optional 80 Hz low cut sit before the recording. Recordings are kept at the level they were played; automatic levelling is an option. The top bar has in and out meters: amber near full scale, red on clipping or when the output limiter has to work hard. Each track shows its own level under its name.
+- A live strip shows what the microphone hears, already shifted by the current latency.
 
 ## Tracks
 
@@ -50,6 +53,10 @@ The app has three views, reached by swiping or with the two buttons in the heade
 
 Each track and the master have a three-band EQ drawn as its response curve. Drag the L, M or H handle sideways to set the frequency and up or down to set the level, from −12 to +12 dB; double-tap a handle to flatten it. The low and high bands are shelves and the mid band is a bell. The curve is the real response of the filters, the filter setting included.
 
+## Scenes
+
+Four scene buttons, A to D, sit above the tracks. Hold one to store which tracks are muted and soloed; tap it to bring that back, following the mute timing setting. A scene that matches the current state lights up. Scenes are saved with the project.
+
 ## Master effects
 
 Under Master in the Edit view:
@@ -61,15 +68,16 @@ Under Master in the Edit view:
 
 ## Projects
 
-- Save the session as a named project: tracks, takes, track settings, loop length, tempo and master effects. Once saved, changes are saved automatically.
+- **Everything is saved.** The first recording creates a project named after the date and time, and every change after that is saved automatically: tracks, takes, track settings, scenes, loop length, tempo and master effects. Rename it under Settings. After a reload, a Continue button reopens the last session.
 - The raw recordings are stored, not the finished loops, so the latency of every take can still be changed after a project is reopened.
 - Projects are stored in the browser on the device (IndexedDB) and are not synced anywhere.
+- **Performance recording.** Records everything you hear, without the click, as an audio file. With the microphone included, what you play live is in it too, lined up with the loops by delaying the music by the latency. Recordings are kept under Settings, where you can save or share them.
 - Export as a WAV file of the audible tracks, without effects or pan. With tracks of different lengths, the export runs until they all line up again.
 
 ## Live use
 
 - The screen stays awake while playing. Large transport buttons: Start, Undo, Record, Capture last and Click on or off.
-- Keys, and Bluetooth pedals that send them: <kbd>Space</kbd> start and stop, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> record, <kbd>←</kbd> undo, <kbd>C</kbd> capture last, <kbd>K</kbd> click, <kbd>1</kbd> to <kbd>9</kbd> mute a track, <kbd>E</kbd> edit, <kbd>S</kbd> settings.
+- Keys, and Bluetooth pedals that send them: <kbd>Space</kbd> start and stop, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> record, <kbd>←</kbd> undo, <kbd>C</kbd> capture last, <kbd>K</kbd> click, <kbd>1</kbd> to <kbd>9</kbd> mute a track, <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>P</kbd> performance recording. Holding the record key starts or stops playback.
 
 ## Technical notes
 

@@ -36,30 +36,37 @@ h1,h2,h3,p{margin:0}
 #app{max-width:560px;margin:0 auto;height:100vh;height:100dvh;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);overflow:hidden}
 
 /* Status band: readable from a distance */
-.status{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"eb title sb" "st st pos";column-gap:8px;padding:6px 12px 10px 8px;border-bottom:4px solid transparent;transition:background .12s}
-.status h1{grid-area:title;align-self:center;font:400 21px/1 var(--pen);letter-spacing:.02em;color:var(--tape);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.status h1 .mk{width:24px;height:24px;vertical-align:-5px;margin-right:8px}
-.status h1 span{font:500 15px/1 var(--ui);letter-spacing:0;color:var(--mut);margin-left:8px}
-.hb{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:var(--mut)}
-.hb svg{width:24px;height:24px;fill:currentColor}
+.status{position:relative;z-index:16;background:var(--desk);display:grid;grid-template-columns:56px 1fr 56px;grid-template-areas:"eb title sb" "st st pos";column-gap:8px;padding:6px 8px 10px;border-bottom:4px solid transparent;transition:background .12s}
+.home{grid-area:title;justify-self:center;align-self:center;display:flex;align-items:center;gap:10px;padding:6px 12px;border-radius:12px;font:400 26px/1 var(--pen);letter-spacing:.02em;color:var(--tape)}
+.home .mk{width:32px;height:32px}
+.stbox{grid-area:st;align-self:end;min-width:0;padding-left:8px}
+.projline{font-size:14px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:18px}
+.hb{width:54px;height:54px;border-radius:12px;display:grid;place-items:center;color:var(--mut)}
+.hb svg{width:32px;height:32px;fill:currentColor}
 #editBtn{grid-area:eb}
-#setBtn{grid-area:sb}
+#setBtn{grid-area:sb;justify-self:end}
+[data-mode=set] #setBtn{background:var(--amber);color:#1b1f2e}
 [data-mode=edit] #editBtn{background:var(--amber);color:#1b1f2e}
-#stateText{grid-area:st;align-self:end;padding-left:8px;font-size:22px;font-weight:600;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.status .right{grid-area:pos;text-align:right}
+#stateText{font-size:22px;font-weight:600;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.status .right{grid-area:pos;text-align:right;width:112px;justify-self:end}
 #pos{font-size:44px;font-weight:700;line-height:.9;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
-.meter{width:96px;height:6px;border-radius:3px;background:var(--raise);margin:6px 0 0 auto;overflow:hidden}
-.meter i{display:block;height:100%;background:var(--tape);transform-origin:left;transform:scaleX(0)}
+.meters{display:grid;grid-template-columns:auto 1fr;gap:4px 5px;align-items:center;width:112px;margin:6px 0 0 auto;font-size:11px;line-height:1;color:var(--mut)}
+.mtr{display:block;height:5px;border-radius:3px;background:var(--raise);overflow:hidden}
+.mtr b{display:block;height:100%;background:var(--tape);transform-origin:left;transform:scaleX(0)}
+.mtr.hot b{background:var(--amber)}
+.mtr.clip{background:var(--rec)}
+.mtr.clip b{background:#fff}
+.perfind{color:var(--rec);font-weight:700;margin-left:8px}
 body.s-play .status{border-bottom-color:var(--amber)}
 body.s-armed .status{border-bottom-color:var(--rec)}
 body.s-rec .status{background:var(--rec);border-bottom-color:var(--rec)}
-body.s-rec .status h1,body.s-rec .status h1 span,body.s-rec .hb{color:#fff}
-body.s-rec .meter{background:rgba(0,0,0,.25)}
-body.s-rec .meter i{background:#fff}
+body.s-rec .home,body.s-rec .projline,body.s-rec .hb{color:#fff}
+body.s-rec .meters,body.s-rec .perfind{color:#fff}
+body.s-rec .mtr{background:rgba(0,0,0,.25)}
 
 /* Play view: name block and tape strip per track */
-#main{position:relative;flex:1;min-height:0;display:flex}
-.tape{flex:1;overflow-y:auto;padding:10px 16px 16px;--ph:0}
+#main{position:relative;flex:1;min-height:0;display:flex;overflow:hidden}
+.tape{flex:1;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;padding:10px 16px 16px;--ph:0}
 .row{display:grid;grid-template-columns:var(--nw) 1fr;column-gap:8px;margin-bottom:8px}
 .trk{position:relative;overflow:hidden}
 .trk canvas{display:block;width:100%;height:100%}
@@ -77,10 +84,21 @@ body.s-rec .meter i{background:#fff}
 #ruler i.first{height:26px;border-left:2px solid var(--mut)}
 #ruler i.on{background:linear-gradient(var(--amber),var(--amber)) left bottom/100% 5px no-repeat;color:var(--amber)}
 
-.tname{height:52px;border-radius:8px;background:var(--panel);padding:0 10px;text-align:left;display:flex;flex-direction:column;justify-content:center;min-width:0;line-height:1.15;transition:background .1s}
+.tname{position:relative;overflow:hidden;height:52px;border-radius:8px;background:var(--panel);padding:0 10px;text-align:left;display:flex;flex-direction:column;justify-content:center;min-width:0;line-height:1.15;transition:background .1s}
 .tname b{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tname small{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tname .lv{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--mut);transform-origin:left;transform:scaleX(0);pointer-events:none}
 .track.solo .tname{background:var(--amber);color:#1b1f2e}
+.track.solo .tname .lv{background:#1b1f2e}
+.scenes{margin-bottom:10px}
+.sclab{display:flex;align-items:center;padding-left:10px;color:var(--mut);font-size:14px}
+.scn{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.scb{position:relative;overflow:hidden;height:44px;display:grid;place-items:center;border-radius:8px;background:var(--raise);font-weight:700;cursor:pointer}
+.scb.empty{background:transparent;border:1px dashed var(--line);color:var(--mut)}
+.scb.on{background:var(--amber);color:#1b1f2e}
+.scb .lp{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,178,36,.35);pointer-events:none}
+.scb.pressing .lp{width:100%;transition:width .45s linear}
+.cont{margin:0 0 14px}
 .track.solo .tname small{color:#5c4a14}
 .track.armed .tname{box-shadow:inset 5px 0 0 var(--rec)}
 .track.armed .tname small{color:var(--rec);font-weight:700}
@@ -107,7 +125,7 @@ body.s-rec .live .trk{border-color:var(--rec)}
 .empty b{color:var(--text);font-weight:600}
 
 /* Edit pane */
-.epane{position:absolute;top:0;bottom:0;left:0;right:calc(16px + var(--nw) + 10px);overflow-y:auto;padding:10px 0 28px 16px;transform:translateX(-105%);transition:transform .25s ease;--ph:0}
+.epane{position:absolute;top:0;bottom:0;left:0;right:calc(16px + var(--nw) + 10px);overflow-y:auto;overflow-x:hidden;touch-action:pan-y;padding:10px 0 28px 16px;transform:translateX(-105%);transition:transform .25s ease;--ph:0}
 [data-mode=edit] .epane{transform:none}
 .epane h3{font-size:15px;font-weight:600;color:var(--mut);margin:14px 0 2px}
 .epane .trk{height:48px;background:var(--tape);border-radius:2px;margin:6px 0 2px}
@@ -163,10 +181,10 @@ body.s-rec #recBtn{background:#fff;color:var(--rec)}
 @keyframes blink{50%{box-shadow:inset 0 0 0 3px transparent}}
 
 /* Settings page */
-.spage{position:fixed;inset:0;z-index:15;background:var(--desk);overflow-y:auto;transform:translateX(102%);transition:transform .25s ease;visibility:hidden}
+.spage{position:fixed;inset:0;top:var(--hh,0px);z-index:15;background:var(--desk);overflow-y:auto;transform:translateX(102%);transition:transform .25s ease;visibility:hidden}
 [data-mode=set] .spage{transform:none;visibility:visible}
 .sp-in{max-width:560px;margin:0 auto;padding:0 16px calc(28px + env(safe-area-inset-bottom))}
-.sp-head{display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--desk);padding:calc(12px + env(safe-area-inset-top)) 0 8px;z-index:1}
+.sp-head{display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--desk);padding:12px 0 8px;z-index:1}
 .spage h2{font-size:24px;font-weight:600}
 .spage h3{font-size:18px;font-weight:600;margin:22px 0 4px;padding-top:14px;border-top:1px solid var(--line)}
 .spage h3.first{border-top:0;padding-top:0;margin-top:6px}
@@ -203,19 +221,21 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 <div id="app">
   <header class="status">
     <button class="hb" id="editBtn" aria-label="Edit tracks"><svg viewBox="0 0 24 24"><path d="M4 6h9.2a3 3 0 015.6 0H20v2h-1.2a3 3 0 01-5.6 0H4zm12 2a1 1 0 100-2 1 1 0 000 2zM4 16h1.2a3 3 0 015.6 0H20v2h-9.2a3 3 0 01-5.6 0H4zm4 2a1 1 0 100-2 1 1 0 000 2z"/></svg></button>
-    <h1><svg class="mk" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="115" fill="#1b1f2e"/><g stroke="#ece5d0" stroke-width="13" stroke-linecap="round"><line x1="256.0" y1="150.0" x2="256.0" y2="58.0" opacity=".32"/><line x1="275.9" y1="130.2" x2="283.6" y2="81.6" opacity=".32"/><line x1="297.4" y1="128.5" x2="308.5" y2="94.3" opacity=".32"/><line x1="316.1" y1="138.0" x2="333.9" y2="103.1"/><line x1="335.1" y1="147.1" x2="355.6" y2="119.0"/><line x1="349.8" y1="162.2" x2="377.2" y2="134.8"/><line x1="355.9" y1="183.4" x2="402.0" y2="149.9"/><line x1="377.8" y1="193.9" x2="405.0" y2="180.1"/><line x1="381.9" y1="215.1" x2="419.2" y2="203.0"/><line x1="390.0" y1="234.8" x2="422.3" y2="229.7"/><line x1="388.9" y1="256.0" x2="427.1" y2="256.0"/><line x1="364.3" y1="273.2" x2="447.9" y2="286.4"/><line x1="379.0" y1="296.0" x2="422.1" y2="310.0"/><line x1="380.6" y1="319.5" x2="402.2" y2="330.5"/><line x1="366.7" y1="336.4" x2="391.3" y2="354.3"/><line x1="352.5" y1="352.5" x2="374.5" y2="374.5"/><line x1="339.9" y1="371.4" x2="350.8" y2="386.5"/><line x1="314.6" y1="370.9" x2="335.4" y2="411.9"/><line x1="299.2" y1="388.9" x2="306.8" y2="412.3"/><line x1="276.8" y1="387.0" x2="282.8" y2="425.2"/><line x1="256.0" y1="390.3" x2="256.0" y2="425.7"/><line x1="233.9" y1="395.3" x2="230.5" y2="417.0"/><line x1="214.6" y1="383.4" x2="203.5" y2="417.7"/><line x1="203.3" y1="359.5" x2="170.7" y2="423.4"/><line x1="177.9" y1="363.4" x2="155.4" y2="394.5"/><line x1="156.0" y1="356.0" x2="141.0" y2="371.0"/><line x1="140.5" y1="339.9" x2="125.6" y2="350.8"/><line x1="143.1" y1="313.5" x2="98.0" y2="336.5"/><line x1="124.3" y1="298.8" x2="98.6" y2="307.2"/><line x1="117.3" y1="278.0" x2="94.4" y2="281.6"/><line x1="124.0" y1="256.0" x2="84.0" y2="256.0"/><line x1="124.5" y1="235.2" x2="87.3" y2="229.3"/><line x1="149.1" y1="221.3" x2="73.8" y2="196.8"/><line x1="139.4" y1="196.6" x2="101.7" y2="177.4"/><line x1="145.3" y1="175.6" x2="120.8" y2="157.7"/><line x1="160.3" y1="160.3" x2="136.7" y2="136.7" opacity=".32"/><line x1="178.8" y1="149.8" x2="154.5" y2="116.3" opacity=".32"/><line x1="195.9" y1="138.0" x2="178.1" y2="103.1" opacity=".32"/><line x1="214.2" y1="127.4" x2="203.8" y2="95.4" opacity=".32"/><line x1="235.3" y1="125.5" x2="229.1" y2="86.2" opacity=".32"/></g><line x1="194.7" y1="204.6" x2="82.9" y2="110.7" stroke="#ffb224" stroke-width="14" stroke-linecap="round"/><circle cx="256" cy="256" r="46" fill="#ff3d57"/></svg>Varv<span id="projName"></span></h1>
+    <button class="home" id="homeBtn" aria-label="Back to the play view"><svg class="mk" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="115" fill="#1b1f2e"/><g stroke="#ece5d0" stroke-width="13" stroke-linecap="round"><line x1="256.0" y1="150.0" x2="256.0" y2="58.0" opacity=".32"/><line x1="275.9" y1="130.2" x2="283.6" y2="81.6" opacity=".32"/><line x1="297.4" y1="128.5" x2="308.5" y2="94.3" opacity=".32"/><line x1="316.1" y1="138.0" x2="333.9" y2="103.1"/><line x1="335.1" y1="147.1" x2="355.6" y2="119.0"/><line x1="349.8" y1="162.2" x2="377.2" y2="134.8"/><line x1="355.9" y1="183.4" x2="402.0" y2="149.9"/><line x1="377.8" y1="193.9" x2="405.0" y2="180.1"/><line x1="381.9" y1="215.1" x2="419.2" y2="203.0"/><line x1="390.0" y1="234.8" x2="422.3" y2="229.7"/><line x1="388.9" y1="256.0" x2="427.1" y2="256.0"/><line x1="364.3" y1="273.2" x2="447.9" y2="286.4"/><line x1="379.0" y1="296.0" x2="422.1" y2="310.0"/><line x1="380.6" y1="319.5" x2="402.2" y2="330.5"/><line x1="366.7" y1="336.4" x2="391.3" y2="354.3"/><line x1="352.5" y1="352.5" x2="374.5" y2="374.5"/><line x1="339.9" y1="371.4" x2="350.8" y2="386.5"/><line x1="314.6" y1="370.9" x2="335.4" y2="411.9"/><line x1="299.2" y1="388.9" x2="306.8" y2="412.3"/><line x1="276.8" y1="387.0" x2="282.8" y2="425.2"/><line x1="256.0" y1="390.3" x2="256.0" y2="425.7"/><line x1="233.9" y1="395.3" x2="230.5" y2="417.0"/><line x1="214.6" y1="383.4" x2="203.5" y2="417.7"/><line x1="203.3" y1="359.5" x2="170.7" y2="423.4"/><line x1="177.9" y1="363.4" x2="155.4" y2="394.5"/><line x1="156.0" y1="356.0" x2="141.0" y2="371.0"/><line x1="140.5" y1="339.9" x2="125.6" y2="350.8"/><line x1="143.1" y1="313.5" x2="98.0" y2="336.5"/><line x1="124.3" y1="298.8" x2="98.6" y2="307.2"/><line x1="117.3" y1="278.0" x2="94.4" y2="281.6"/><line x1="124.0" y1="256.0" x2="84.0" y2="256.0"/><line x1="124.5" y1="235.2" x2="87.3" y2="229.3"/><line x1="149.1" y1="221.3" x2="73.8" y2="196.8"/><line x1="139.4" y1="196.6" x2="101.7" y2="177.4"/><line x1="145.3" y1="175.6" x2="120.8" y2="157.7"/><line x1="160.3" y1="160.3" x2="136.7" y2="136.7" opacity=".32"/><line x1="178.8" y1="149.8" x2="154.5" y2="116.3" opacity=".32"/><line x1="195.9" y1="138.0" x2="178.1" y2="103.1" opacity=".32"/><line x1="214.2" y1="127.4" x2="203.8" y2="95.4" opacity=".32"/><line x1="235.3" y1="125.5" x2="229.1" y2="86.2" opacity=".32"/></g><line x1="194.7" y1="204.6" x2="82.9" y2="110.7" stroke="#ffb224" stroke-width="14" stroke-linecap="round"/><circle cx="256" cy="256" r="46" fill="#ff3d57"/></svg><span>Varv</span></button>
     <button class="hb" id="setBtn" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M10.3 2h3.4l.5 2.6 1.6.9 2.5-.9 1.7 3-2 1.7v1.9l2 1.7-1.7 3-2.5-.9-1.6.9-.5 2.6h-3.4l-.5-2.6-1.6-.9-2.5.9-1.7-3 2-1.7V9.3l-2-1.7 1.7-3 2.5.9 1.6-.9zM12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z" transform="translate(0 1)"/></svg></button>
-    <div id="stateText" aria-live="polite">Stopped</div>
+    <div class="stbox"><div class="projline"><span id="projName"></span><span class="perfind" id="perfInd" hidden>● recording set</span></div><div id="stateText" aria-live="polite">Stopped</div></div>
     <div class="right">
       <div id="pos">–</div>
-      <div class="meter" title="Microphone level"><i id="meterFill"></i></div>
+      <div class="meters"><span>in</span><i class="mtr" id="mIn" title="Microphone level"><b></b></i><span>out</span><i class="mtr" id="mOut" title="Output level"><b></b></i></div>
     </div>
   </header>
 
   <div id="main">
     <main class="tape" id="tape">
       <div class="row ruler"><div></div><div id="ruler" class="slide"></div></div>
-      <p class="empty" id="empty"><b>Tap Record to start.</b> Tap a track to mute it, hold it to arm it, tap its name to solo. Swipe right to edit tracks, left for settings.</p>
+      <div class="row scenes" id="sceneRow" hidden><div class="sclab nmcol">Scenes</div><div class="scn slide" id="scn"></div></div>
+      <p class="empty" id="empty"><b>Tap Record to start.</b> Tap a track to mute it, hold it to arm it, tap its name to solo. Hold Record to start or stop. Swipe right to edit tracks, left for settings.</p>
+      <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
       <div class="row"><button class="addtrk nmcol" id="addTrk">+ Track</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
       <div class="row masterrow" id="masterRow"><button class="tname nmcol" id="masterName"><b>Master</b><small>effects</small></button><div></div></div>
@@ -272,12 +292,22 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
   <div class="seg full" id="muteSeg"></div>
   <p class="note" id="muteNote"></p>
 
+  <h3>Performance</h3>
+  <button class="btn wide" id="perfBtn">Record performance</button>
+  <div class="field"><span>Include microphone</span><div class="seg" id="perfMicSeg"></div></div>
+  <p class="note">Records everything you hear, without the click, as an audio file. With the microphone included, what you play live is in it too, lined up with the loops.</p>
+  <div class="plist" id="perfList"></div>
+
   <h3>Microphone</h3>
   <div class="field"><select class="txt" id="micSel" aria-label="Microphone"><option value="">Start first to choose</option></select></div>
+  <div id="inGainRow"></div>
+  <div class="field"><span>Low cut (80 Hz)</span><div class="seg" id="lowCutSeg"></div></div>
+  <div class="field"><span>Auto level recordings</span><div class="seg" id="autoLvlSeg"></div></div>
+  <p class="note">Set the gain so loud hits reach the amber part of the in meter. Red means clipping.</p>
   <p class="note" id="diag">Audio starts the first time you tap Start, Record or Measure.</p>
 
   <h3>Keys and pedal</h3>
-  <p class="note"><kbd>Space</kbd> start and stop. <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> record. <kbd>←</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd> to <kbd>9</kbd> mute a track. <kbd>E</kbd> edit, <kbd>S</kbd> settings.</p>
+  <p class="note"><kbd>Space</kbd> start and stop. <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> record. <kbd>←</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd> to <kbd>9</kbd> mute a track. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>P</kbd> record performance. Hold the record key, like the Record button, to start or stop.</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -301,7 +331,7 @@ const INKS = ['#20232b', '#2146b5', '#1d7a4a', '#7a3cae', '#b3501a', '#0e7482', 
 const EQ_DEF = { eqL: 0, eqM: 0, eqH: 0, eqLf: 200, eqMf: 1000, eqHf: 4000 };
 const FX_KEYS = ['master', 'gFilter', 'eqL', 'eqM', 'eqH', 'eqLf', 'eqMf', 'eqHf', 'gEcho', 'echoDiv', 'echoMs', 'echoFb', 'echoLvl', 'gRev', 'revSize', 'revLvl', 'compThr', 'compAmt'];
 const st = Object.assign({
-  bpm: 100, beats: 4, bars: 2, lenMode: 'bars', clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now',
+  bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now',
   profiles: [{ name: 'AirPods', ms: 180, guess: true }, { name: 'Wired or speaker', ms: 20, guess: true }],
   active: 0, micId: '', master: 0.9, gFilter: 0,
   gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1,
@@ -314,12 +344,15 @@ const prof = () => st.profiles[st.active];
 
 /* ---------- audio engine ---------- */
 let ctx = null, sr = 48000, limiter, comp, clickComp, outGain, pre, gLP, gHP, mEq, mix, echoIn, echoDelay, echoFbG, echoOut, conv, revIn, revOut, gEchoSend, gRevSend, clickGain;
+let inHP = null, inG = null, mAn = null, mbuf = null, clipIn = 0, clipOut = 0;
+const dbLin = db => Math.pow(10, db / 20);
 let capNode = null, capMode = '', micStream = null, micSrc = null, micOK = false, micLabel = '', mics = [], initP = null;
 let ring = null, R = 0, capEnd = 0, capFirst = -1, inPeak = 0, synth = null;
 let L = 0, PRE = 0, XF = 0, MAXLAT = 0, OPEN_LP = 20000, epoch = 0, running = false, runId = 0, clickSrc = null;
 let rec = null, recTail = null, defining = null, freeL = 0, measuring = false;
 
 /* Tracks are the lanes on screen and hold the settings; takes are the recordings inside a track. */
+let scenes = [null, null, null, null];
 let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, selId = null, mode = 'play';
 const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null }, EQ_DEF);
 const TRACK_KEYS = Object.keys(TRACK_DEF);
@@ -381,6 +414,7 @@ function buildGraph() {
   gEchoSend = gn(0); mix.connect(gEchoSend); gEchoSend.connect(echoIn);
   gRevSend = gn(0); mix.connect(gRevSend); gRevSend.connect(revIn);
   clickGain = gn(0); clickGain.connect(clickComp);
+  mAn = ctx.createAnalyser(); mAn.fftSize = 2048; comp.connect(mAn); mbuf = new Float32Array(2048);
   applyGlobalFx();
 }
 
@@ -437,6 +471,8 @@ registerProcessor('varv-cap',C)`;
     capNode = sp; capMode = 'script';
   }
   const z = gn(0); capNode.connect(z); z.connect(ctx.destination);
+  inHP = bq('highpass', st.lowCut ? 80 : 10); inHP.Q.value = 0.7; inG = gn(dbLin(st.inGain));   // microphone → low cut → gain → capture
+  inHP.connect(inG); inG.connect(capNode);
 }
 
 function ensureRing(min) {
@@ -469,6 +505,7 @@ function onCap(f, d) {
   ringWrite(f, d); capEnd = f + d.length;
   let pk = 0; for (let i = 0; i < d.length; i += 4) { const v = Math.abs(d[i]); if (v > pk) pk = v; }
   if (pk > inPeak) inPeak = pk;
+  if (pk >= 0.98) clipIn = performance.now();
   tick();
 }
 
@@ -483,7 +520,7 @@ async function openMic(id, auto) {
   if (!s) { micOK = false; toast('No access to the microphone. Allow the microphone for this page and try again.'); diag(); return false; }
   if (micStream) micStream.getTracks().forEach(t => t.stop());
   if (micSrc) { try { micSrc.disconnect(); } catch (e) {} }
-  micStream = s; micSrc = ctx.createMediaStreamSource(s); micSrc.connect(capNode); micOK = true;
+  micStream = s; micSrc = ctx.createMediaStreamSource(s); micSrc.connect(inHP); micOK = true;
   micOpenAt = performance.now();
   const tr = s.getAudioTracks()[0]; micLabel = tr ? tr.label : '';
   micDev = (tr && tr.getSettings && tr.getSettings().deviceId) || id || '';
@@ -593,8 +630,8 @@ async function toggleRec() {
   const p = heardPos();
   if (rec) {
     if (p < rec.k * rec.len && !inTail(p)) rec = null;                     // was waiting: cancel
-    else if (rec.cont) rec.last = !rec.last;                              // continuous: last lap
-    else { rec = null; toast('Recording cancelled.'); }
+    else if (rec.cont) rec.last = !rec.last;                              // continuous: last lap, or carry on
+    else { rec.cont = true; rec.stay = true; rec.last = false; }          // one lap: keep going, stacking takes in the same track
     ui(); return;
   }
   const r = plan(0), kk = Math.floor(p / r.len);
@@ -619,7 +656,8 @@ function addTake(r, auto, lat) {
   t.takes.push({ id: ++uid, key: rid(), k: r.k, len: r.len, run: runId, F0, rawStart: F0 - PRE, raw: new Float32Array(r.len + XF + MAXLAT + 8), filled: 0,
     lat: lat == null ? prof().ms : lat, reverse: false, norm: null, peak: 0, peaks: null, buf: null, src: null, tg: null,
     final: false, started: false, full: false, auto, track: t, savedTo: null });
-  drawHead(t);
+  drawHead(t); ensureProject();
+  return t;
 }
 
 /* Free mode, first recording: starts at once and runs until End loop, which fixes the loop length.
@@ -674,7 +712,7 @@ function render(k) {
     peaks[b] = m; if (m > pk) pk = m;
   }
   k.peaks = peaks; k.peak = pk;
-  if (k.norm == null) k.norm = pk > 0.003 ? clamp(0.6 / pk, 1, 12) : 1;
+  if (k.norm == null) k.norm = st.autoLevel && pk > 0.003 ? clamp(0.6 / pk, 1, 12) : 1;
   const buf = ctx.createBuffer(1, N, sr);
   if (buf.copyToChannel) buf.copyToChannel(out, 0); else buf.getChannelData(0).set(out);
   k.buf = buf;
@@ -716,8 +754,8 @@ function tick() {
   const now = nowF();
   if (defining && now - defining.T0 >= FREE_MAX_S * sr) endDefine();
   if (running && rec && now >= epoch + (rec.k + 1) * rec.len - LEAD_S * sr) {
-    const r = rec; addTake(r, r.cont); recTail = { start: r.k * r.len, end: (r.k + 1) * r.len };
-    rec = r.cont && !r.last ? plan((r.k + 1) * r.len) : null;
+    const r = rec, t = addTake(r, r.cont); recTail = { start: r.k * r.len, end: (r.k + 1) * r.len };
+    rec = !r.cont || r.last ? null : r.stay ? { tid: t.id, len: r.len, k: r.k + 1, cont: true, last: false, stay: true } : plan((r.k + 1) * r.len);
   }
   for (const k of allTakes()) serviceTake(k, now);
   for (const it of trash) for (const k of (it.take ? [it.take] : it.track.takes)) fillRaw(k);   // keeps removed takes complete for a restore
@@ -744,6 +782,7 @@ function buildTrackNodes(t) {
   t.lp.connect(t.hp); t.hp.connect(t.eq[0]); t.eq[2].connect(t.g);
   const out = t.pn || t.g; if (t.pn) t.g.connect(t.pn);
   out.connect(mix); out.connect(t.es); t.es.connect(echoIn); out.connect(t.rs); t.rs.connect(revIn);
+  t.an = ctx.createAnalyser(); t.an.fftSize = 2048; out.connect(t.an); t.lvS = 0;
   applyTrack(t);
   for (const k of t.takes) { attachTake(k); if (running) startSource(k, nowF() + Math.round(SAFE_S * sr)); }
 }
@@ -751,7 +790,7 @@ function dropTrackNodes(t) {
   for (const k of t.takes) detachTake(k);
   if (!t.lp) return;
   for (const n of [t.lp, t.hp, t.eq[0], t.eq[1], t.eq[2], t.g, t.pn, t.es, t.rs]) { if (n) try { n.disconnect(); } catch (e) {} }
-  t.lp = t.g = t.pn = null;
+  t.lp = t.g = t.pn = t.an = null;
 }
 /* `at` is an audio-clock time for the gain change, so mute and solo can land on the beat or bar. */
 function applyTrack(t, at) {
@@ -769,12 +808,62 @@ function switchAt() {
   return (epoch + Math.ceil((nowF() - epoch + 0.01 * sr) / unit) * unit) / sr;
 }
 function toggleMute(t) { t.mute = !t.mute; applyTrack(t, switchAt()); drawHeads(); markDirty(); }
+/* ---------- performance recording ----------
+   Records what comes out (the click excluded). The microphone can be mixed in; the music is then delayed
+   by the latency so that what you play live lines up with the loops you were hearing. */
+let perf = null;
+const perfType = () => typeof MediaRecorder === 'undefined' ? null : ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', ''].find(t => !t || (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)));
+async function togglePerf() {
+  if (perf) { perf.mr.stop(); return; }
+  const ok = await initAudio(); if (!ok) return;
+  const type = perfType();
+  if (type == null || !ctx.createMediaStreamDestination) { toast('This browser cannot record the performance.'); return; }
+  const dest = ctx.createMediaStreamDestination(), bus = gn(1), lim = ctx.createDynamicsCompressor(), dl = ctx.createDelay(1.5);
+  lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.003; lim.release.value = 0.12;
+  dl.delayTime.value = st.perfMic ? clamp(prof().ms / 1000, 0, 1.4) : 0;
+  comp.connect(dl); dl.connect(bus);
+  let mg = null; if (st.perfMic && inG) { mg = gn(1); inG.connect(mg); mg.connect(bus); }
+  bus.connect(lim); lim.connect(dest);
+  let mr; try { mr = new MediaRecorder(dest.stream, type ? { mimeType: type } : undefined); } catch (e) { toast('This browser cannot record the performance.'); return; }
+  const chunks = [], t0 = Date.now();
+  mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  mr.onstop = async () => {
+    try { comp.disconnect(dl); } catch (e) {} try { if (mg) inG.disconnect(mg); } catch (e) {}
+    for (const n of [dl, mg, bus, lim]) if (n) try { n.disconnect(); } catch (e) {}
+    perf = null; ui();
+    const mime = mr.mimeType || type || 'audio/webm', blob = new Blob(chunks, { type: mime }), d = new Date(t0);
+    const item = { id: rid(), name: 'Performance ' + d.toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), project: project ? project.name : '',
+      created: t0, dur: (Date.now() - t0) / 1000, type: mime, buf: await blob.arrayBuffer() };
+    try { const tx = (await db()).transaction('perf', 'readwrite'); tx.objectStore('perf').put(item); await txDone(tx); toast('Performance saved under Settings.'); }
+    catch (e) { toast('Could not store the recording: ' + ((e && e.message) || e)); }
+    drawPerf();
+  };
+  mr.start(1000); perf = { mr, t0 }; ui();
+}
+const perfExt = t => /mp4|aac|m4a/.test(t) ? '.m4a' : /ogg/.test(t) ? '.ogg' : '.webm';
+async function drawPerf() {
+  const host = $('#perfList'); let list = [];
+  try { list = await req2p((await db()).transaction('perf').objectStore('perf').getAll()); } catch (e) {}
+  host.textContent = '';
+  for (const it of list.sort((a, b) => b.created - a.created)) {
+    const row = el('div', 'prow'), info = el('div'), m = Math.floor(it.dur / 60), sec = Math.round(it.dur % 60);
+    info.append(el('b', '', it.name), el('span', '', m + ':' + String(sec).padStart(2, '0') + (it.project ? ', ' + it.project : '')));
+    const sv = el('button', 'btn', 'Save'), del = el('button', 'btn danger');
+    sv.addEventListener('click', () => {
+      const name = it.name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') + perfExt(it.type), blob = new Blob([it.buf], { type: it.type });
+      try { const f = new File([blob], name, { type: it.type }); if (matchMedia('(pointer:coarse)').matches && navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f] }).catch(() => {}); return; } } catch (e) {}
+      const a = el('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    });
+    twoTap(del, 'Delete', 'Sure?', () => true, async () => { const tx = (await db()).transaction('perf', 'readwrite'); tx.objectStore('perf').delete(it.id); await txDone(tx); drawPerf(); });
+    row.append(info, sv, del); host.append(row);
+  }
+}
 function toggleSolo(t) { t.solo = !t.solo; const at = switchAt(); for (const x of tracks) applyTrack(x, at); drawHeads(); markDirty(); }
 function toggleArm(t) { armedId = armedId === t.id ? null : t.id; drawHeads(); ui(); }
 
 /* ---------- tracks: rows on screen ---------- */
 function newTrack(opts, idx) {
-  const t = Object.assign({ id: ++uid, name: '', auto: false, takes: [] }, TRACK_DEF, opts || {});
+  const t = Object.assign({ id: ++uid, key: rid(), name: '', auto: false, takes: [] }, TRACK_DEF, opts || {});
   laneCount++; if (!t.name) t.name = 'Track ' + laneCount;
   t.ink = INKS[inkN++ % INKS.length];
   idx = idx == null ? tracks.length : idx;
@@ -783,7 +872,7 @@ function newTrack(opts, idx) {
 }
 function mountTrack(t, idx) {
   const row = el('div', 'row track'); row.style.setProperty('--ink', t.ink);
-  const nb = el('button', 'tname nmcol'); nb.append(el('b'), el('small'));
+  const nb = el('button', 'tname nmcol'); nb.append(el('b'), el('small'), el('i', 'lv')); t.lvEl = null;
   nb.addEventListener('click', () => { if (mode === 'edit') selectTrack(t.id); else toggleSolo(t); });
   const trk = el('div', 'trk slide'); trk.tabIndex = 0; trk.setAttribute('role', 'button');
   t.cv = el('canvas'); trk.append(t.cv, el('i', 'ph'), el('i', 'lp'), el('em', '', 'muted'));
@@ -801,11 +890,11 @@ function unmountTrack(t) {
   if (armedId === t.id) armedId = null;
 }
 /* tap = short action, hold = long action; moving the finger cancels both, so scrolling and swiping never trigger them */
-function pressable(node, onTap, onHold) {
+function pressable(node, onTap, onHold, anyMode) {
   let timer = 0, pid = null, held = false, sx = 0, sy = 0;
   const cancel = () => { clearTimeout(timer); node.classList.remove('pressing'); pid = null; };
   node.addEventListener('pointerdown', e => {
-    if (mode !== 'play' || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if ((!anyMode && mode !== 'play') || (e.pointerType === 'mouse' && e.button !== 0)) return;
     pid = e.pointerId; sx = e.clientX; sy = e.clientY; held = false;
     node.classList.add('pressing');
     timer = setTimeout(() => { held = true; node.classList.remove('pressing'); onHold(); }, HOLD_MS);
@@ -827,7 +916,34 @@ function drawHead(t) {
   t.row.classList.toggle('silent', !audible(t));
   t.row.classList.toggle('sel', mode === 'edit' && selId === t.id);
 }
-const drawHeads = () => { for (const t of tracks) drawHead(t); $('#masterRow').classList.toggle('sel', selId === 'master'); };
+const drawHeads = () => { for (const t of tracks) drawHead(t); $('#masterRow').classList.toggle('sel', selId === 'master'); drawScenes(); };
+
+/* Scenes store which tracks are muted and soloed. Tap recalls (on the mute timing), hold stores. */
+const SCN = 'ABCD';
+function sceneStore(i) {
+  scenes[i] = { mute: {}, solo: {} };
+  for (const t of tracks) { scenes[i].mute[t.key] = t.mute; scenes[i].solo[t.key] = t.solo; }
+  drawScenes(); markDirty(); toast('Scene ' + SCN[i] + ' stored.');
+}
+function sceneRecall(i) {
+  const sc = scenes[i];
+  if (!sc) { toast('Hold to store the current mutes as scene ' + SCN[i] + '.'); return; }
+  const at = switchAt();
+  for (const t of tracks) if (t.key in sc.mute) { t.mute = sc.mute[t.key]; t.solo = !!sc.solo[t.key]; }
+  for (const t of tracks) applyTrack(t, at);
+  drawHeads(); refreshPane(tracks.find(t => t.id === selId)); markDirty();
+}
+const sceneOn = sc => !!sc && tracks.length > 0 && tracks.every(t => !(t.key in sc.mute) || (sc.mute[t.key] === t.mute && !!sc.solo[t.key] === t.solo));
+function drawScenes() {
+  const host = $('#scn');
+  if (!host.children.length) SCN.split('').forEach((c, i) => {
+    const b = el('button', 'scb'); b.append(el('i', 'lp'), document.createTextNode(c));
+    b.setAttribute('aria-label', 'Scene ' + c + ': tap to recall, hold to store');
+    pressable(b, () => sceneRecall(i), () => sceneStore(i)); host.append(b);
+  });
+  $('#sceneRow').hidden = !tracks.length;
+  [...host.children].forEach((b, i) => { b.classList.toggle('empty', !scenes[i]); b.classList.toggle('on', sceneOn(scenes[i])); });
+}
 
 /* Removed recordings and tracks stay restorable until the bar is dismissed. */
 function removeTake(k) {
@@ -1075,10 +1191,10 @@ function masterPane() {
 function setShift() { const tp = $('#tape'); tp.style.setProperty('--shift', Math.max(0, tp.clientWidth - 32 - parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nw'))) + 'px'); }
 function setMode(m) {
   if (m === mode) return;
-  setShift(); mode = m; document.body.dataset.mode = m;
+  setShift(); setHH(); $('#tape').scrollLeft = 0; mode = m; document.body.dataset.mode = m;
   if (m === 'edit') { if (selId == null) selId = tracks.length ? tracks[0].id : 'master'; renderPane(); }
   else renderPane();
-  if (m === 'set') { drawProjects(); $('#spage').scrollTop = 0; }
+  if (m === 'set') { drawProjects(); drawPerf(); $('#spage').scrollTop = 0; }
   drawHeads();
 }
 let sw = null, eatClick = false;
@@ -1166,10 +1282,33 @@ function buildRuler() {
   }
   for (const t of tracks) drawLane(t);
 }
+/* Peak meters on a dB scale (−48 to 0 dBFS). Amber from −6 dB; red holds for 1.5 s after a clip,
+   or, on the output, after the limiter has had to pull the level down by more than 3 dB. */
+const mW = pk => clamp((20 * Math.log10(pk + 1e-9) + 48) / 48, 0, 1);
+function setMeter(node, pk, clipT) {
+  const w = mW(pk), now = performance.now();
+  node.firstChild.style.transform = 'scaleX(' + w.toFixed(3) + ')';
+  node.classList.toggle('hot', w > 0.875); node.classList.toggle('clip', now - clipT < 1500);
+}
+function peakOf(an) { an.getFloatTimeDomainData(mbuf); let pk = 0; for (let i = 0; i < mbuf.length; i++) { const v = Math.abs(mbuf[i]); if (v > pk) pk = v; } return pk; }
+let outS = 0;
+function meters() {
+  setMeter($('#mIn'), inPeak, clipIn); inPeak *= 0.86;
+  if (!mAn) return;
+  outS = Math.max(peakOf(mAn), outS * 0.86);
+  if (limiter.reduction < -3 || outS >= 0.98) clipOut = performance.now();
+  setMeter($('#mOut'), outS, clipOut);
+  for (const t of tracks) {
+    if (!t.an || !t.row) continue;
+    t.lvS = Math.max(peakOf(t.an), t.lvS * 0.82);
+    if (!t.lvEl) t.lvEl = $('.lv', t.row);
+    t.lvEl.style.transform = 'scaleX(' + mW(t.lvS).toFixed(3) + ')';
+  }
+}
 function frame() {
   requestAnimationFrame(frame);
   if (!ctx) return;
-  $('#meterFill').style.transform = 'scaleX(' + Math.min(1, Math.sqrt(inPeak) * 1.5).toFixed(3) + ')'; inPeak *= 0.86;
+  meters();
   if (defining) { $('#pos').textContent = ((nowF() - defining.T0) / sr).toFixed(1); return; }
   if (!running) { if (lastBeat !== -2) { setBeat(-2); $('#pos').textContent = '–'; } return; }
   const p = heardPos(), tot = isFree() ? 1 : st.bars * st.beats, bl = isFree() ? L : barsLen(1) / st.beats;
@@ -1265,8 +1404,13 @@ const req2p = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result)
 const txDone = tx => new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); });
 function db() {
   if (!dbP) dbP = new Promise((res, rej) => {
-    const r = indexedDB.open('varv', 1);
-    r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('projects', { keyPath: 'id' }); d.createObjectStore('audio'); };
+    const r = indexedDB.open('varv', 2);
+    r.onupgradeneeded = () => {
+      const d = r.result, has = n => d.objectStoreNames.contains(n);
+      if (!has('projects')) d.createObjectStore('projects', { keyPath: 'id' });
+      if (!has('audio')) d.createObjectStore('audio');
+      if (!has('perf')) d.createObjectStore('perf', { keyPath: 'id' });
+    };
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   });
   return dbP;
@@ -1277,27 +1421,37 @@ function markDirty() {
   dirty = true; if (!project) return;
   clearTimeout(saveT); saveT = setTimeout(saveProject, 2500);
 }
+/* The state is copied synchronously, so the session can be cleared or replaced the moment after this is called;
+   the copy is written in the background, after any save that is still running. */
 async function saveProject() {
   clearTimeout(saveT);
   if (!project) return false;
-  while (saving) await saving;
-  saving = (async () => {
-    dirty = false;
-    const pid = project.id, tx = (await db()).transaction(['projects', 'audio'], 'readwrite'), A = tx.objectStore('audio'), keep = new Set();
-    const meta = { id: pid, name: project.name, saved: Date.now(), sr, bpm: st.bpm, beats: st.beats, bars: st.bars, lenMode: st.lenMode, freeLen: freeL / sr, fx: pick(st, FX_KEYS),
-      tracks: tracks.map(t => Object.assign(pick(t, TRACK_KEYS), { name: t.name, auto: t.auto,
-        takes: t.takes.filter(k => k.full && k.started).map(k => {
-          keep.add(k.key);
-          if (k.savedTo !== pid) { A.put(k.raw.slice(0, k.filled), pid + '/' + k.key); k.savedTo = pid; }
-          return { key: k.key, lat: k.lat, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
-        }) })) };
+  dirty = false;
+  const pid = project.id, keep = new Set(), puts = [];
+  const meta = { id: pid, name: project.name, saved: Date.now(), sr, bpm: st.bpm, beats: st.beats, bars: st.bars, lenMode: st.lenMode, freeLen: freeL / sr, fx: pick(st, FX_KEYS),
+    scenes: JSON.parse(JSON.stringify(scenes)),
+    tracks: tracks.map(t => Object.assign(pick(t, TRACK_KEYS), { key: t.key, name: t.name, auto: t.auto,
+      takes: t.takes.filter(k => k.full && k.started).map(k => {
+        keep.add(k.key);
+        if (k.savedTo !== pid) { puts.push([pid + '/' + k.key, k.raw.slice(0, k.filled)]); k.savedTo = pid; }
+        return { key: k.key, lat: k.lat, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
+      }) })) };
+  const prev = saving;
+  const job = (async () => {
+    if (prev) await prev;
+    const tx = (await db()).transaction(['projects', 'audio'], 'readwrite'), A = tx.objectStore('audio');
+    for (const [key, data] of puts) A.put(data, key);
     tx.objectStore('projects').put(meta);
     const keys = A.getAllKeys(IDBKeyRange.bound(pid + '/', pid + '/￿'));
     keys.onsuccess = () => { for (const key of keys.result) if (!keep.has(key.slice(pid.length + 1))) A.delete(key); };
     await txDone(tx);
+    try { localStorage.setItem('varv.last', pid); } catch (e) {}
     return true;
   })().catch(e => { dirty = true; toast('Saving failed: ' + ((e && e.message) || e)); return false; });
-  const r = await saving; saving = null; return r;
+  saving = job;
+  const r = await job; if (saving === job) saving = null;
+  if (mode === 'set') drawProjects();
+  return r;
 }
 async function listProjects() {
   try { const all = await req2p((await db()).transaction('projects').objectStore('projects').getAll()); return all.sort((a, b) => b.saved - a.saved); }
@@ -1307,7 +1461,8 @@ async function deleteProject(id) {
   const tx = (await db()).transaction(['projects', 'audio'], 'readwrite');
   tx.objectStore('projects').delete(id); tx.objectStore('audio').delete(IDBKeyRange.bound(id + '/', id + '/￿'));
   await txDone(tx);
-  if (project && project.id === id) { project = null; ui(); }
+  try { if (localStorage.getItem('varv.last') === id) localStorage.removeItem('varv.last'); } catch (e) {}
+  if (project && project.id === id) { project = null; clearAll(); }
 }
 function resample(x, ratio) {
   const n = Math.floor(x.length * ratio), y = new Float32Array(n);
@@ -1316,12 +1471,20 @@ function resample(x, ratio) {
 }
 function clearAll() {
   for (const t of tracks) unmountTrack(t);
-  tracks = []; trash = []; laneCount = 0; inkN = 0; armedId = null; selId = null; rec = null; recTail = null;
+  tracks = []; trash = []; laneCount = 0; inkN = 0; armedId = null; selId = null; rec = null; recTail = null; scenes = [null, null, null, null];
   if (isFree()) { stop(); freeL = 0; L = 0; buildRuler(); }
   drawTrash(); renderPane(); ui();
 }
 const hasContent = () => allTakes().length > 0 || trash.length > 0;
-async function leaveProject() { if (project && dirty) await saveProject(); clearTimeout(saveT); project = null; }
+/* Every session is saved: the first recording creates a project named after the date and time. */
+function ensureProject(name) {
+  if (project) return;
+  const d = new Date();
+  project = { id: rid(), name: name || 'Session ' + d.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+  $('#cont').hidden = true; markDirty(); ui();
+}
+function leaveProject() { if (project && dirty) saveProject(); clearTimeout(saveT); project = null; }
 async function openProject(id) {
   const ok = await initAudio(); if (!ok) return;
   let meta; try { meta = await dbGet('projects', id); } catch (e) {}
@@ -1333,7 +1496,7 @@ async function openProject(id) {
   const ratio = sr / (meta.sr || sr), same = Math.abs(ratio - 1) < 1e-6;
   let missing = 0;
   for (const tm of meta.tracks || []) {
-    const t = newTrack(Object.assign({}, EQ_DEF, pick(tm, TRACK_KEYS), { name: tm.name, auto: !!tm.auto }));
+    const t = newTrack(Object.assign({}, EQ_DEF, pick(tm, TRACK_KEYS), { name: tm.name, auto: !!tm.auto }, tm.key ? { key: tm.key } : {}));
     for (const km of tm.takes || []) {
       let raw = null; try { raw = await dbGet('audio', id + '/' + km.key); } catch (e) {}
       if (!raw || (isFree() && !freeL)) { missing++; continue; }
@@ -1346,7 +1509,9 @@ async function openProject(id) {
     }
     drawLane(t);
   }
-  project = { id, name: meta.name }; dirty = !same; clearTimeout(saveT);
+  project = { id, name: meta.name }; dirty = !same; clearTimeout(saveT); $('#cont').hidden = true;
+  scenes = Array.isArray(meta.scenes) ? meta.scenes.slice(0, 4) : [null, null, null, null]; while (scenes.length < 4) scenes.push(null);
+  try { localStorage.setItem('varv.last', id); } catch (e) {}
   drawHeads(); ui(); drawProjects(); renderPane();
   toast('Opened ' + meta.name + (missing ? ', ' + missing + ' recordings missing' : '') + '.');
 }
@@ -1382,7 +1547,7 @@ function exportWav() {
 
 /* ---------- interface ---------- */
 function stateText(s) {
-  const to = targetName();
+  const cur = rec && rec.tid != null && rec.stay ? tracks.find(t => t.id === rec.tid) : null, to = cur ? cur.name : targetName();
   return { stop: 'Stopped', count: 'Counting in', countrec: 'Count-in, then into ' + to, armed: 'Next lap into ' + to,
     rec: 'Recording into ' + to, reclast: 'Last lap into ' + to, play: 'Playing', meas: 'Measuring latency', define: 'Recording the loop' }[s];
 }
@@ -1394,8 +1559,10 @@ function ui() {
   $('#tape').classList.toggle('run', running); $('#epane').classList.toggle('run', running);
   $('#playLbl').textContent = running ? 'Stop' : 'Start';
   $('#playIco').innerHTML = running ? '<path d="M6 6h12v12H6z"/>' : '<path d="M7 4l13 8-13 8z"/>';
-  $('#recLbl').textContent = s === 'define' ? 'End loop' : s === 'armed' || s === 'countrec' ? 'Cancel' : s === 'rec' && rec && rec.cont ? 'Last lap' : s === 'reclast' ? 'Continue' : s === 'rec' && rec ? 'Cancel' : 'Record';
+  $('#recLbl').textContent = s === 'define' ? 'End loop' : s === 'armed' || s === 'countrec' ? 'Cancel' : s === 'rec' && rec && rec.cont ? 'Last lap' : s === 'reclast' ? 'Continue' : s === 'rec' && rec ? 'Keep going' : 'Record';
   $('#empty').hidden = tracks.length > 0;
+  if (tracks.length) $('#cont').hidden = true;
+  $('#perfInd').hidden = !perf; $('#perfBtn').textContent = perf ? 'Stop recording performance' : 'Record performance'; $('#perfBtn').classList.toggle('on', !!perf);
   $('#projName').textContent = project ? project.name : hasContent() ? 'unsaved' : '';
   const lk = locked(); $('#tempoLock').hidden = !lk;
   for (const b of document.querySelectorAll('#bpmStep .sbtn, #beatsStep .sbtn, #barsStep .sbtn, #tapBtn, #lenSeg button')) b.disabled = lk;
@@ -1408,7 +1575,7 @@ function ui() {
   $('#muteNote').textContent = st.muteQ === 'now' ? 'Mute and solo act the moment you lift your finger.'
     : isFree() ? 'In free mode the change lands at the start of the next pass of the loop.' : 'Tap ahead: the change lands on the next ' + (st.muteQ === 'bar' ? 'bar' : 'beat') + '.';
   if (document.activeElement !== $('#projInput')) $('#projInput').value = project ? project.name : '';
-  $('#projNote').textContent = project ? 'Saves automatically.' : 'Not saved yet.';
+  $('#projNote').textContent = project ? 'Saves automatically.' : 'Saved automatically from the first recording.';
 }
 /* A destructive button asks for a second tap within three seconds. */
 function twoTap(b, label, confirmLabel, needed, fn) {
@@ -1427,7 +1594,7 @@ async function drawProjects() {
     const n = (p.tracks || []).length, when = new Date(p.saved);
     info.append(el('b', '', p.name), el('span', '', n + (n === 1 ? ' track, ' : ' tracks, ') + p.bpm + ' bpm, ' + when.toLocaleDateString() + ' ' + when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })));
     const open = el('button', 'btn'), del = el('button', 'btn danger');
-    twoTap(open, 'Open', 'Discard?', () => !project && hasContent(), () => openProject(p.id));
+    open.textContent = 'Open'; open.addEventListener('click', () => openProject(p.id));
     twoTap(del, 'Delete', 'Sure?', () => true, async () => { await deleteProject(p.id); drawProjects(); toast(p.name + ' deleted.'); });
     row.append(info, open, del); host.append(row);
   }
@@ -1483,11 +1650,17 @@ function drawClick() {
 
 /* ---------- wiring ---------- */
 $('#editBtn').addEventListener('click', () => setMode(mode === 'edit' ? 'play' : 'edit'));
-$('#setBtn').addEventListener('click', () => setMode('set'));
+$('#setBtn').addEventListener('click', () => setMode(mode === 'set' ? 'play' : 'set'));
 $('#setDone').addEventListener('click', () => setMode('play'));
+$('#homeBtn').addEventListener('click', () => setMode('play'));
+$('#setBtn').onclick = null;
+const setHH = () => document.documentElement.style.setProperty('--hh', Math.round($('.status').getBoundingClientRect().bottom) + 'px');
+setHH();
 $('#masterName').addEventListener('click', () => selectTrack('master'));
 $('#playBtn').addEventListener('click', () => { if (running) stop(); else start(false); });
-$('#recBtn').addEventListener('click', toggleRec);
+const startStop = () => { if (running || defining) stop(); else start(false); };
+pressable($('#recBtn'), toggleRec, startStop, true);
+$('#recBtn').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) toggleRec(); } });
 $('#undoBtn').addEventListener('click', undoLast);
 $('#capBtn').addEventListener('click', capturePrev);
 $('#clickBtn').addEventListener('click', () => setClick(!st.clickOn));
@@ -1518,6 +1691,11 @@ $('#measLoop').addEventListener('click', measure);
 $('#measUse').addEventListener('click', () => { if (!measOut) return; prof().ms = measOut.ms; prof().guess = false; save(); $('#measUse').hidden = true; ui(); toast('New recordings shift by ' + measOut.ms + ' ms.'); });
 
 $('#clickVolRow').append(sliderRow('Volume', 0, 1, 0.01, st.clickVol, 0.6, pct, v => { st.clickVol = v; save(); if (ctx && running && st.clickOn && nowF() >= epoch) clickGain.gain.setTargetAtTime(v, ctx.currentTime, 0.01); }));
+$('#inGainRow').append(sliderRow('Input gain', -12, 30, 0.5, st.inGain, 0, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + ' dB', v => { st.inGain = v; save(); if (inG) inG.gain.setTargetAtTime(dbLin(v), ctx.currentTime, 0.02); }));
+seg($('#lowCutSeg'), [[false, 'Off'], [true, 'On']], () => st.lowCut, v => { st.lowCut = v; save(); if (inHP) inHP.frequency.setTargetAtTime(v ? 80 : 10, ctx.currentTime, 0.02); });
+seg($('#autoLvlSeg'), [[false, 'Off'], [true, 'On']], () => st.autoLevel, v => { st.autoLevel = v; save(); });
+seg($('#perfMicSeg'), [[true, 'On'], [false, 'Off']], () => st.perfMic, v => { st.perfMic = v; save(); });
+$('#perfBtn').addEventListener('click', togglePerf);
 seg($('#modeSeg'), [['one', 'One lap'], ['cont', 'Continuous']], () => st.mode, v => { st.mode = v; save(); ui(); });
 seg($('#muteSeg'), [['now', 'Immediately'], ['beat', 'Next beat'], ['bar', 'Next bar']], () => st.muteQ, v => { st.muteQ = v; save(); ui(); });
 $('#micSel').addEventListener('change', e => { if (!ctx) return; st.micId = e.target.value; save(); openMic(st.micId, !st.micId); });
@@ -1526,23 +1704,33 @@ $('#exportBtn').addEventListener('click', exportWav);
 
 $('#projInput').addEventListener('input', e => { if (!project) return; project.name = e.target.value.trim() || 'Untitled'; ui(); markDirty(); });
 $('#saveBtn').addEventListener('click', async () => {
-  if (!project) {
-    const d = new Date(), nm = $('#projInput').value.trim() || 'Project ' + d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    project = { id: rid(), name: nm };
-    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
-  }
+  ensureProject($('#projInput').value.trim());
   if (await saveProject()) { toast('Saved ' + project.name + '.'); ui(); drawProjects(); }
 });
-twoTap($('#newBtn'), 'New project', 'Discard unsaved?', () => !project && hasContent(), async () => {
-  await leaveProject(); clearAll(); ui(); drawProjects(); toast('New project.');
-});
+$('#newBtn').addEventListener('click', async () => { await leaveProject(); clearAll(); ui(); drawProjects(); toast('New project.'); });
+/* After a reload, offer to continue the last session. */
+(async () => {
+  let id = null; try { id = localStorage.getItem('varv.last'); } catch (e) {}
+  if (!id) return;
+  let meta = null; try { meta = await dbGet('projects', id); } catch (e) {}
+  if (!meta || project || tracks.length) return;
+  $('#contBtn').textContent = 'Continue ' + meta.name; $('#cont').hidden = false;
+  $('#contBtn').onclick = () => openProject(id);
+})();
 
+const REC_KEYS = ['r', 'R', 'Enter', 'ArrowRight', 'PageDown'];
+let recKey = null;
 document.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input,select,textarea')) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const k = e.key;
   if (k === ' ') { e.preventDefault(); if (e.repeat) return; if (running) stop(); else start(false); }
-  else if (k === 'r' || k === 'R' || k === 'Enter' || k === 'ArrowRight' || k === 'PageDown') { if (e.target.closest && e.target.closest('button,[role=button]') && k === 'Enter') return; e.preventDefault(); if (!e.repeat) toggleRec(); }
+  else if (REC_KEYS.includes(k)) {
+    if (e.target.closest && e.target.closest('button,[role=button]') && k === 'Enter') return;
+    e.preventDefault(); if (e.repeat || recKey) return;
+    recKey = { held: false, t: setTimeout(() => { recKey.held = true; startStop(); }, 600) };
+  }
+  else if (k === 'p' || k === 'P') togglePerf();
   else if (k === 'ArrowLeft' || k === 'PageUp' || k === 'Backspace') { e.preventDefault(); if (!e.repeat) undoLast(); }
   else if (k === 'c' || k === 'C') capturePrev();
   else if (k === 'k' || k === 'K') setClick(!st.clickOn);
@@ -1551,18 +1739,25 @@ document.addEventListener('keydown', e => {
   else if (k === 'Escape') setMode('play');
   else if (k >= '1' && k <= '9') { const t = tracks[+k - 1]; if (t) toggleMute(t); }
 });
+document.addEventListener('keyup', e => {
+  if (!REC_KEYS.includes(e.key) || !recKey) return;
+  clearTimeout(recKey.t); const held = recKey.held; recKey = null;
+  if (!held) toggleRec();
+});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { if (running) stop(); if (project && dirty) saveProject(); }
   else if (ctx) keepMic(false);
 });
 window.addEventListener('pagehide', () => { if (project && dirty) saveProject(); });
-window.addEventListener('resize', () => { setShift(); for (const t of tracks) drawLane(t); liveDirty = true; for (const w of document.querySelectorAll('.eqw')) w.draw(); });
+window.addEventListener('resize', () => { setShift(); setHH(); for (const t of tracks) drawLane(t); liveDirty = true; for (const w of document.querySelectorAll('.eqw')) w.draw(); });
 
 buildRuler(); ui(); requestAnimationFrame(frame);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* for debugging and tests */
 window.__varv = { st, analyzeLoop, get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
+  ringPeak: sec => { let pk = 0; for (let f = Math.max(availStart(), capEnd - Math.round(sec * sr)); f < capEnd; f++) pk = Math.max(pk, Math.abs(ring[f % R])); return pk; },
+  get scenes() { return scenes; }, get perf() { return perf; }, togglePerf, get inG() { return inG; },
   get mode() { return mode; }, get selId() { return selId; }, get freeL() { return freeL; }, get rec() { return rec; },
   get info() { return { sr, L, epoch, running, capEnd, capFirst, R, PRE, XF, capMode, micOK, armedId, state: stateNow() }; },
   set synth(f) { synth = f; }, start, stop, toggleRec, capturePrev, measure, initAudio, saveProject, openProject, listProjects, setMode, eqResponse, nowF: () => nowF(),
