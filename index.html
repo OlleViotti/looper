@@ -99,6 +99,7 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 .scb .lp{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,178,36,.35);pointer-events:none}
 .scb.pressing .lp{width:100%;transition:width .45s linear}
 .cont{margin:0 0 14px}
+[data-mode=edit] .cont{display:none}
 .track.solo .tname small{color:#5c4a14}
 .track.armed .tname{box-shadow:inset 5px 0 0 var(--rec)}
 .track.armed .tname small{color:var(--rec);font-weight:700}
@@ -656,7 +657,8 @@ function addTake(r, auto, lat) {
   t.takes.push({ id: ++uid, key: rid(), k: r.k, len: r.len, run: runId, F0, rawStart: F0 - PRE, raw: new Float32Array(r.len + XF + MAXLAT + 8), filled: 0,
     lat: lat == null ? prof().ms : lat, reverse: false, norm: null, peak: 0, peaks: null, buf: null, src: null, tg: null,
     final: false, started: false, full: false, auto, track: t, savedTo: null });
-  drawHead(t); ensureProject();
+  if (armedId === t.id) { armedId = null; drawHeads(); }        // armed for one recording
+  touched(t); drawHead(t); ensureProject();
   return t;
 }
 
@@ -754,8 +756,9 @@ function tick() {
   const now = nowF();
   if (defining && now - defining.T0 >= FREE_MAX_S * sr) endDefine();
   if (running && rec && now >= epoch + (rec.k + 1) * rec.len - LEAD_S * sr) {
-    const r = rec, t = addTake(r, r.cont); recTail = { start: r.k * r.len, end: (r.k + 1) * r.len };
-    rec = !r.cont || r.last ? null : r.stay ? { tid: t.id, len: r.len, k: r.k + 1, cont: true, last: false, stay: true } : plan((r.k + 1) * r.len);
+    const armedBefore = armedId, r = rec, t = addTake(r, r.cont); recTail = { start: r.k * r.len, end: (r.k + 1) * r.len };
+    const stay = r.stay || armedBefore === t.id;
+    rec = !r.cont || r.last ? null : stay ? { tid: t.id, len: r.len, k: r.k + 1, cont: true, last: false, stay: true } : plan((r.k + 1) * r.len);
   }
   for (const k of allTakes()) serviceTake(k, now);
   for (const it of trash) for (const k of (it.take ? [it.take] : it.track.takes)) fillRaw(k);   // keeps removed takes complete for a restore
@@ -807,7 +810,9 @@ function switchAt() {
   const unit = isFree() ? L : st.muteQ === 'bar' ? barsLen(1) : barsLen(1) / st.beats;
   return (epoch + Math.ceil((nowF() - epoch + 0.01 * sr) / unit) * unit) / sr;
 }
-function toggleMute(t) { t.mute = !t.mute; applyTrack(t, switchAt()); drawHeads(); markDirty(); }
+let lastTouched = null;
+const touched = t => { if (t) lastTouched = t.id; };
+function toggleMute(t) { touched(t); t.mute = !t.mute; applyTrack(t, switchAt()); drawHeads(); markDirty(); }
 /* ---------- performance recording ----------
    Records what comes out (the click excluded). The microphone can be mixed in; the music is then delayed
    by the latency so that what you play live lines up with the loops you were hearing. */
@@ -858,8 +863,8 @@ async function drawPerf() {
     row.append(info, sv, del); host.append(row);
   }
 }
-function toggleSolo(t) { t.solo = !t.solo; const at = switchAt(); for (const x of tracks) applyTrack(x, at); drawHeads(); markDirty(); }
-function toggleArm(t) { armedId = armedId === t.id ? null : t.id; drawHeads(); ui(); }
+function toggleSolo(t) { touched(t); t.solo = !t.solo; const at = switchAt(); for (const x of tracks) applyTrack(x, at); drawHeads(); markDirty(); }
+function toggleArm(t) { touched(t); armedId = armedId === t.id ? null : t.id; drawHeads(); ui(); }
 
 /* ---------- tracks: rows on screen ---------- */
 function newTrack(opts, idx) {
@@ -992,7 +997,14 @@ function sliderRow(label, min, max, step, val, def, fmt, on) {
   const bi = min < 0 && max > 0; if (bi) i.className = 'bi';
   const o = el('output', '', fmt(+val));
   i.addEventListener('input', () => { let v = +i.value; if (bi && Math.abs(v) < (max - min) * 0.03) v = 0; o.textContent = fmt(v); on(v); });
-  i.addEventListener('dblclick', () => { i.value = def; i.dispatchEvent(new Event('input')); });
+  let lastDown = 0;
+  const reset = () => { i.value = def; i.dispatchEvent(new Event('input')); };
+  i.addEventListener('pointerdown', e => {                       // double-tap resets (dblclick does not fire for touch on iPhone)
+    const now = performance.now();
+    if (now - lastDown < 320) { e.preventDefault(); lastDown = 0; setTimeout(reset, 0); return; }
+    lastDown = now;
+  });
+  i.addEventListener('dblclick', reset);
   r.append(i, o); r.set = v => { i.value = v; o.textContent = fmt(+v); };
   return r;
 }
@@ -1081,7 +1093,7 @@ function eqWidget(o, filtKey, onChange) {
     EQB.forEach(([fk, gk], i) => { const d = Math.hypot(fx(o[fk]) - x, gy(o[gk]) - y); if (d < bd) { bd = d; best = i; } });
     if (best < 0) { best = 0; let bx = 1e9; EQB.forEach(([fk], i) => { const d = Math.abs(fx(o[fk]) - x); if (d < bx) { bx = d; best = i; } }); }
     const now = performance.now();
-    if (best === lastBand && now - lastTap < 320) { o[EQB[best][1]] = 0; onChange(); label(best); draw(); lastTap = 0; return; }
+    if (best === lastBand && now - lastTap < 320) { const [fk, gk] = EQB[best]; o[gk] = EQ_DEF[gk]; o[fk] = EQ_DEF[fk]; onChange(); label(best); draw(); lastTap = 0; return; }
     lastTap = now; lastBand = best; act = best; cv.setPointerCapture(e.pointerId); label(best); draw();
   });
   cv.addEventListener('pointermove', e => {
@@ -1092,13 +1104,13 @@ function eqWidget(o, filtKey, onChange) {
   });
   const up = () => { if (act < 0) return; act = -1; draw(); };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-  out.textContent = 'Drag a handle: sideways for frequency, up or down for level.';
+  out.textContent = 'Drag a handle: sideways for frequency, up or down for level. Double-tap to reset.';
   wrap.draw = draw;
   return wrap;
 }
 
 /* ---------- edit mode ---------- */
-function selectTrack(id) { selId = id; renderPane(); }
+function selectTrack(id) { selId = id; if (id !== 'master') lastTouched = id; renderPane(); }
 function refreshPane(t) { if (mode === 'edit' && t && selId === t.id) renderPane(); }
 let paneFor = null;
 function renderPane() {
@@ -1117,10 +1129,7 @@ function trackPane(t) {
   nm.addEventListener('input', () => { t.name = nm.value.trim() || 'Track'; t.auto = false; drawHead(t); ui(); markDirty(); });
   const del = el('button', 'btn danger', 'Delete'); del.addEventListener('click', () => deleteTrack(t));
   const f = el('div', 'field'); f.append(nm, del);
-  const tg = el('div', 'tgl');
-  const mk = (label, cls, on, fn) => { const b = el('button', 'btn ' + cls + (on ? ' on' : ''), label); b.addEventListener('click', () => { fn(); renderPane(); }); return b; };
-  tg.append(mk('Arm', 'rec', armedId === t.id, () => toggleArm(t)), mk('Solo', '', t.solo, () => toggleSolo(t)), mk('Mute', '', t.mute, () => toggleMute(t)));
-  p.append(f, tg);
+  p.append(f);
   if (!isFree()) {
     const has = t.takes.length > 0, row = el('div', 'field'), mini = el('div', 'mini'), out = el('output');
     const show = () => { out.innerHTML = trackBars(t) + (t.bars ? '' : '<small>as lap</small>'); };
@@ -1192,7 +1201,12 @@ function setShift() { const tp = $('#tape'); tp.style.setProperty('--shift', Mat
 function setMode(m) {
   if (m === mode) return;
   setShift(); setHH(); $('#tape').scrollLeft = 0; mode = m; document.body.dataset.mode = m;
-  if (m === 'edit') { if (selId == null) selId = tracks.length ? tracks[0].id : 'master'; renderPane(); }
+  if (m === 'edit') {
+    if (tracks.some(t => t.id === lastTouched)) selId = lastTouched;
+    else if (selId == null) selId = tracks.length ? tracks[0].id : 'master';
+    renderPane();
+  }
+  if (m !== 'play') { $('#empty').dataset.gone = '1'; $('#empty').hidden = true; }   // the first swipe dismisses the instructions
   else renderPane();
   if (m === 'set') { drawProjects(); drawPerf(); $('#spage').scrollTop = 0; }
   drawHeads();
@@ -1560,7 +1574,7 @@ function ui() {
   $('#playLbl').textContent = running ? 'Stop' : 'Start';
   $('#playIco').innerHTML = running ? '<path d="M6 6h12v12H6z"/>' : '<path d="M7 4l13 8-13 8z"/>';
   $('#recLbl').textContent = s === 'define' ? 'End loop' : s === 'armed' || s === 'countrec' ? 'Cancel' : s === 'rec' && rec && rec.cont ? 'Last lap' : s === 'reclast' ? 'Continue' : s === 'rec' && rec ? 'Keep going' : 'Record';
-  $('#empty').hidden = tracks.length > 0;
+  $('#empty').hidden = tracks.length > 0 || !!$('#empty').dataset.gone;
   if (tracks.length) $('#cont').hidden = true;
   $('#perfInd').hidden = !perf; $('#perfBtn').textContent = perf ? 'Stop recording performance' : 'Record performance'; $('#perfBtn').classList.toggle('on', !!perf);
   $('#projName').textContent = project ? project.name : hasContent() ? 'unsaved' : '';
@@ -1664,7 +1678,7 @@ $('#recBtn').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key =
 $('#undoBtn').addEventListener('click', undoLast);
 $('#capBtn').addEventListener('click', capturePrev);
 $('#clickBtn').addEventListener('click', () => setClick(!st.clickOn));
-$('#addTrk').addEventListener('click', () => { const t = newTrack(); ui(); if (mode === 'edit') selectTrack(t.id); t.row.scrollIntoView({ block: 'nearest' }); });
+$('#addTrk').addEventListener('click', () => { const t = newTrack(); touched(t); ui(); if (mode === 'edit') selectTrack(t.id); t.row.scrollIntoView({ block: 'nearest' }); });
 $('#undoRestore').addEventListener('click', restoreLast);
 $('#undoClose').addEventListener('click', () => { trash = []; drawTrash(); releaseFree(); ui(); });
 drawClick();

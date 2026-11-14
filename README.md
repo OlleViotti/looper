@@ -14,9 +14,9 @@ The app has three views, reached by swiping or with the buttons in the top bar: 
 
 - **Play** is the live view. Each track is a name and a tape strip showing its waveform.
   - **Tap a strip** to mute or unmute the track.
-  - **Hold a strip** to arm it; a red fill shows the hold, and the armed track gets a red frame.
+  - **Hold a strip** to arm it for the next recording; a red fill shows the hold, and the armed track gets a red frame. The track disarms itself once the recording is in.
   - **Tap a name** to solo the track.
-- **Swipe right for Edit.** The track names travel to the right edge and the edit window comes in from the left. Tap a name to edit that track, or tap Master for the master effects. Swipe left on the names, or tap the edit button, to go back.
+- **Swipe right for Edit.** The track names travel to the right edge and the edit window comes in from the left. It opens on the track you last touched; tap another name to edit that one, or tap Master for the master effects. Double-tap any slider or EQ handle to return it to its default. Swipe left on the names, or tap the edit button, to go back.
 - **Swipe left for Settings,** which slide in under the top bar: loop length, tempo, latency, project, performance recording, click, recording, mute timing and microphone. Swipe right, tap Done or tap the logo to go back.
 
 ## Latency correction
@@ -47,11 +47,11 @@ The app has three views, reached by swiping or with the buttons in the top bar: 
 - **Arm** a track (hold its strip) to record into it. With no track armed, Record fills the empty tracks from the top, then creates new ones. The status bar always says where the next recording will go.
 - Recording again into a track that already holds audio adds another take on top (overdub). Each take has its own latency, reverse and remove.
 - **Mute timing:** mute and solo act immediately by default. In Settings they can instead land on the next beat or the next bar (in free mode: the next pass of the loop), so you can tap a little ahead.
-- Per track, in Edit: name, arm, solo and mute buttons, volume, pan, graphical EQ, filter (darker or thinner), delay send and reverb send, plus the waveform and each take's latency, reverse and remove.
+- Per track, in Edit: name, bars, volume, pan, graphical EQ, filter (darker or thinner), delay send and reverb send, plus the waveform and each take's latency, reverse and remove.
 
 ## Graphical EQ
 
-Each track and the master have a three-band EQ drawn as its response curve. Drag the L, M or H handle sideways to set the frequency and up or down to set the level, from −12 to +12 dB; double-tap a handle to flatten it. The low and high bands are shelves and the mid band is a bell. The curve is the real response of the filters, the filter setting included.
+Each track and the master have a three-band EQ drawn as its response curve. Drag the L, M or H handle sideways to set the frequency and up or down to set the level, from −12 to +12 dB; double-tap a handle to return it to its default level and frequency. The low and high bands are shelves and the mid band is a bell. The curve is the real response of the filters, the filter setting included.
 
 ## Scenes
 
