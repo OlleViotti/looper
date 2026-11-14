@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Varv">
+<meta name="theme-color" content="#1b1f2e">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Permanent+Marker&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<title>Varv</title>
+<style>
+:root{
+  --desk:#1b1f2e; --panel:#252a3d; --raise:#30364d; --line:#3c4361;
+  --tape:#ece5d0; --pencil:rgba(32,35,43,.2); --text:#f0f2f8; --mut:#a0a8c0;
+  --amber:#ffb224; --rec:#ff3d57;
+  --ui:"Barlow Semi Condensed",-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --pen:"Permanent Marker","Marker Felt","Bradley Hand",cursive;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--desk);color:var(--text);overscroll-behavior:none;overflow:hidden}
+body{font:500 16px/1.35 var(--ui);-webkit-user-select:none;user-select:none;touch-action:manipulation;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{border:0;background:none;padding:0;cursor:pointer;touch-action:manipulation}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+h1,h2,p{margin:0}
+
+#app{max-width:560px;margin:0 auto;height:100vh;height:100dvh;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+
+/* Statusband: läsbart på håll */
+.status{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:10px 16px 12px;border-bottom:4px solid transparent;transition:background .12s}
+.status h1{font:400 22px/1 var(--pen);letter-spacing:.02em;color:var(--tape)}
+#stateText{font-size:22px;font-weight:600;line-height:1.15;margin-top:6px}
+.status .right{text-align:right;flex:none}
+#pos{font-size:46px;font-weight:700;line-height:.9;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.meter{width:96px;height:6px;border-radius:3px;background:var(--raise);margin:8px 0 0 auto;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--tape);transform-origin:left;transform:scaleX(0)}
+body.s-play .status{border-bottom-color:var(--amber)}
+body.s-armed .status{border-bottom-color:var(--rec)}
+body.s-rec .status{background:var(--rec);border-bottom-color:var(--rec)}
+body.s-rec .status h1{color:#fff}
+body.s-rec .meter{background:rgba(0,0,0,.25)}
+body.s-rec .meter i{background:#fff}
+
+/* Chips: öppnar inställningar */
+.chips{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1.08fr) minmax(0,1fr) 50px;gap:6px;padding:12px 16px 4px}
+.chip{background:var(--panel);border-radius:10px;padding:8px;text-align:left;min-height:52px;line-height:1.15;min-width:0;overflow:hidden}
+.chip b{display:block;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip span{display:block;font-size:13px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.on b{color:var(--amber)}
+
+/* Bandet: linjal, lager, liveremsa */
+.tape{flex:1;overflow-y:auto;padding:10px 16px 16px;--ph:0}
+.lane{display:grid;grid-template-columns:48px 1fr;column-gap:10px;margin-bottom:8px}
+.trk{position:relative;height:56px;background:var(--tape);border-radius:2px;overflow:hidden;
+  clip-path:polygon(0 0,100% 0,calc(100% - 3px) 22%,100% 48%,calc(100% - 2px) 76%,100% 100%,0 100%,3px 72%,0 46%,2px 20%)}
+.trk canvas{display:block;width:100%;height:100%}
+.ph{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;left:calc(var(--ph)*100%);background:var(--amber);display:none;pointer-events:none}
+.tape.run .ph{display:block}
+.lane .trkbtn{display:block;width:100%;border-radius:2px}
+.lane.open .trkbtn{box-shadow:0 0 0 2px var(--amber)}
+.mute{width:48px;height:56px;display:grid;place-items:center}
+.mute i{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--tape);color:var(--ink);font:400 21px/1 var(--pen);font-style:normal;border:2px solid var(--tape)}
+.lane.muted .mute i{background:transparent;color:var(--mut);border:2px dashed var(--line)}
+.lane.muted .trk{opacity:.32}
+
+.ruler{margin-bottom:6px}
+#ruler{display:flex;height:26px;align-items:flex-end}
+#ruler i{flex:1;height:10px;border-left:1px solid var(--line);font:500 13px/1 var(--ui);font-style:normal;color:var(--mut);padding-left:4px;position:relative}
+#ruler i.first{height:26px;border-left:2px solid var(--mut)}
+#ruler i.on{background:linear-gradient(var(--amber),var(--amber)) left bottom/100% 5px no-repeat;color:var(--amber)}
+
+.live .trk{background:transparent;border:1px dashed var(--line);height:40px;clip-path:none;border-radius:4px}
+.live .gut{display:grid;place-items:center;font-size:13px;color:var(--mut)}
+body.s-rec .live .trk{border-color:var(--rec)}
+.empty{color:var(--mut);padding:14px 0 0 58px;max-width:34em}
+.empty b{color:var(--text);font-weight:600}
+
+/* Lagerpanel */
+.lpanel{grid-column:1/-1;background:var(--panel);border-radius:10px;padding:6px 14px 14px;margin-top:8px}
+.srow{display:grid;grid-template-columns:64px 1fr 70px;align-items:center;gap:10px;min-height:48px}
+.srow span{color:var(--mut);font-size:15px}
+.srow output{text-align:right;font-variant-numeric:tabular-nums;font-size:15px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:44px;background:transparent;margin:0;touch-action:pan-y}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:var(--raise)}
+input[type=range]::-moz-range-track{height:8px;border-radius:4px;background:var(--raise)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:50%;background:var(--tape);margin-top:-11px;border:0;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+input[type=range]::-moz-range-thumb{width:30px;height:30px;border-radius:50%;background:var(--tape);border:0}
+input[type=range].bi::-webkit-slider-runnable-track{background:linear-gradient(90deg,var(--raise) calc(50% - 1px),var(--mut) calc(50% - 1px),var(--mut) calc(50% + 1px),var(--raise) calc(50% + 1px))}
+.step{display:grid;grid-template-columns:64px repeat(2,44px) 1fr repeat(2,44px);align-items:center;gap:6px;min-height:52px}
+.step>span{color:var(--mut);font-size:15px}
+.step output{text-align:center;font-weight:600;font-variant-numeric:tabular-nums}
+.sbtn{height:44px;border-radius:8px;background:var(--raise);font-weight:600;font-variant-numeric:tabular-nums}
+.sbtn:active,.btn:active,.bar button:active,.chip:active{filter:brightness(1.25)}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.btn{min-height:44px;padding:0 14px;border-radius:8px;background:var(--raise);font-weight:600}
+.btn.on{background:var(--amber);color:#1b1f2e}
+.btn.danger{color:#ff8b9a}
+.btn.wide{width:100%}
+.btn:disabled,.sbtn:disabled{opacity:.4}
+
+/* Transport */
+.bar{display:grid;grid-template-columns:1fr 1fr 1.3fr 1fr;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--desk)}
+.bar button{height:70px;border-radius:14px;background:var(--raise);font-weight:600;font-size:15px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;line-height:1}
+.bar svg{width:22px;height:22px;fill:currentColor}
+#recBtn{background:var(--rec);color:#fff}
+body.s-armed #recBtn{background:var(--raise);box-shadow:inset 0 0 0 3px var(--rec);animation:blink .5s steps(2,jump-none) infinite}
+body.s-rec #recBtn{background:#fff;color:var(--rec)}
+@keyframes blink{50%{box-shadow:inset 0 0 0 3px transparent}}
+@media (prefers-reduced-motion:reduce){body.s-armed #recBtn{animation:none}}
+
+/* Ark */
+.sheet{position:fixed;inset:0;background:rgba(10,12,20,.55);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+.sheet-in{width:100%;max-width:560px;overflow-x:hidden;max-height:88vh;max-height:88dvh;overflow-y:auto;background:var(--panel);border-radius:16px 16px 0 0;padding:14px 16px calc(18px + env(safe-area-inset-bottom))}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sheet h2{font-size:22px;font-weight:600}
+.sheet h3{font-size:17px;font-weight:600;margin:18px 0 4px}
+.note{color:var(--mut);font-size:15px;margin:8px 0;max-width:38em}
+.note.warn{color:var(--amber)}
+.big{display:grid;grid-template-columns:repeat(2,52px) 1fr repeat(2,52px);gap:6px;align-items:center;margin:8px 0}
+.big output{text-align:center;font-size:44px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.big output small{font-size:17px;font-weight:500;color:var(--mut);margin-left:4px}
+.big .sbtn{height:52px}
+.field{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:56px}
+.field>span{color:var(--mut)}
+.seg{display:flex;background:var(--raise);border-radius:8px;padding:3px;gap:2px}
+.seg button{min-width:40px;height:40px;padding:0 10px;border-radius:6px;font-weight:600;white-space:nowrap}
+.seg button.on{background:var(--tape);color:#1b1f2e}
+.profs{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+.profs button{min-height:44px;padding:4px 12px;border-radius:8px;background:var(--raise);text-align:left;line-height:1.15}
+.profs button b{display:block;font-weight:600}
+.profs button span{font-size:13px;color:var(--mut)}
+.profs button.on{background:var(--tape);color:#1b1f2e}
+.profs button.on span{color:#555b6e}
+.txt{height:44px;border-radius:8px;border:1px solid var(--line);background:var(--desk);padding:0 12px;flex:1;min-width:0;-webkit-user-select:text;user-select:text}
+select.txt{appearance:auto}
+.dots{display:flex;gap:6px;margin:12px 0}
+.dots i{width:14px;height:14px;border-radius:50%;background:var(--raise)}
+.dots i.on{background:var(--amber)}
+#measRes{font-size:17px;margin:8px 0}
+.srow.g{grid-template-columns:96px 1fr 70px}
+kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
+
+.toast{position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--tape);color:#1b1f2e;border-radius:10px;padding:10px 14px;display:flex;gap:14px;align-items:center;max-width:calc(100% - 32px);z-index:20;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.45)}
+.toast button{font-weight:700;text-decoration:underline;min-height:32px}
+</style>
+</head>
+<body class="s-stop">
+<div id="app">
+  <header class="status">
+    <div>
+      <h1>Varv</h1>
+      <div id="stateText" aria-live="polite">Stoppad</div>
+    </div>
+    <div class="right">
+      <div id="pos">–</div>
+      <div class="meter" title="Mikrofonnivå"><i id="meterFill"></i></div>
+    </div>
+  </header>
+
+  <nav class="chips">
+    <button class="chip" id="chipTempo" data-open="sheetTempo"><b></b><span></span></button>
+    <button class="chip" id="chipLat" data-open="sheetLat"><b></b><span></span></button>
+    <button class="chip" id="chipFx" data-open="sheetFx"><b>Effekter</b><span></span></button>
+    <button class="chip" id="chipMore" data-open="sheetMore" aria-label="Mer: klick, mikrofon, export"><b>Mer</b><span>&nbsp;</span></button>
+  </nav>
+
+  <main class="tape" id="tape">
+    <div class="lane ruler"><div></div><div id="ruler"></div></div>
+    <div id="lanes"></div>
+    <div class="lane live" id="liveLane"><div class="gut">in</div><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i></div></div>
+    <p class="empty" id="empty"><b>Tryck på Spela in.</b> Klicket räknar in en takt och sedan spelas ett varv in. Varje nytt varv blir ett eget lager som flyttas bakåt med latensen, så att det hamnar på slaget.</p>
+  </main>
+
+  <footer class="bar">
+    <button id="playBtn"><svg viewBox="0 0 24 24" id="playIco"><path d="M7 4l13 8-13 8z"/></svg><span id="playLbl">Start</span></button>
+    <button id="undoBtn"><svg viewBox="0 0 24 24"><path d="M9 5L3 11l6 6v-4h5a4 4 0 010 8h-3v2h3a6 6 0 000-12H9z"/></svg><span>Ångra</span></button>
+    <button id="recBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg><span id="recLbl">Spela in</span></button>
+    <button id="capBtn"><svg viewBox="0 0 24 24"><path d="M11 3h2v9l3.5-3.5 1.4 1.4L12 15.8 6.1 9.9l1.4-1.4L11 12zM4 18h16v2H4z"/></svg><span>Fånga förra</span></button>
+  </footer>
+</div>
+
+<div class="sheet" id="sheetTempo" hidden><div class="sheet-in" role="dialog" aria-labelledby="hTempo">
+  <div class="sheet-head"><h2 id="hTempo">Tempo och längd</h2><button class="btn" data-close>Klar</button></div>
+  <p class="note warn" id="tempoLock" hidden>Tempo och längd är låsta så länge det finns lager. Rensa lagren under Mer för att ändra.</p>
+  <div class="big" id="bpmStep"><button class="sbtn" data-d="-5">−5</button><button class="sbtn" data-d="-1">−1</button><output id="bpmVal"></output><button class="sbtn" data-d="1">+1</button><button class="sbtn" data-d="5">+5</button></div>
+  <button class="btn wide" id="tapBtn">Tappa tempo</button>
+  <div class="field"><span>Slag per takt</span><div class="seg" id="beatsSeg"></div></div>
+  <div class="field"><span>Takter per varv</span><div class="seg" id="barsSeg"></div></div>
+  <p class="note" id="lenNote"></p>
+</div></div>
+
+<div class="sheet" id="sheetLat" hidden><div class="sheet-in" role="dialog" aria-labelledby="hLat">
+  <div class="sheet-head"><h2 id="hLat">Latens</h2><button class="btn" data-close>Klar</button></div>
+  <p class="note">Så här långt bakåt flyttas varje nytt lager. Spara ett värde per uppsättning av hörlurar och mikrofon. Lager som redan finns behåller sitt eget värde, som du ändrar på lagret.</p>
+  <div class="profs" id="profs"></div>
+  <div class="big" id="latStep"><button class="sbtn" data-d="-10">−10</button><button class="sbtn" data-d="-1">−1</button><output id="latVal"></output><button class="sbtn" data-d="1">+1</button><button class="sbtn" data-d="10">+10</button></div>
+  <div class="field"><input class="txt" id="profName" aria-label="Namn på uppsättningen" maxlength="28"><button class="btn danger" id="profDel">Ta bort</button></div>
+  <h3>Mät upp</h3>
+  <p class="note">Håll ena hörluren mot telefonens mikrofon och tryck Mät. Tio klick spelas, och appen mäter hur sent de kommer tillbaka. Med högtalare räcker det att vara tyst. Vill du hellre mäta så som du upplever det, behåll hörlurarna i och klappa i takt med klicken.</p>
+  <button class="btn wide" id="measBtn">Mät</button>
+  <div class="dots" id="measDots" hidden></div>
+  <p id="measRes" hidden></p>
+  <button class="btn on wide" id="measUse" hidden></button>
+</div></div>
+
+<div class="sheet" id="sheetFx" hidden><div class="sheet-in" role="dialog" aria-labelledby="hFx">
+  <div class="sheet-head"><h2 id="hFx">Effekter på hela mixen</h2><button class="btn" data-close>Klar</button></div>
+  <div id="gfx"></div>
+  <div class="field"><span>Ekots takt</span><div class="seg" id="echoSeg"></div></div>
+  <div class="acts"><button class="btn" id="fxReset">Nollställ effekter</button></div>
+  <p class="note">Varje lager har egna reglage för filter, eko och rum. Tryck på lagrets remsa för att öppna dem. Dubbeltryck på ett reglage för att nollställa det.</p>
+</div></div>
+
+<div class="sheet" id="sheetMore" hidden><div class="sheet-in" role="dialog" aria-labelledby="hMore">
+  <div class="sheet-head"><h2 id="hMore">Mer</h2><button class="btn" data-close>Klar</button></div>
+  <div class="field"><span>Klick</span><div class="seg" id="clickSeg"></div></div>
+  <div id="clickVolRow"></div>
+  <div class="field"><span>Inspelning</span><div class="seg" id="modeSeg"></div></div>
+  <p class="note" id="modeNote"></p>
+  <h3>Mikrofon</h3>
+  <div class="field"><select class="txt" id="micSel" aria-label="Mikrofon"><option value="">Starta först för att välja</option></select></div>
+  <p class="note" id="diag">Ljudet startar första gången du trycker Start, Spela in eller Mät.</p>
+  <h3>Lager</h3>
+  <div class="acts"><button class="btn" id="exportBtn">Exportera varvet som WAV</button><button class="btn danger" id="clearBtn">Rensa alla lager</button></div>
+  <p class="note">Exporten innehåller de lager som hörs, utan effekter. Lagren sparas inte när sidan stängs.</p>
+  <h3>Tangenter och pedal</h3>
+  <p class="note"><kbd>Mellanslag</kbd> startar och stoppar. <kbd>R</kbd>, <kbd>Enter</kbd> eller <kbd>→</kbd> spelar in. <kbd>←</kbd> ångrar senaste lagret. <kbd>C</kbd> fångar förra varvet. <kbd>1</kbd> till <kbd>9</kbd> tystar ett lager. En Bluetooth-pedal som skickar piltangenter fungerar alltså som inspelningspedal.</p>
+</div></div>
+
+<div class="toast" id="toast" hidden><span id="toastTxt"></span><button id="toastAct" hidden></button></div>
+
+<script>
+(() => {
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ---------- inställningar ---------- */
+const KEY = 'varv.settings.1';
+const MAXLAT_MS = 600, PRE_MS = 60, XF_MS = 20, LEAD_S = 0.09, SAFE_S = 0.04, GRACE_S = 0.15;
+const INKS = ['#20232b', '#2146b5', '#1d7a4a', '#7a3cae', '#b3501a', '#0e7482', '#ad2f6c'];
+const st = Object.assign({
+  bpm: 100, beats: 4, bars: 2, clickOn: true, clickVol: 0.6, mode: 'one',
+  profiles: [{ name: 'AirPods', ms: 180, guess: true }, { name: 'Sladd eller högtalare', ms: 20, guess: true }],
+  active: 0, micId: '', master: 0.9, gFilter: 0, gEcho: 0, gRev: 0, echoDiv: 0.75
+}, (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })());
+if (!Array.isArray(st.profiles) || !st.profiles.length) st.profiles = [{ name: 'Standard', ms: 0, guess: true }];
+st.active = clamp(st.active | 0, 0, st.profiles.length - 1);
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
+const prof = () => st.profiles[st.active];
+
+/* ---------- ljudmotor ---------- */
+let ctx = null, sr = 48000, limiter, outGain, pre, gLP, gHP, mix, echoIn, echoDelay, revIn, gEchoSend, gRevSend, clickGain;
+let capNode = null, capMode = '', micStream = null, micSrc = null, micOK = false, micLabel = '', mics = [], initP = null;
+let ring = null, R = 0, capEnd = 0, capFirst = -1, inPeak = 0, synth = null;
+let L = 0, PRE = 0, XF = 0, MAXLAT = 0, OPEN_LP = 20000, epoch = 0, running = false, runId = 0, clickSrc = null;
+let layers = [], laneCount = 0, uid = 0, recPass = null, stopAfter = false, lastRec = null, openId = null, measuring = false;
+
+const nowF = () => Math.round(ctx.currentTime * sr);
+const latN = ms => Math.round(ms / 1000 * sr);
+const loopFrames = () => Math.round(st.bars * st.beats * 60 / st.bpm * sr);
+const bq = (type, f) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = 0.9; return b; };
+const gn = v => { const g = ctx.createGain(); g.gain.value = v; return g; };
+
+function initAudio() {
+  if (ctx) { if (ctx.state !== 'running') ctx.resume().catch(() => {}); return initP; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) { toast('Webbläsaren saknar stöd för ljudmotorn.'); return Promise.resolve(false); }
+  try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) {}
+  try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e) { ctx = new AC(); }
+  sr = ctx.sampleRate; ctx.resume().catch(() => {});
+  PRE = latN(PRE_MS); XF = latN(XF_MS); MAXLAT = latN(MAXLAT_MS); OPEN_LP = Math.min(20000, sr * 0.45);
+  buildGraph();
+  initP = (async () => { await setupCapture(); await openMic(st.micId, true); diag(); return true; })();
+  return initP;
+}
+
+function buildGraph() {
+  limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -2; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.003; limiter.release.value = 0.12;
+  limiter.connect(ctx.destination);
+  outGain = gn(st.master); outGain.connect(limiter);
+  gLP = bq('lowpass', OPEN_LP); gHP = bq('highpass', 10); pre = gn(1);
+  pre.connect(gLP); gLP.connect(gHP); gHP.connect(outGain);
+  mix = gn(1); mix.connect(pre);
+  echoIn = gn(1); echoDelay = ctx.createDelay(3); const tone = bq('lowpass', Math.min(3200, OPEN_LP)); const fb = gn(0.42);
+  echoIn.connect(echoDelay); echoDelay.connect(tone); tone.connect(fb); fb.connect(echoDelay); tone.connect(pre);
+  revIn = gn(1); const conv = ctx.createConvolver(); conv.buffer = makeIR(); revIn.connect(conv); conv.connect(pre);
+  gEchoSend = gn(0); mix.connect(gEchoSend); gEchoSend.connect(echoIn);
+  gRevSend = gn(0); mix.connect(gRevSend); gRevSend.connect(revIn);
+  clickGain = gn(0); clickGain.connect(limiter);
+  applyGlobalFx();
+}
+
+function makeIR() {
+  const n = Math.round(2.0 * sr), b = ctx.createBuffer(2, n, sr);
+  for (let c = 0; c < 2; c++) {
+    const d = b.getChannelData(c); let lp = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / n, x = (Math.random() * 2 - 1) * Math.exp(-5.5 * t) * (1 - t), a = 0.15 + 0.7 * t;
+      lp = lp * a + x * (1 - a); d[i] = lp;
+    }
+  }
+  return b;
+}
+
+function setFilter(lp, hp, v) {
+  const t = ctx.currentTime;
+  lp.frequency.setTargetAtTime(v < 0 ? Math.min(OPEN_LP, 18000 * Math.pow(180 / 18000, -v)) : OPEN_LP, t, 0.02);
+  hp.frequency.setTargetAtTime(v > 0 ? 20 * Math.pow(5000 / 20, v) : 10, t, 0.02);
+}
+function applyGlobalFx() {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  outGain.gain.setTargetAtTime(st.master, t, 0.01);
+  setFilter(gLP, gHP, st.gFilter);
+  gEchoSend.gain.setTargetAtTime(st.gEcho * 0.8, t, 0.01);
+  gRevSend.gain.setTargetAtTime(st.gRev, t, 0.01);
+  echoDelay.delayTime.setTargetAtTime(clamp(st.echoDiv * 60 / st.bpm, 0.02, 2.9), t, 0.01);
+}
+
+/* fångst: mikrofonen skrivs löpande till en ringbuffert, indexerad med ljudklockans ramnummer */
+async function setupCapture() {
+  const code = `class C extends AudioWorkletProcessor{constructor(){super();this.b=new Float32Array(1024);this.n=0;this.s=0}
+process(i){const c=i[0]&&i[0][0],n=c?c.length:128;if(this.n+n>this.b.length)this.flush();if(this.n===0)this.s=currentFrame;
+if(c)this.b.set(c,this.n);this.n+=n;if(this.n>=this.b.length)this.flush();return true}
+flush(){const o=this.b.subarray(0,this.n).slice();this.port.postMessage({f:this.s,d:o},[o.buffer]);this.b.fill(0);this.n=0}}
+registerProcessor('varv-cap',C)`;
+  try {
+    const url = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+    await ctx.audioWorklet.addModule(url);
+    capNode = new AudioWorkletNode(ctx, 'varv-cap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], channelCount: 1, channelCountMode: 'explicit', channelInterpretation: 'speakers' });
+    capNode.port.onmessage = e => onCap(e.data.f, e.data.d);
+    capMode = 'worklet';
+  } catch (e) {
+    const sp = ctx.createScriptProcessor(1024, 1, 1);
+    sp.onaudioprocess = ev => onCap(Math.round(ev.playbackTime * sr) - 2048, new Float32Array(ev.inputBuffer.getChannelData(0)));
+    capNode = sp; capMode = 'script';
+  }
+  const z = gn(0); capNode.connect(z); z.connect(ctx.destination);
+}
+
+function ensureRing() {
+  const need = Math.max(12 * sr, 2 * L + 4 * sr + MAXLAT) | 0;
+  if (ring && R >= need) return;
+  const had = !!ring; ring = new Float32Array(need); R = need; capFirst = had ? capEnd : -1;
+}
+const availStart = () => Math.max(capFirst, capEnd - R);
+function ringWrite(f, d) {
+  const p = f % R, a = Math.min(d.length, R - p);
+  ring.set(a === d.length ? d : d.subarray(0, a), p);
+  if (a < d.length) ring.set(d.subarray(a), 0);
+}
+function ringRead(f, n, dest, off) {
+  const p = f % R, a = Math.min(n, R - p);
+  dest.set(ring.subarray(p, p + a), off);
+  if (a < n) dest.set(ring.subarray(0, n - a), off + a);
+}
+function onCap(f, d) {
+  if (!ring) return;
+  if (synth) synth(f, d);
+  if (capFirst < 0) { capFirst = f; capEnd = f; }
+  if (f > capEnd) {            // lucka i fångsten: fyll med tystnad så att tidslinjen håller
+    const gap = Math.min(f - capEnd, R);
+    ringWrite(f - gap, new Float32Array(gap)); capEnd = f;
+  } else if (f < capEnd) {
+    const skip = capEnd - f; if (skip >= d.length) return;
+    d = d.subarray(skip); f = capEnd;
+  }
+  ringWrite(f, d); capEnd = f + d.length;
+  let pk = 0; for (let i = 0; i < d.length; i += 4) { const v = Math.abs(d[i]); if (v > pk) pk = v; }
+  if (pk > inPeak) inPeak = pk;
+  tick();
+}
+
+async function openMic(id, first) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { micOK = false; toast('Mikrofonen kräver att sidan öppnas via https.'); return false; }
+  const base = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 };
+  let s = null;
+  try { s = await navigator.mediaDevices.getUserMedia({ audio: id ? Object.assign({ deviceId: { exact: id } }, base) : base }); }
+  catch (e) { if (id) { try { s = await navigator.mediaDevices.getUserMedia({ audio: base }); st.micId = ''; save(); } catch (e2) {} } }
+  if (!s) { micOK = false; toast('Ingen åtkomst till mikrofonen. Tillåt mikrofon för sidan och försök igen.'); diag(); return false; }
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  if (micSrc) { try { micSrc.disconnect(); } catch (e) {} }
+  micStream = s; micSrc = ctx.createMediaStreamSource(s); micSrc.connect(capNode); micOK = true;
+  const tr = s.getAudioTracks()[0]; micLabel = tr ? tr.label : '';
+  try { mics = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch (e) { mics = []; }
+  const builtIn = /iphone|ipad|built-?in|inbyggd|intern/i;
+  if (first && !st.micId && !builtIn.test(micLabel)) {
+    const bi = mics.find(m => builtIn.test(m.label));
+    if (bi) return openMic(bi.deviceId, false);     // lyssna i hörlurarna, spela in med telefonens mikrofon
+  }
+  fillMics(); diag(); return true;
+}
+
+/* ---------- transport ---------- */
+let beatPos = [];
+function buildClick() {
+  const tot = st.bars * st.beats, b = ctx.createBuffer(1, L, sr), d = b.getChannelData(0), n = Math.round(0.035 * sr);
+  beatPos = [];
+  for (let j = 0; j < tot; j++) {
+    const p = Math.round(j * L / tot); beatPos.push(p);
+    const first = j === 0, bar = j % st.beats === 0, f = first ? 1760 : bar ? 1320 : 880, a = first ? 1 : bar ? 0.8 : 0.5;
+    for (let i = 0; i < n && p + i < L; i++) d[p + i] += a * Math.sin(2 * Math.PI * f * i / sr) * Math.exp(-i / (0.006 * sr));
+  }
+  return b;
+}
+
+async function start(countIn) {
+  if (measuring) return false;
+  const ok = await initAudio(); if (!ok) return false;
+  if (running) return true;
+  L = loopFrames(); ensureRing(); applyGlobalFx();
+  const t0 = nowF() + Math.round(0.1 * sr);
+  const cin = countIn ? (st.bars > 1 ? Math.round(L / st.bars) : L) : 0;
+  epoch = t0 + cin;
+  clickSrc = ctx.createBufferSource(); clickSrc.buffer = buildClick(); clickSrc.loop = true; clickSrc.connect(clickGain);
+  clickSrc.start(t0 / sr, ((L - cin) % L) / sr);
+  const g = clickGain.gain; g.cancelScheduledValues(0);
+  if (countIn) { g.setValueAtTime(Math.max(st.clickVol, 0.4), t0 / sr); g.setValueAtTime(st.clickOn ? st.clickVol : 0, epoch / sr); }
+  else g.setValueAtTime(st.clickOn ? st.clickVol : 0, t0 / sr);
+  running = true; runId++; recPass = null; stopAfter = false; lastRec = null; livePass = null;
+  for (const l of layers) if (l.mounted && l.buf) startSource(l, epoch);
+  wake(true); ui(); return true;
+}
+
+function stop() {
+  if (!running) return;
+  running = false; recPass = null; stopAfter = false; lastRec = null;
+  try { clickSrc.stop(); } catch (e) {} clickSrc = null;
+  for (const l of layers) { if (l.src) { try { l.src.stop(); } catch (e) {} l.src = null; } }
+  wake(false); ui();
+}
+
+function startSource(l, at) {
+  at = Math.max(at, epoch);
+  const s = ctx.createBufferSource(); s.buffer = l.buf; s.loop = true; s.connect(l.lp);
+  s.start(at / sr, (((at - epoch) % L + L) % L) / sr);
+  if (l.src) { try { l.src.stop(at / sr); } catch (e) {} }
+  l.src = s;
+}
+
+/* upplevd position: ljudklockan minus aktuell latens, alltså där det du hör och spelar hamnar */
+const heardPos = () => nowF() - latN(prof().ms) - epoch;
+
+async function toggleRec() {
+  if (measuring) return;
+  if (!running) {
+    if (!(await start(true))) return;
+    if (!micOK) { toast('Mikrofonen är inte igång, så inget kan spelas in.'); return; }
+    recPass = 0; ui(); return;
+  }
+  if (!micOK) { toast('Mikrofonen är inte igång, så inget kan spelas in.'); return; }
+  const p = heardPos(), k = Math.floor(p / L);
+  if (recPass != null) {
+    if (p < 0 || (k < recPass && lastRec !== k)) recPass = null;          // väntade: avbryt
+    else if (st.mode === 'cont') stopAfter = !stopAfter;                   // löpande: sista varvet
+    else { recPass = null; toast('Inspelningen avbröts.'); }
+    ui(); return;
+  }
+  let target = p < 0 ? 0 : (p - k * L < GRACE_S * sr ? k : k + 1);
+  while (layers.some(l => l.run === runId && l.k === target)) target++;
+  recPass = target; stopAfter = false; ui();
+}
+
+function capturePrev() {
+  if (!running || !micOK) { toast('Starta först, så finns det ett varv att fånga.'); return; }
+  const k = Math.floor(heardPos() / L) - 1;
+  if (k < 0) { toast('Inget helt varv har gått än.'); return; }
+  if (layers.some(l => l.run === runId && l.k === k)) { toast('Det varvet är redan sparat.'); return; }
+  addLayer(k, false); tick();
+}
+
+function addLayer(k, auto) {
+  const F0 = epoch + k * L;
+  layers.push({ id: ++uid, n: 0, k, run: runId, F0, rawStart: F0 - PRE, raw: new Float32Array(L + XF + MAXLAT + 8), filled: 0,
+    lat: prof().ms, vol: 1, mute: false, filt: 0, echo: 0, rev: 0, reverse: false, norm: null, peak: 0,
+    buf: null, src: null, final: false, started: false, mounted: false, auto });
+}
+
+function fillRaw(l) {
+  if (l.filled >= l.raw.length) return;
+  const as = availStart(); let f = l.rawStart + l.filled;
+  if (f < as) { l.filled = Math.min(l.raw.length, as - l.rawStart); f = l.rawStart + l.filled; }
+  const n = Math.min(l.raw.length - l.filled, capEnd - f);
+  if (n <= 0) return;
+  ringRead(f, n, l.raw, l.filled); l.filled += n;
+}
+
+/* Bygger lagrets loop ur råinspelningen, förskjuten med lagrets latens.
+   Skarven ligger PRE före ettan så att ett tidigt slag på ettan kommer med hel,
+   och XF korstonar skarven. Två varv i följd summerar då till exakt originalet. */
+function render(l) {
+  const d = clamp(latN(l.lat), 0, MAXLAT), out = new Float32Array(L), raw = l.raw, filled = l.filled;
+  for (let i = 0; i < L + XF; i++) {
+    const ri = d + i; if (ri >= filled) break;
+    const w = i < XF ? i / XF : i >= L ? 1 - (i - L) / XF : 1;
+    let pos = i - PRE; if (pos < 0) pos += L; else if (pos >= L) pos -= L;
+    out[pos] += w * raw[ri];
+  }
+  if (l.reverse) out.reverse();
+  let pk = 0; const NB = 600, peaks = new Float32Array(NB);
+  for (let b = 0; b < NB; b++) {
+    const a = Math.floor(b * L / NB), e = Math.floor((b + 1) * L / NB); let m = 0;
+    for (let i = a; i < e; i++) { const v = Math.abs(out[i]); if (v > m) m = v; }
+    peaks[b] = m; if (m > pk) pk = m;
+  }
+  l.peaks = peaks; l.peak = pk;
+  if (l.norm == null) l.norm = pk > 0.003 ? clamp(0.6 / pk, 1, 12) : 1;
+  const buf = ctx.createBuffer(1, L, sr);
+  if (buf.copyToChannel) buf.copyToChannel(out, 0); else buf.getChannelData(0).set(out);
+  l.buf = buf;
+}
+
+function serviceLayer(l, now) {
+  fillRaw(l);
+  const need = Math.min(clamp(latN(l.lat), 0, MAXLAT) + L + XF, l.raw.length), end = l.F0 + L;
+  if (!l.final && l.filled >= need) { render(l); l.final = true; afterRender(l, now, end); }
+  else if (!l.started && now >= end - LEAD_S * sr) { render(l); afterRender(l, now, end); }
+}
+function afterRender(l, now, end) {
+  if (!l.mounted) {
+    if (l.auto && l.peak < 0.006) { layers.splice(layers.indexOf(l), 1); return; }   // tyst varv i löpande läge
+    mount(l);
+  }
+  drawLane(l);
+  if (running) startSource(l, Math.max(now + Math.round(SAFE_S * sr), end));
+  l.started = true;
+}
+
+let lastState = '';
+function tick() {
+  if (!ctx) return;
+  const now = nowF();
+  if (running && recPass != null && now >= epoch + (recPass + 1) * L - LEAD_S * sr) {
+    addLayer(recPass, st.mode === 'cont'); lastRec = recPass;
+    if (st.mode === 'cont' && !stopAfter) recPass++; else { recPass = null; stopAfter = false; }
+  }
+  for (const l of layers.slice()) serviceLayer(l, now);
+  if (running) liveUpdate();
+  const s = stateNow(); if (s !== lastState) ui();
+}
+setInterval(tick, 25);
+
+function stateNow() {
+  if (measuring) return 'meas';
+  if (!running) return 'stop';
+  const p = heardPos();
+  if (p < 0) return recPass === 0 ? 'countrec' : 'count';
+  const k = Math.floor(p / L);
+  if (recPass != null) { if (k < recPass && lastRec !== k) return 'armed'; return stopAfter ? 'reclast' : 'rec'; }
+  return lastRec === k ? 'rec' : 'play';
+}
+
+/* ---------- lager: ljudnoder och gränssnitt ---------- */
+function applyLayer(l) {
+  const t = ctx.currentTime;
+  l.g.gain.setTargetAtTime(l.mute ? 0 : l.norm * l.vol, t, 0.008);
+  setFilter(l.lp, l.hp, l.filt);
+  l.es.gain.setTargetAtTime(l.echo * 0.8, t, 0.01);
+  l.rs.gain.setTargetAtTime(l.rev, t, 0.01);
+}
+function mount(l, before) {
+  if (!l.n) l.n = ++laneCount;
+  l.ink = INKS[(l.n - 1) % INKS.length];
+  l.lp = bq('lowpass', OPEN_LP); l.hp = bq('highpass', 10); l.g = gn(0); l.es = gn(0); l.rs = gn(0);
+  l.lp.connect(l.hp); l.hp.connect(l.g); l.g.connect(mix); l.g.connect(l.es); l.es.connect(echoIn); l.g.connect(l.rs); l.rs.connect(revIn);
+  applyLayer(l);
+  const row = el('div', 'lane'); row.style.setProperty('--ink', l.ink);
+  const m = el('button', 'mute'); m.append(el('i', '', l.n)); m.setAttribute('aria-label', 'Tysta lager ' + l.n);
+  m.addEventListener('click', () => toggleMute(l));
+  const tb = el('button', 'trkbtn'); tb.setAttribute('aria-label', 'Reglage för lager ' + l.n);
+  const trk = el('div', 'trk'); l.cv = el('canvas'); trk.append(l.cv, el('i', 'ph')); tb.append(trk);
+  tb.addEventListener('click', () => { openId = openId === l.id ? null : l.id; syncPanels(); });
+  row.append(m, tb); l.row = row;
+  const host = $('#lanes'); if (before && before.row && before.row.parentNode === host) host.insertBefore(row, before.row); else host.append(row);
+  l.mounted = true; syncLane(l); ui();
+}
+function unmount(l) {
+  if (l.src) { try { l.src.stop(); } catch (e) {} l.src = null; }
+  for (const n of [l.lp, l.hp, l.g, l.es, l.rs]) { try { n.disconnect(); } catch (e) {} }
+  if (l.row) l.row.remove();
+  l.mounted = false; l.row = null; l.cv = null;
+  if (openId === l.id) openId = null;
+}
+function syncLane(l) { if (l.row) l.row.classList.toggle('muted', l.mute); }
+function toggleMute(l) { l.mute = !l.mute; applyLayer(l); syncLane(l); const b = l.row && $('.mutebtn', l.row); if (b) b.classList.toggle('on', l.mute); }
+
+function removeLayer(l) {
+  const i = layers.indexOf(l); if (i < 0) return;
+  const next = layers.slice(i + 1).find(x => x.mounted);
+  layers.splice(i, 1); unmount(l); ui();
+  toast('Lager ' + l.n + ' raderat', 'Ångra', () => {
+    layers.splice(Math.min(i, layers.length), 0, l);
+    mount(l, next && next.mounted ? next : null); drawLane(l);
+    if (running && l.buf) startSource(l, nowF() + Math.round(SAFE_S * sr));
+    l.started = true; ui();
+  });
+}
+function undoLast() {
+  const m = layers.filter(l => l.mounted);
+  if (!m.length) { toast('Det finns inget lager att ångra.'); return; }
+  removeLayer(m.reduce((a, b) => (b.id > a.id ? b : a)));
+}
+
+function sliderRow(label, min, max, step, val, def, fmt, on, cls) {
+  const r = el('label', 'srow' + (cls ? ' ' + cls : '')); r.append(el('span', '', label));
+  const i = el('input'); i.type = 'range'; i.min = min; i.max = max; i.step = step; i.value = val;
+  if (min < 0) i.className = 'bi';
+  const o = el('output', '', fmt(val));
+  i.addEventListener('input', () => { let v = +i.value; if (min < 0 && Math.abs(v) < 0.06) v = 0; o.textContent = fmt(v); on(v); });
+  i.addEventListener('dblclick', () => { i.value = def; i.dispatchEvent(new Event('input')); });
+  r.append(i, o); r.set = v => { i.value = v; o.textContent = fmt(v); };
+  return r;
+}
+const pct = v => Math.round(v * 100) + ' %';
+const filtTxt = v => v === 0 ? 'av' : v < 0 ? 'mörkare' : 'tunnare';
+
+function hold(btn, fn) {
+  let t1 = 0, t2 = 0;
+  const end = () => { clearTimeout(t1); clearInterval(t2); };
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); fn(); end(); t1 = setTimeout(() => { t2 = setInterval(fn, 70); }, 380); });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, end);
+  btn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } });
+}
+
+function syncPanels() {
+  for (const l of layers) {
+    if (!l.row) continue;
+    const open = l.id === openId; l.row.classList.toggle('open', open);
+    const old = $('.lpanel', l.row);
+    if (!open) { if (old) old.remove(); continue; }
+    if (old) continue;
+    const p = el('div', 'lpanel');
+    p.append(
+      sliderRow('Volym', 0, 1.5, 0.01, l.vol, 1, pct, v => { l.vol = v; applyLayer(l); }),
+      sliderRow('Filter', -1, 1, 0.01, l.filt, 0, filtTxt, v => { l.filt = v; applyLayer(l); }),
+      sliderRow('Eko', 0, 1, 0.01, l.echo, 0, pct, v => { l.echo = v; applyLayer(l); }),
+      sliderRow('Rum', 0, 1, 0.01, l.rev, 0, pct, v => { l.rev = v; applyLayer(l); }));
+    const s = el('div', 'step'); s.append(el('span', '', 'Latens'));
+    const out = el('output'), use = el('button', 'btn');
+    const show = () => { out.textContent = l.lat + ' ms'; use.hidden = l.lat === prof().ms; use.textContent = 'Använd ' + l.lat + ' ms för nya lager'; };
+    const mk = d => { const b = el('button', 'sbtn', (d > 0 ? '+' : '−') + Math.abs(d)); hold(b, () => { l.lat = clamp(l.lat + d, 0, MAXLAT_MS); l.final = false; show(); }); return b; };
+    s.append(mk(-10), mk(-1), out, mk(1), mk(10));
+    use.addEventListener('click', () => { prof().ms = l.lat; prof().guess = false; save(); show(); ui(); toast('Nya lager flyttas ' + l.lat + ' ms.'); });
+    const acts = el('div', 'acts');
+    const mu = el('button', 'btn mutebtn' + (l.mute ? ' on' : ''), 'Tyst'); mu.addEventListener('click', () => toggleMute(l));
+    const rv = el('button', 'btn' + (l.reverse ? ' on' : ''), 'Baklänges'); rv.addEventListener('click', () => { l.reverse = !l.reverse; l.final = false; rv.classList.toggle('on', l.reverse); });
+    const del = el('button', 'btn danger', 'Radera'); del.addEventListener('click', () => removeLayer(l));
+    acts.append(mu, rv, use, del);
+    p.append(s, acts); l.row.append(p); show();
+  }
+}
+
+/* ---------- ritning ---------- */
+function sizeCanvas(cv) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3), w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  return { g, w, h };
+}
+function drawLane(l) {
+  if (!l.cv) return;
+  const { g, w, h } = sizeCanvas(l.cv), tot = st.bars * st.beats, mid = h / 2;
+  for (let j = 1; j < tot; j++) {
+    const x = Math.round(j / tot * w) + 0.5, bar = j % st.beats === 0;
+    g.strokeStyle = bar ? 'rgba(32,35,43,.45)' : 'rgba(32,35,43,.18)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x, bar ? 0 : h * 0.2); g.lineTo(x, bar ? h : h * 0.8); g.stroke();
+  }
+  if (!l.peaks) return;
+  const NB = l.peaks.length, sc = (mid - 4) / Math.max(l.peak, 1e-4);
+  g.fillStyle = l.ink;
+  for (let x = 0; x < w; x++) {
+    const a = Math.floor(x / w * NB), e = Math.max(a + 1, Math.floor((x + 1) / w * NB)); let m = 0;
+    for (let b = a; b < e && b < NB; b++) if (l.peaks[b] > m) m = l.peaks[b];
+    const hh = Math.max(0.6, m * sc); g.fillRect(x, mid - hh, 1, hh * 2);
+  }
+}
+
+/* liveremsan visar det som kommer in just nu, redan flyttat med aktuell latens */
+const LIVE_N = 300; let liveBins = new Float32Array(LIVE_N), livePass = null, liveNext = 0, liveDirty = false;
+function liveUpdate() {
+  const d = latN(prof().ms), m = capEnd - d - epoch; if (m < 0 || !micOK) return;
+  const k = Math.floor(m / L);
+  if (k !== livePass) { livePass = k; liveNext = 0; liveBins.fill(0); liveDirty = true; }
+  const F0 = epoch + k * L + d, upto = Math.min(LIVE_N, Math.floor((m - k * L) / L * LIVE_N)), as = availStart();
+  for (; liveNext < upto; liveNext++) {
+    const a = F0 + Math.floor(liveNext * L / LIVE_N), e = F0 + Math.floor((liveNext + 1) * L / LIVE_N); let mx = 0;
+    if (a >= as) for (let f = a; f < e; f += 2) { const v = Math.abs(ring[f % R]); if (v > mx) mx = v; }
+    liveBins[liveNext] = mx; liveDirty = true;
+  }
+}
+function drawLive() {
+  liveDirty = false;
+  const { g, w, h } = sizeCanvas($('#liveCv')), mid = h / 2, bw = w / LIVE_N;
+  g.fillStyle = document.body.classList.contains('s-rec') ? '#ff3d57' : 'rgba(240,242,248,.6)';
+  for (let b = 0; b < liveNext; b++) {
+    const a = Math.min(1, Math.pow(liveBins[b] * 3, 0.6)); if (a < 0.02) continue;
+    g.fillRect(b * bw, mid - a * mid, Math.max(1, bw), a * h);
+  }
+}
+
+let beatEls = [], lastBeat = -2;
+function buildRuler() {
+  const r = $('#ruler'); r.textContent = ''; beatEls = []; lastBeat = -2;
+  for (let j = 0; j < st.bars * st.beats; j++) {
+    const bar = j % st.beats === 0, b = el('i', bar ? 'first' : '', bar ? j / st.beats + 1 : null);
+    r.append(b); beatEls.push(b);
+  }
+}
+function frame() {
+  requestAnimationFrame(frame);
+  if (!ctx) return;
+  $('#meterFill').style.transform = 'scaleX(' + Math.min(1, Math.sqrt(inPeak) * 1.5).toFixed(3) + ')'; inPeak *= 0.86;
+  if (!running) { if (lastBeat !== -2) { setBeat(-2); $('#pos').textContent = '–'; } return; }
+  const p = heardPos(), tot = st.bars * st.beats, bl = L / tot;
+  if (p < 0) {
+    const left = Math.ceil(-p / bl);
+    if (lastBeat !== -100 - left) { setBeat(-1); lastBeat = -100 - left; $('#pos').textContent = left; }
+    $('#tape').style.setProperty('--ph', 0); return;
+  }
+  const x = (p % L) / L, j = Math.min(tot - 1, Math.floor(x * tot));
+  $('#tape').style.setProperty('--ph', x.toFixed(4));
+  if (j !== lastBeat) { setBeat(j); $('#pos').textContent = (Math.floor(j / st.beats) + 1) + '.' + (j % st.beats + 1); }
+  if (liveDirty) drawLive();
+}
+function setBeat(j) { for (let i = 0; i < beatEls.length; i++) beatEls[i].classList.toggle('on', i === j); lastBeat = j; }
+
+/* ---------- latensmätning ---------- */
+let measOut = null;
+async function measure() {
+  if (measuring) return;
+  if (running) stop();
+  const ok = await initAudio();
+  if (!ok || !micOK) { toast('Mätningen behöver mikrofonen.'); return; }
+  L = L || loopFrames(); ensureRing();
+  measuring = true; ui();
+  const N = 10, SKIP = 2, iv = Math.round(0.72 * sr), n = Math.round(0.02 * sr);
+  const b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.sin(2 * Math.PI * 2000 * i / sr) * Math.exp(-i / (0.004 * sr));
+  const t0 = nowF() + Math.round(0.4 * sr), g = gn(0.9); g.connect(limiter);
+  const dots = $('#measDots'); dots.textContent = ''; dots.hidden = false; $('#measRes').hidden = true; $('#measUse').hidden = true; $('#measBtn').disabled = true;
+  for (let k = 0; k < N; k++) {
+    const s = ctx.createBufferSource(); s.buffer = b; s.connect(g); s.start((t0 + k * iv) / sr);
+    const dot = el('i'); dots.append(dot);
+    setTimeout(() => dot.classList.add('on'), Math.max(0, ((t0 + k * iv) / sr - ctx.currentTime) * 1000));
+  }
+  await sleep(((t0 + N * iv) / sr - ctx.currentTime + 0.3) * 1000);
+  measOut = analyze(t0, iv, N, SKIP);
+  try { g.disconnect(); } catch (e) {}
+  measuring = false; $('#measBtn').disabled = false;
+  const res = $('#measRes'); res.hidden = false;
+  if (!measOut) res.textContent = 'Klicken hördes inte tydligt nog i mikrofonen. Höj volymen, håll hörluren tätt mot mikrofonen och mät igen.';
+  else {
+    res.textContent = measOut.ms + ' ms, spridning ±' + measOut.spread.toFixed(1) + ' ms över ' + measOut.n + ' av ' + measOut.of + ' klick.' +
+      (measOut.spread > 12 ? ' Spridningen är stor, så mät gärna en gång till.' : '');
+    const u = $('#measUse'); u.hidden = false; u.textContent = 'Använd ' + measOut.ms + ' ms för ' + prof().name;
+  }
+  ui();
+}
+function analyze(t0, iv, N, SKIP) {
+  const a = Math.round(0.08 * sr), w = Math.round(0.70 * sr), seg = new Float32Array(w), lats = [];
+  for (let k = SKIP; k < N; k++) {
+    const C = t0 + k * iv; if (C - a < availStart() || C - a + w > capEnd) continue;
+    ringRead(C - a, w, seg, 0);
+    let pk = 0, sum = 0; for (let i = 0; i < w; i++) { const v = Math.abs(seg[i]); sum += v; if (v > pk) pk = v; }
+    if (pk < 0.004 || pk < 12 * sum / w) continue;
+    let on = 0; while (Math.abs(seg[on]) < 0.4 * pk) on++;
+    lats.push((on - a) / sr * 1000);
+  }
+  if (lats.length < 4) return null;
+  const med = x => { const s = x.slice().sort((p, q) => p - q), h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
+  const m = med(lats);
+  return { ms: clamp(Math.round(m), 0, MAXLAT_MS), spread: med(lats.map(x => Math.abs(x - m))), n: lats.length, of: N - SKIP };
+}
+
+/* ---------- export ---------- */
+function exportWav() {
+  const act = layers.filter(l => l.mounted && l.buf && !l.mute);
+  if (!act.length) { toast('Det finns inga hörbara lager att exportera.'); return; }
+  const m = new Float32Array(L); let pk = 0;
+  for (const l of act) { const d = l.buf.getChannelData(0), g = l.norm * l.vol; for (let i = 0; i < L; i++) m[i] += g * d[i]; }
+  for (let i = 0; i < L; i++) { const v = Math.abs(m[i]); if (v > pk) pk = v; }
+  const sc = pk > 0.98 ? 0.98 / pk : 1, ab = new ArrayBuffer(44 + L * 2), v = new DataView(ab);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + L * 2, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, L * 2, true);
+  for (let i = 0; i < L; i++) v.setInt16(44 + i * 2, Math.round(clamp(m[i] * sc, -1, 1) * 32767), true);
+  const name = 'varv-' + st.bpm + 'bpm-' + st.bars + 'x' + st.beats + '.wav', blob = new Blob([ab], { type: 'audio/wav' });
+  try {
+    const file = new File([blob], name, { type: 'audio/wav' });
+    if (matchMedia('(pointer:coarse)').matches && navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file] }).catch(() => {}); return; }
+  } catch (e) {}
+  const a = el('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ---------- gränssnitt ---------- */
+const STATE_TXT = { stop: 'Stoppad', count: 'Räknar in', countrec: 'Räknar in, sedan inspelning', armed: 'Spelar in från nästa varv', rec: 'Spelar in', reclast: 'Spelar in, sista varvet', play: 'Spelar', meas: 'Mäter latens' };
+function ui() {
+  const s = stateNow(); lastState = s;
+  $('#stateText').textContent = STATE_TXT[s];
+  document.body.className = s === 'rec' || s === 'reclast' ? 's-rec' : s === 'armed' || s === 'countrec' ? 's-armed' : s === 'stop' || s === 'meas' ? 's-stop' : 's-play';
+  $('#tape').classList.toggle('run', running);
+  $('#playLbl').textContent = running ? 'Stopp' : 'Start';
+  $('#playIco').innerHTML = running ? '<path d="M6 6h12v12H6z"/>' : '<path d="M7 4l13 8-13 8z"/>';
+  $('#recLbl').textContent = s === 'armed' || s === 'countrec' ? 'Avbryt' : s === 'rec' && st.mode === 'cont' ? 'Sista varvet' : s === 'reclast' ? 'Fortsätt' : s === 'rec' ? 'Avbryt' : 'Spela in';
+  const has = layers.some(l => l.mounted);
+  $('#empty').hidden = has; $('#tempoLock').hidden = !has;
+  for (const b of document.querySelectorAll('#bpmStep .sbtn, #beatsSeg button, #barsSeg button, #tapBtn')) b.disabled = has;
+  $('#chipTempo b').textContent = st.bpm + ' bpm';
+  $('#chipTempo span').textContent = st.bars + ' × ' + st.beats + '/4';
+  $('#chipLat b').textContent = prof().ms + ' ms';
+  $('#chipLat span').textContent = prof().guess ? 'ej uppmätt' : prof().name;
+  const fxOn = st.gFilter !== 0 || st.gEcho > 0 || st.gRev > 0;
+  $('#chipFx').classList.toggle('on', fxOn); $('#chipFx span').textContent = fxOn ? 'på' : 'av';
+  $('#bpmVal').innerHTML = st.bpm + '<small>bpm</small>';
+  $('#latVal').innerHTML = prof().ms + '<small>ms</small>';
+  $('#lenNote').textContent = 'Ett varv är ' + (st.bars * st.beats * 60 / st.bpm).toFixed(1).replace('.', ',') + ' sekunder.';
+  $('#modeNote').textContent = st.mode === 'one' ? 'Ett varv spelas in, sedan går loopen vidare.' : 'Varje varv blir ett nytt lager tills du trycker igen. Tysta varv sparas inte.';
+  if (document.activeElement !== $('#profName')) $('#profName').value = prof().name;
+  $('#profDel').disabled = st.profiles.length < 2;
+  drawProfs();
+}
+function drawProfs() {
+  const host = $('#profs'); host.textContent = '';
+  st.profiles.forEach((p, i) => {
+    const b = el('button', i === st.active ? 'on' : ''); b.append(el('b', '', p.name || 'Namnlös'), el('span', '', p.ms + ' ms' + (p.guess ? ', ej uppmätt' : '')));
+    b.addEventListener('click', () => { st.active = i; save(); ui(); }); host.append(b);
+  });
+  const add = el('button'); add.append(el('b', '', 'Ny uppsättning'), el('span', '', 'börjar på ' + prof().ms + ' ms'));
+  add.addEventListener('click', () => { st.profiles.push({ name: 'Uppsättning ' + (st.profiles.length + 1), ms: prof().ms, guess: true }); st.active = st.profiles.length - 1; save(); ui(); $('#profName').focus(); $('#profName').select(); });
+  host.append(add);
+}
+function seg(host, opts, get, set) {
+  host.textContent = '';
+  for (const [v, label] of opts) {
+    const b = el('button', get() === v ? 'on' : '', label);
+    b.addEventListener('click', () => { set(v); for (const c of host.children) c.classList.remove('on'); b.classList.add('on'); });
+    host.append(b);
+  }
+}
+function fillMics() {
+  const sel = $('#micSel'); sel.textContent = '';
+  mics.forEach((m, i) => { const o = el('option', '', m.label || 'Mikrofon ' + (i + 1)); o.value = m.deviceId; o.selected = m.label === micLabel; sel.append(o); });
+  if (!mics.length) sel.append(el('option', '', 'Ingen mikrofon hittades'));
+}
+function diag() {
+  if (!ctx) return;
+  let t = Math.round(sr / 100) / 10 + ' kHz, fångst via ' + (capMode === 'worklet' ? 'AudioWorklet' : 'reservläge med sämre tidsprecision') + '. ';
+  t += micOK ? 'Mikrofon: ' + (micLabel || 'okänd') + '. ' : 'Mikrofonen är inte igång. ';
+  if (ctx.outputLatency > 0) t += 'Systemet uppger ' + Math.round(ctx.outputLatency * 1000) + ' ms utfördröjning. ';
+  if (sr < 32000) t += 'Den låga samplingsfrekvensen tyder på att hörlurarnas mikrofon används. Välj telefonens mikrofon ovan.';
+  const n = $('#diag'); n.textContent = t; n.classList.toggle('warn', sr < 32000 || !micOK);
+}
+
+let toastT = 0;
+function toast(txt, act, fn) {
+  const t = $('#toast'), a = $('#toastAct'); $('#toastTxt').textContent = txt; t.hidden = false;
+  a.hidden = !act; if (act) { a.textContent = act; a.onclick = () => { t.hidden = true; fn(); }; }
+  clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, act ? 6000 : 3200);
+}
+
+let wl = null;
+async function wake(on) {
+  try {
+    if (on) { if (!wl && navigator.wakeLock) { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => { wl = null; }); } }
+    else if (wl) { await wl.release(); wl = null; }
+  } catch (e) {}
+}
+
+function setTempo(fn) {
+  if (layers.some(l => l.mounted)) return;
+  fn(); st.bpm = clamp(Math.round(st.bpm), 40, 240); save(); buildRuler(); applyGlobalFx(); ui();
+  if (running) { stop(); start(false); }
+}
+
+/* ---------- koppla ihop ---------- */
+for (const b of document.querySelectorAll('[data-open]')) b.addEventListener('click', () => { $('#' + b.dataset.open).hidden = false; });
+for (const s of document.querySelectorAll('.sheet')) s.addEventListener('click', e => { if (e.target === s || e.target.closest('[data-close]')) s.hidden = true; });
+
+$('#playBtn').addEventListener('click', () => { if (running) stop(); else start(false); });
+$('#recBtn').addEventListener('click', toggleRec);
+$('#undoBtn').addEventListener('click', undoLast);
+$('#capBtn').addEventListener('click', capturePrev);
+
+for (const b of document.querySelectorAll('#bpmStep .sbtn')) hold(b, () => setTempo(() => { st.bpm += +b.dataset.d; }));
+let taps = [];
+$('#tapBtn').addEventListener('pointerdown', () => {
+  const t = performance.now(); if (taps.length && t - taps[taps.length - 1] > 2000) taps = [];
+  taps.push(t); if (taps.length > 5) taps.shift();
+  if (taps.length >= 2) setTempo(() => { st.bpm = 60000 / ((taps[taps.length - 1] - taps[0]) / (taps.length - 1)); });
+});
+seg($('#beatsSeg'), [2, 3, 4, 5, 6, 7].map(v => [v, v]), () => st.beats, v => setTempo(() => { st.beats = v; }));
+seg($('#barsSeg'), [1, 2, 4, 8].map(v => [v, v]), () => st.bars, v => setTempo(() => { st.bars = v; }));
+
+for (const b of document.querySelectorAll('#latStep .sbtn')) hold(b, () => { const p = prof(); p.ms = clamp(p.ms + +b.dataset.d, 0, MAXLAT_MS); p.guess = false; save(); ui(); });
+$('#profName').addEventListener('input', e => { prof().name = e.target.value; save(); ui(); });
+$('#profDel').addEventListener('click', () => { if (st.profiles.length < 2) return; st.profiles.splice(st.active, 1); st.active = 0; save(); ui(); });
+$('#measBtn').addEventListener('click', measure);
+$('#measUse').addEventListener('click', () => { if (!measOut) return; prof().ms = measOut.ms; prof().guess = false; save(); $('#measUse').hidden = true; ui(); toast('Nya lager flyttas ' + measOut.ms + ' ms.'); });
+
+const gRows = [
+  sliderRow('Huvudvolym', 0, 1, 0.01, st.master, 0.9, pct, v => { st.master = v; save(); applyGlobalFx(); }, 'g'),
+  sliderRow('Filter', -1, 1, 0.01, st.gFilter, 0, filtTxt, v => { st.gFilter = v; save(); applyGlobalFx(); ui(); }, 'g'),
+  sliderRow('Eko', 0, 1, 0.01, st.gEcho, 0, pct, v => { st.gEcho = v; save(); applyGlobalFx(); ui(); }, 'g'),
+  sliderRow('Rum', 0, 1, 0.01, st.gRev, 0, pct, v => { st.gRev = v; save(); applyGlobalFx(); ui(); }, 'g')];
+$('#gfx').append(...gRows);
+seg($('#echoSeg'), [[0.5, 'Åttondel'], [0.75, 'Punkterad'], [1, 'Fjärdedel']], () => st.echoDiv, v => { st.echoDiv = v; save(); applyGlobalFx(); });
+$('#fxReset').addEventListener('click', () => { st.gFilter = st.gEcho = st.gRev = 0; gRows[1].set(0); gRows[2].set(0); gRows[3].set(0); save(); applyGlobalFx(); ui(); });
+
+seg($('#clickSeg'), [[true, 'På'], [false, 'Av']], () => st.clickOn, v => { st.clickOn = v; save(); if (ctx && running && nowF() >= epoch) clickGain.gain.setTargetAtTime(v ? st.clickVol : 0, ctx.currentTime, 0.01); });
+$('#clickVolRow').append(sliderRow('Klickvolym', 0, 1, 0.01, st.clickVol, 0.6, pct, v => { st.clickVol = v; save(); if (ctx && running && st.clickOn && nowF() >= epoch) clickGain.gain.setTargetAtTime(v, ctx.currentTime, 0.01); }, 'g'));
+seg($('#modeSeg'), [['one', 'Ett varv'], ['cont', 'Löpande']], () => st.mode, v => { st.mode = v; save(); ui(); });
+$('#micSel').addEventListener('change', e => { if (!ctx) return; st.micId = e.target.value; save(); openMic(st.micId, false); });
+$('#exportBtn').addEventListener('click', exportWav);
+let clearArmed = 0;
+$('#clearBtn').addEventListener('click', e => {
+  const b = e.currentTarget;
+  if (Date.now() - clearArmed > 3000) { clearArmed = Date.now(); b.textContent = 'Tryck igen för att rensa'; setTimeout(() => { b.textContent = 'Rensa alla lager'; }, 3000); return; }
+  clearArmed = 0; b.textContent = 'Rensa alla lager';
+  for (const l of layers.slice()) if (l.mounted) unmount(l);
+  layers = []; laneCount = 0; recPass = null; stopAfter = false; ui(); toast('Alla lager rensade.');
+});
+
+document.addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input,select,textarea')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key;
+  if (k === ' ') { e.preventDefault(); if (e.repeat) return; if (running) stop(); else start(false); }
+  else if (k === 'r' || k === 'R' || k === 'Enter' || k === 'ArrowRight' || k === 'PageDown') { if (e.target.closest && e.target.closest('button') && k === 'Enter') return; e.preventDefault(); if (!e.repeat) toggleRec(); }
+  else if (k === 'ArrowLeft' || k === 'PageUp' || k === 'Backspace') { e.preventDefault(); if (!e.repeat) undoLast(); }
+  else if (k === 'c' || k === 'C') capturePrev();
+  else if (k === 'Escape') for (const s of document.querySelectorAll('.sheet')) s.hidden = true;
+  else if (k >= '1' && k <= '9') { const l = layers.find(x => x.mounted && x.n === +k); if (l) toggleMute(l); }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden && running) stop(); });
+window.addEventListener('resize', () => { for (const l of layers) drawLane(l); liveDirty = true; });
+
+buildRuler(); ui(); requestAnimationFrame(frame);
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+
+/* för felsökning och tester */
+window.__varv = { st, analyze, get layers() { return layers; }, get info() { return { sr, L, epoch, running, capEnd, capFirst, R, PRE, XF, capMode, micOK, recPass, state: stateNow() }; },
+  set synth(f) { synth = f; }, start, stop, toggleRec, capturePrev, measure, initAudio, nowF: () => nowF() };
+})();
+</script>
+</body>
+</html>
