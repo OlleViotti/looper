@@ -1,6 +1,6 @@
 # Varv
 
-A loop station in the browser with latency compensation per layer. Made for listening in Bluetooth headphones while recording with the phone's microphone.
+A loop station in the browser with latency compensation per layer. Made specifically to handle listening in Bluetooth headphones while recording with the phone's microphone.
 
 - Click with count-in, tempo, time signature and 1 to 8 bars per lap
 - Every lap becomes its own layer, shifted back by the set latency; the latency can be adjusted afterwards per layer
@@ -11,3 +11,7 @@ A loop station in the browser with latency compensation per layer. Made for list
 - Keys and Bluetooth pedal: space, R or right arrow, left arrow, C, K, 1 to 9
 
 Everything lives in `index.html`. The page must be opened over https for the microphone to work.
+
+Todo:
+- Save projects
+- Overdub recording?
