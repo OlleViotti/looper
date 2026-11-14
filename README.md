@@ -23,7 +23,7 @@ The top bar is a single row: the bar and beat counter on the left, the Varv logo
 
 - **Per recording.** Every recording is shifted back by the latency in force when it was made. Each one keeps its own value, which you can nudge afterwards in steps of 1 or 10 ms while the loop plays, watching the hits line up with the beat lines.
 - **Automatic measurement, exact.** The app plays ten clicks and listens for them through the microphone, using a matched filter tuned to the click, so no human timing is involved. Hold the phone's microphone against an earbud and tap Measure exactly. It finds a faint click buried in noise and reports nothing rather than a wrong value when it cannot hear the clicks.
-- **Microphone choice.** By default the app records with the phone's own microphone even when headphones are connected, and switches back to it if the system changes the input.
+- **Microphone choice.** The iPhone microphone is the default, even when headphones with a microphone are connected, and the app switches back to it if the system changes the input. Another microphone, such as a USB interface, can be chosen in Settings.
 
 ## Loop length
 
@@ -35,7 +35,7 @@ The top bar is a single row: the bar and beat counter on the left, the Varv logo
 
 - **One button.** Tap Record to record the next pass. Tap again while it records to keep going: the following passes stack up as takes in the same track until you tap once more for the last one. Hold Record to start or stop playback. This all works from a single pedal button.
 
-- **One lap** records a single lap. **Continuous** records every lap until you tap again; silent laps are thrown away.
+- **One lap** records a single lap. **Auto** records every lap until you tap again; silent laps are thrown away. Switch between them with the button next to the scenes, just above the transport buttons, or in Settings.
 - **Capture last** keeps the lap you just played even if you never pressed Record.
 - **Undo** removes the latest recording. Removed recordings and deleted tracks stay in a bar at the bottom with a Restore button until you dismiss it.
 - **Levels.** Input gain (−12 to +30 dB) and an optional 80 Hz low cut sit before the recording. Recordings are kept at the level they were played; automatic levelling is an option. The in and out meters in the top bar turn amber near full scale, red on clipping or when the output limiter has to work hard. Each track shows its own level under its name.
@@ -46,7 +46,7 @@ The top bar is a single row: the bar and beat counter on the left, the Varv logo
 - Add tracks before you start, name them and give them their own effects.
 - **Arm** a track (hold its strip) to record into it. With no track armed, Record fills the empty tracks from the top, then creates new ones. The status bar always says where the next recording will go.
 - Recording again into a track that already holds audio adds another take on top (overdub). Each take has its own latency, reverse and remove.
-- **Mute timing:** mute and solo act immediately by default. In Settings they can instead land on the next beat or the next bar (in free mode: the next pass of the loop), so you can tap a little ahead.
+- **Mute timing:** mute and solo land on the next bar by default (in free mode: the next pass of the loop), so you can tap a little ahead. In Settings they can instead act immediately or on the next beat.
 - Per track, in Edit: name, bars, volume, pan, graphical EQ, filter (darker or thinner), delay send and reverb send, plus the waveform and each take's latency, reverse and remove.
 
 ## Graphical EQ
@@ -55,7 +55,7 @@ Each track and the master have a three-band EQ drawn as its response curve. Drag
 
 ## Scenes
 
-Four scene buttons, A to D, sit above the tracks. Hold one to store which tracks are muted and soloed; tap it to bring that back, following the mute timing setting. A scene that matches the current state lights up. Scenes are saved with the project.
+Four scene buttons, A to D, sit just above the transport buttons, next to the One lap / Auto switch. Hold one to store which tracks are muted and soloed; tap it to bring that back, following the mute timing setting. A scene that matches the current state lights up. Scenes are saved with the project.
 
 ## Master effects
 
@@ -77,7 +77,7 @@ Under Master in the Edit view:
 ## Live use
 
 - The screen stays awake while playing. Large transport buttons: Start, Undo, Record, Capture last and Click on or off.
-- Keys, and Bluetooth pedals that send them: <kbd>Space</kbd> start and stop, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> record, <kbd>←</kbd> undo, <kbd>C</kbd> capture last, <kbd>K</kbd> click, <kbd>1</kbd> to <kbd>9</kbd> mute a track, <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>P</kbd> performance recording. Holding the record key starts or stops playback.
+- Keys, and Bluetooth pedals that send them: <kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button (tap to record, hold to start or stop), <kbd>←</kbd> or <kbd>Backspace</kbd> undo, <kbd>C</kbd> capture last, <kbd>L</kbd> One lap or Auto, <kbd>K</kbd> click, <kbd>1</kbd>–<kbd>9</kbd> mute a track and <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it, <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play, <kbd>P</kbd> performance recording.
 
 ## Technical notes
 

@@ -73,6 +73,8 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 [data-mode=edit] .nmcol{transform:translateX(var(--shift,0px))}
 
 .ruler{margin-bottom:10px}
+.laptog{height:44px;border-radius:8px;background:var(--panel);font-size:15px;font-weight:700;color:var(--mut)}
+.laptog.on{background:var(--tape);color:#1b1f2e}
 #ruler{display:flex;height:26px;align-items:flex-end}
 #ruler i{flex:1;height:10px;border-left:1px solid var(--line);font:500 13px/1 var(--ui);font-style:normal;color:var(--mut);padding-left:4px;position:relative}
 #ruler i.first{height:26px;border-left:2px solid var(--mut)}
@@ -84,10 +86,11 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 .tname .lv{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--mut);transform-origin:left;transform:scaleX(0);pointer-events:none}
 .track.solo .tname{background:var(--amber);color:#1b1f2e}
 .track.solo .tname .lv{background:#1b1f2e}
-.scenes{margin-bottom:10px}
+.scenes{margin:0;padding:8px 16px;border-top:1px solid var(--line);background:var(--desk)}
+[data-mode=edit] .scenes{display:none!important}
 .sclab{display:flex;align-items:center;padding-left:10px;color:var(--mut);font-size:14px}
 .scn{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.scb{position:relative;overflow:hidden;height:44px;display:grid;place-items:center;border-radius:8px;background:var(--raise);font-weight:700;cursor:pointer}
+.scb{position:relative;overflow:hidden;height:44px;display:flex;align-items:center;justify-content:center;line-height:1;border-radius:8px;background:var(--raise);font-weight:700;cursor:pointer}
 .scb.empty{background:transparent;border:1px dashed var(--line);color:var(--mut)}
 .scb.on{background:var(--amber);color:#1b1f2e}
 .scb .lp{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,178,36,.35);pointer-events:none}
@@ -116,7 +119,12 @@ body.s-rec .live .trk{border-color:var(--rec)}
 .masterrow{display:none}
 [data-mode=edit] .masterrow{display:grid}
 .masterrow .tname{background:transparent;border:1px solid var(--line)}
-.empty{color:var(--mut);padding:2px 0 14px;max-width:34em}
+.empty,.hint{color:var(--mut);padding:2px 0 14px;max-width:34em;margin:0}
+.hint{font-size:15px;padding:0 0 12px}
+.hint b{color:var(--text);font-weight:600}
+.hint-bar{padding:8px 16px 0;border-top:1px solid var(--line)}
+.hint-bar+.scenes{border-top:0}
+[data-mode=edit] .hint{display:none}
 .empty b{color:var(--text);font-weight:600}
 
 /* Edit pane */
@@ -166,7 +174,7 @@ select.txt{appearance:auto}
 .eqw output{display:block;font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums;min-height:20px;margin-top:4px}
 
 /* Transport */
-.bar{display:grid;grid-template-columns:1fr 1fr 1.25fr 1fr 1fr;gap:6px;padding:10px 10px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--desk)}
+.bar{display:grid;grid-template-columns:1fr 1fr 1.25fr 1fr 1fr;gap:6px;padding:4px 10px calc(10px + env(safe-area-inset-bottom));background:var(--desk)}
 .bar button{height:70px;border-radius:14px;background:var(--raise);font-weight:600;font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;line-height:1.05;padding:0 2px}
 .bar svg{width:22px;height:22px;fill:currentColor}
 #recBtn{background:var(--rec);color:#fff}
@@ -207,6 +215,9 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 .undo{z-index:9;padding:6px 6px 6px 14px}
 .undo span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .undo:not([hidden])~.toast{bottom:calc(166px + env(safe-area-inset-bottom))}
+.toast,.undo{bottom:calc(164px + env(safe-area-inset-bottom))}
+.undo:not([hidden])~.toast{bottom:calc(226px + env(safe-area-inset-bottom))}
+[data-mode=edit] .toast,[data-mode=edit] .undo{bottom:calc(104px + env(safe-area-inset-bottom))}
 .undo button{flex:none;min-height:40px;padding:0 12px;border-radius:8px;font-weight:700;background:#1b1f2e;color:var(--tape)}
 .undo button.x{background:transparent;color:#1b1f2e;font-size:24px;line-height:1;padding:0 10px}
 @media (prefers-reduced-motion:reduce){.slide,.nmcol,.epane,.spage,.trk.pressing .lp{transition:none}body.s-armed #recBtn{animation:none}}
@@ -223,17 +234,19 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 
   <div id="main">
     <main class="tape" id="tape">
-      <div class="row ruler"><div></div><div id="ruler" class="slide"></div></div>
-      <div class="row scenes" id="sceneRow" hidden><div class="sclab nmcol">Scenes</div><div class="scn slide" id="scn"></div></div>
       <p class="empty" id="empty"><b>Tap Record to start.</b> Tap a track to mute it, hold it to arm it, tap its name to solo. Hold Record to start or stop. Swipe right to edit tracks, left for settings.</p>
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
+      <p class="hint" id="hTrack" hidden><b>Tap</b> a track to mute it, <b>hold</b> it to arm the next recording, tap its <b>name</b> to solo.</p>
+      <p class="hint" id="hSwipe" hidden><b>Swipe right</b> to edit a track's sound, <b>left</b> for settings. Tap the logo to come back.</p>
       <div class="row"><button class="addtrk nmcol" id="addTrk">+ Track</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
       <div class="row masterrow" id="masterRow"><button class="tname nmcol" id="masterName"><b>Master</b><small>effects</small></button><div></div></div>
     </main>
     <section class="epane" id="epane" aria-label="Edit"></section>
   </div>
 
+  <p class="hint hint-bar" id="hScenes" hidden><b>Scenes A–D:</b> hold one to store which tracks are muted, tap it to bring that back. <b>One lap</b> records a lap, <b>Auto</b> keeps recording until you tap again.</p>
+  <div class="row scenes" id="sceneRow"><button class="laptog" id="lapTog" aria-label="Recording length: tap to switch"></button><div class="scn" id="scn" aria-label="Scenes"></div></div>
   <footer class="bar">
     <button id="playBtn"><svg viewBox="0 0 24 24" id="playIco"><path d="M7 4l13 8-13 8z"/></svg><span id="playLbl">Start</span></button>
     <button id="undoBtn"><svg viewBox="0 0 24 24"><path d="M9 5L3 11l6 6v-4h5a4 4 0 010 8h-3v2h3a6 6 0 000-12H9z"/></svg><span>Undo</span></button>
@@ -244,7 +257,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 </div>
 
 <div class="spage" id="spage" role="dialog" aria-labelledby="hSet"><div class="sp-in">
-  <div class="sp-head"><h2 id="hSet">Settings</h2><button class="btn" id="setDone">Done</button></div>
+  <div class="sp-head"><h2 id="hSet">Settings</h2></div>
 
   <h3 class="first">Loop</h3>
   <div class="field"><span>Length</span><div class="seg" id="lenSeg"></div></div>
@@ -297,9 +310,12 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
   <p class="note">Set the gain so loud hits reach the amber part of the in meter. Red means clipping.</p>
   <p class="note" id="diag">Audio starts the first time you tap Start, Record or Measure.</p>
 
+  <h3>Guide</h3>
+  <button class="btn" id="hintReset">Show the guide again</button>
+
   <h3>Keys and pedal</h3>
-  <p class="note"><kbd>Space</kbd> start and stop. <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> record. <kbd>←</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd> to <kbd>9</kbd> mute a track. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>P</kbd> record performance. Hold the record key, like the Record button, to start or stop.</p>
-  <p class="note">Version 15 Nov 00:40</p>
+  <p class="note"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>L</kbd> One lap or Auto. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p>
+  <p class="note">Version 15 Nov 01:10</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -322,15 +338,17 @@ const MAXLAT_MS = 600, PRE_MS = 60, XF_MS = 20, LEAD_S = 0.09, SAFE_S = 0.04, GR
 const INKS = ['#20232b', '#2146b5', '#1d7a4a', '#7a3cae', '#b3501a', '#0e7482', '#ad2f6c'];
 const EQ_DEF = { eqL: 0, eqM: 0, eqH: 0, eqLf: 200, eqMf: 1000, eqHf: 4000 };
 const FX_KEYS = ['master', 'gFilter', 'eqL', 'eqM', 'eqH', 'eqLf', 'eqMf', 'eqHf', 'gEcho', 'echoDiv', 'echoMs', 'echoFb', 'echoLvl', 'gRev', 'revSize', 'revLvl', 'compThr', 'compAmt'];
+const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
 const st = Object.assign({
-  bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now',
+  v: 2, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'bar',
   profiles: [{ name: 'AirPods', ms: 180, guess: true }, { name: 'Wired or speaker', ms: 20, guess: true }],
-  active: 0, micId: '', master: 0.9, gFilter: 0,
+  active: 0, micId: 'builtin', master: 0.9, gFilter: 0,
   gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1,
   gRev: 0, revSize: 2, revLvl: 1, compThr: -18, compAmt: 0
-}, EQ_DEF, (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })());
+}, EQ_DEF, saved);
 if (!Array.isArray(st.profiles) || !st.profiles.length) st.profiles = [{ name: 'Default', ms: 0, guess: true }];
 st.active = clamp(st.active | 0, 0, st.profiles.length - 1);
+if ((saved.v || 0) < 2) { st.v = 2; st.muteQ = 'bar'; if (!saved.micId) st.micId = 'builtin'; }   // new defaults: next bar, the iPhone microphone
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
 const prof = () => st.profiles[st.active];
 
@@ -383,7 +401,7 @@ function initAudio() {
   PRE = latN(PRE_MS); XF = latN(XF_MS); MAXLAT = latN(MAXLAT_MS); OPEN_LP = Math.min(20000, sr * 0.45);
   buildGraph();
   for (const t of tracks) buildTrackNodes(t);          // tracks prepared before audio started
-  initP = (async () => { await setupCapture(); await openMic(st.micId, true); diag(); return true; })();
+  initP = (async () => { await setupCapture(); await openMic(wantsBuiltin() ? '' : st.micId, true); diag(); return true; })();
   return initP;
 }
 
@@ -502,13 +520,16 @@ function onCap(f, d) {
 }
 
 const BUILTIN = /iphone|ipad|built-?in|inbyggd|intern/i;
+const wantsBuiltin = () => !st.micId || st.micId === 'builtin';
+const builtinId = list => (list.find(m => BUILTIN.test(m.label)) || {}).deviceId || '';
+const chosenMic = list => wantsBuiltin() ? builtinId(list) : list.some(m => m.deviceId === st.micId) ? st.micId : builtinId(list);
 let micDev = '', micOpenAt = 0, micList = '', keepT = 0;
 async function openMic(id, auto) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { micOK = false; toast('The microphone needs the page to be opened over https.'); return false; }
   const base = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 };
   let s = null;
   try { s = await navigator.mediaDevices.getUserMedia({ audio: id ? Object.assign({ deviceId: { exact: id } }, base) : base }); }
-  catch (e) { if (id) { try { s = await navigator.mediaDevices.getUserMedia({ audio: base }); st.micId = ''; save(); } catch (e2) {} } }
+  catch (e) { if (id) { try { s = await navigator.mediaDevices.getUserMedia({ audio: base }); } catch (e2) {} } }
   if (!s) { micOK = false; toast('No access to the microphone. Allow the microphone for this page and try again.'); diag(); return false; }
   if (micStream) micStream.getTracks().forEach(t => t.stop());
   if (micSrc) { try { micSrc.disconnect(); } catch (e) {} }
@@ -519,7 +540,7 @@ async function openMic(id, auto) {
   if (tr) tr.addEventListener('ended', () => { if (micStream === s) keepMic(true); });
   try { mics = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch (e) { mics = []; }
   micList = mics.map(m => m.deviceId).join();
-  if (auto && !st.micId && !BUILTIN.test(micLabel)) {
+  if (auto && wantsBuiltin() && !BUILTIN.test(micLabel)) {
     const bi = mics.find(m => BUILTIN.test(m.label));
     if (bi && bi.deviceId !== micDev) return openMic(bi.deviceId, false);     // listen in the headphones, record with the phone's microphone
   }
@@ -532,11 +553,11 @@ function keepMic(force) {
     if (!ctx) return;
     let list = []; try { list = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); } catch (e) {}
     const tr = micStream && micStream.getAudioTracks()[0];
-    const want = st.micId && list.some(m => m.deviceId === st.micId) ? st.micId : ((list.find(m => BUILTIN.test(m.label)) || {}).deviceId || '');
+    const want = chosenMic(list);
     const cur = tr && tr.getSettings ? tr.getSettings().deviceId : micDev;
     const changed = force || !tr || tr.readyState !== 'live' || list.map(m => m.deviceId).join() !== micList || (want && cur && cur !== want) || tr.label !== micLabel;
     if (!changed) return;
-    const before = micLabel; await openMic(want, !want);
+    const before = micLabel; await openMic(want, wantsBuiltin());
     if (micOK && micLabel !== before) toast('Microphone: ' + (micLabel || 'unknown'));
   }, 600);
 }
@@ -801,9 +822,10 @@ function switchAt() {
   const unit = isFree() ? L : st.muteQ === 'bar' ? barsLen(1) : barsLen(1) / st.beats;
   return (epoch + Math.ceil((nowF() - epoch + 0.01 * sr) / unit) * unit) / sr;
 }
+function hintDone(n) { if (st.hints[n]) return; st.hints[n] = 1; save(); ui(); }
 let lastTouched = null;
 const touched = t => { if (t) lastTouched = t.id; };
-function toggleMute(t) { touched(t); t.mute = !t.mute; applyTrack(t, switchAt()); drawHeads(); markDirty(); }
+function toggleMute(t) { touched(t); hintDone('track'); t.mute = !t.mute; applyTrack(t, switchAt()); drawHeads(); markDirty(); }
 /* ---------- performance recording ----------
    Records what comes out (the click excluded). The microphone can be mixed in; the music is then delayed
    by the latency so that what you play live lines up with the loops you were hearing. */
@@ -854,8 +876,8 @@ async function drawPerf() {
     row.append(info, sv, del); host.append(row);
   }
 }
-function toggleSolo(t) { touched(t); t.solo = !t.solo; const at = switchAt(); for (const x of tracks) applyTrack(x, at); drawHeads(); markDirty(); }
-function toggleArm(t) { touched(t); armedId = armedId === t.id ? null : t.id; drawHeads(); ui(); }
+function toggleSolo(t) { touched(t); hintDone('track'); t.solo = !t.solo; const at = switchAt(); for (const x of tracks) applyTrack(x, at); drawHeads(); markDirty(); }
+function toggleArm(t) { touched(t); hintDone('track'); armedId = armedId === t.id ? null : t.id; drawHeads(); ui(); }
 
 /* ---------- tracks: rows on screen ---------- */
 function newTrack(opts, idx) {
@@ -873,7 +895,6 @@ function mountTrack(t, idx) {
   const trk = el('div', 'trk slide'); trk.tabIndex = 0; trk.setAttribute('role', 'button');
   t.cv = el('canvas'); trk.append(t.cv, el('i', 'ph'), el('i', 'lp'), el('em', '', 'muted'));
   pressable(trk, () => toggleMute(t), () => toggleArm(t));
-  trk.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleMute(t); } });
   row.append(nb, trk); t.row = row;
   const host = $('#lanes'); host.insertBefore(row, host.children[idx] || null);
   buildTrackNodes(t);
@@ -919,11 +940,12 @@ const SCN = 'ABCD';
 function sceneStore(i) {
   scenes[i] = { mute: {}, solo: {} };
   for (const t of tracks) { scenes[i].mute[t.key] = t.mute; scenes[i].solo[t.key] = t.solo; }
-  drawScenes(); markDirty(); toast('Scene ' + SCN[i] + ' stored.');
+  drawScenes(); markDirty(); hintDone('scenes'); toast('Scene ' + SCN[i] + ' stored.');
 }
 function sceneRecall(i) {
   const sc = scenes[i];
   if (!sc) { toast('Hold to store the current mutes as scene ' + SCN[i] + '.'); return; }
+  hintDone('scenes');
   const at = switchAt();
   for (const t of tracks) if (t.key in sc.mute) { t.mute = sc.mute[t.key]; t.solo = !!sc.solo[t.key]; }
   for (const t of tracks) applyTrack(t, at);
@@ -937,7 +959,6 @@ function drawScenes() {
     b.setAttribute('aria-label', 'Scene ' + c + ': tap to recall, hold to store');
     pressable(b, () => sceneRecall(i), () => sceneStore(i)); host.append(b);
   });
-  $('#sceneRow').hidden = !tracks.length;
   [...host.children].forEach((b, i) => { b.classList.toggle('empty', !scenes[i]); b.classList.toggle('on', sceneOn(scenes[i])); });
 }
 
@@ -1197,7 +1218,7 @@ function setMode(m) {
     else if (selId == null) selId = tracks.length ? tracks[0].id : 'master';
     renderPane();
   }
-  if (m !== 'play') { $('#empty').dataset.gone = '1'; $('#empty').hidden = true; }   // the first swipe dismisses the instructions
+  if (m !== 'play' && !(st.hints.start && st.hints.swipe)) { st.hints.start = st.hints.swipe = 1; save(); ui(); }   // the first swipe dismisses the instructions
   else renderPane();
   if (m === 'set') { drawProjects(); drawPerf(); $('#spage').scrollTop = 0; }
   drawHeads();
@@ -1280,7 +1301,10 @@ function drawLive() {
 
 let beatEls = [], lastBeat = -2;
 function buildRuler() {
-  const r = $('#ruler'); r.textContent = ''; beatEls = []; lastBeat = -2;
+  beatEls = []; lastBeat = -2;
+  const r = $('#ruler');
+  if (!r) { for (const t of tracks) drawLane(t); return; }          // the ruler was removed from the play view
+  r.textContent = '';
   for (let j = 0; j < (isFree() ? 1 : st.bars * st.beats); j++) {
     const bar = j % st.beats === 0, b = el('i', bar ? 'first' : '', bar ? j / st.beats + 1 : null);
     r.append(b); beatEls.push(b);
@@ -1565,7 +1589,12 @@ function ui() {
   $('#playLbl').textContent = running ? 'Stop' : 'Start';
   $('#playIco').innerHTML = running ? '<path d="M6 6h12v12H6z"/>' : '<path d="M7 4l13 8-13 8z"/>';
   $('#recLbl').textContent = s === 'define' ? 'End loop' : s === 'armed' || s === 'countrec' ? 'Cancel' : s === 'rec' && rec && rec.cont ? 'Last lap' : s === 'reclast' ? 'Continue' : s === 'rec' && rec ? 'Keep going' : 'Record';
-  $('#empty').hidden = tracks.length > 0 || !!$('#empty').dataset.gone;
+  const h = st.hints, played = allTakes().some(k => k.started), filled = tracks.filter(t => t.takes.some(k => k.started)).length;
+  $('#empty').hidden = tracks.length > 0 || !!h.start;                 // guide lines, each gone for good once used
+  $('#hTrack').hidden = !tracks.length || !!h.track;
+  $('#hSwipe').hidden = !played || !!h.swipe;
+  $('#hScenes').hidden = filled < 2 || !!h.scenes;
+  $('#lapTog').textContent = st.mode === 'one' ? 'One lap' : 'Auto'; $('#lapTog').classList.toggle('on', st.mode === 'cont');
   if (tracks.length) $('#cont').hidden = true;
   $('#perfInd').hidden = !perf; $('#perfBtn').textContent = perf ? 'Stop recording performance' : 'Record performance'; $('#perfBtn').classList.toggle('on', !!perf);
   $('#projName').textContent = project ? project.name : hasContent() ? 'unsaved' : '';
@@ -1606,8 +1635,9 @@ async function drawProjects() {
 }
 function fillMics() {
   const sel = $('#micSel'); sel.textContent = '';
-  const o0 = el('option', '', "Automatic, prefer the phone's microphone"); o0.value = ''; o0.selected = !st.micId; sel.append(o0);
-  mics.forEach((m, i) => { const o = el('option', '', m.label || 'Microphone ' + (i + 1)); o.value = m.deviceId; o.selected = !!st.micId && m.deviceId === st.micId; sel.append(o); });
+  const bi = mics.find(m => BUILTIN.test(m.label));
+  const o0 = el('option', '', bi && bi.label ? bi.label : 'iPhone microphone'); o0.value = 'builtin'; o0.selected = wantsBuiltin(); sel.append(o0);
+  mics.forEach((m, i) => { if (m === bi) return; const o = el('option', '', m.label || 'Microphone ' + (i + 1)); o.value = m.deviceId; o.selected = !wantsBuiltin() && m.deviceId === st.micId; sel.append(o); });
 }
 function diag() {
   if (!ctx) return;
@@ -1654,7 +1684,6 @@ function drawClick() {
 }
 
 /* ---------- wiring ---------- */
-$('#setDone').addEventListener('click', () => setMode('play'));
 $('#homeBtn').addEventListener('click', () => setMode('play'));
 const setHH = () => document.documentElement.style.setProperty('--hh', Math.round($('.status').getBoundingClientRect().bottom) + 'px');
 setHH();
@@ -1662,7 +1691,6 @@ $('#masterName').addEventListener('click', () => selectTrack('master'));
 $('#playBtn').addEventListener('click', () => { if (running) stop(); else start(false); });
 const startStop = () => { if (running || defining) stop(); else start(false); };
 pressable($('#recBtn'), toggleRec, startStop, true);
-$('#recBtn').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) toggleRec(); } });
 $('#undoBtn').addEventListener('click', undoLast);
 $('#capBtn').addEventListener('click', capturePrev);
 $('#clickBtn').addEventListener('click', () => setClick(!st.clickOn));
@@ -1698,11 +1726,14 @@ seg($('#lowCutSeg'), [[false, 'Off'], [true, 'On']], () => st.lowCut, v => { st.
 seg($('#autoLvlSeg'), [[false, 'Off'], [true, 'On']], () => st.autoLevel, v => { st.autoLevel = v; save(); });
 seg($('#perfMicSeg'), [[true, 'On'], [false, 'Off']], () => st.perfMic, v => { st.perfMic = v; save(); });
 $('#perfBtn').addEventListener('click', togglePerf);
-seg($('#modeSeg'), [['one', 'One lap'], ['cont', 'Continuous']], () => st.mode, v => { st.mode = v; save(); ui(); });
+const drawModeSeg = () => seg($('#modeSeg'), [['one', 'One lap'], ['cont', 'Auto']], () => st.mode, v => { st.mode = v; save(); ui(); });
+drawModeSeg();
+$('#lapTog').addEventListener('click', () => { hintDone('scenes'); st.mode = st.mode === 'one' ? 'cont' : 'one'; save(); drawModeSeg(); ui(); });
 seg($('#muteSeg'), [['now', 'Immediately'], ['beat', 'Next beat'], ['bar', 'Next bar']], () => st.muteQ, v => { st.muteQ = v; save(); ui(); });
-$('#micSel').addEventListener('change', e => { if (!ctx) return; st.micId = e.target.value; save(); openMic(st.micId, !st.micId); });
+$('#micSel').addEventListener('change', e => { if (!ctx) return; st.micId = e.target.value; save(); openMic(chosenMic(mics), wantsBuiltin()); });
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (performance.now() - micOpenAt > 1500) keepMic(false); });
 $('#exportBtn').addEventListener('click', exportWav);
+$('#hintReset').addEventListener('click', () => { st.hints = {}; save(); ui(); toast('The guide will show on the play screen again.'); });
 
 $('#projInput').addEventListener('input', e => { if (!project) return; project.name = e.target.value.trim() || 'Untitled'; ui(); markDirty(); });
 $('#saveBtn').addEventListener('click', async () => {
@@ -1720,16 +1751,14 @@ $('#newBtn').addEventListener('click', async () => { await leaveProject(); clear
   $('#contBtn').onclick = () => openProject(id);
 })();
 
-const REC_KEYS = ['r', 'R', 'Enter', 'ArrowRight', 'PageDown'];
+const REC_KEYS = [' ', 'r', 'R', 'Enter', 'ArrowRight', 'PageDown'];
 let recKey = null;
 document.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input,select,textarea')) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const k = e.key;
-  if (k === ' ') { e.preventDefault(); if (e.repeat) return; if (running) stop(); else start(false); }
-  else if (REC_KEYS.includes(k)) {
-    if (e.target.closest && e.target.closest('button,[role=button]') && k === 'Enter') return;
-    e.preventDefault(); if (e.repeat || recKey) return;
+  if (REC_KEYS.includes(k)) {
+    e.preventDefault(); if (e.repeat || recKey) return;          // also keeps Space and Enter from pressing a focused button
     recKey = { held: false, t: setTimeout(() => { recKey.held = true; startStop(); }, 600) };
   }
   else if (k === 'p' || k === 'P') togglePerf();
@@ -1739,10 +1768,13 @@ document.addEventListener('keydown', e => {
   else if (k === 'e' || k === 'E') setMode(mode === 'edit' ? 'play' : 'edit');
   else if (k === 's' || k === 'S') setMode(mode === 'set' ? 'play' : 'set');
   else if (k === 'Escape') setMode('play');
-  else if (k >= '1' && k <= '9') { const t = tracks[+k - 1]; if (t) toggleMute(t); }
+  else if (k === 'l' || k === 'L') $('#lapTog').click();
+  else if (/^Digit[1-9]$/.test(e.code)) { const t = tracks[+e.code.slice(5) - 1]; if (t) { if (e.shiftKey) toggleSolo(t); else toggleMute(t); } }
 });
 document.addEventListener('keyup', e => {
-  if (!REC_KEYS.includes(e.key) || !recKey) return;
+  if (!REC_KEYS.includes(e.key)) return;
+  if (!(e.target.closest && e.target.closest('input,select,textarea'))) e.preventDefault();
+  if (!recKey) return;
   clearTimeout(recKey.t); const held = recKey.held; recKey = null;
   if (!held) toggleRec();
 });
@@ -1753,7 +1785,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => { if (project && dirty) saveProject(); });
 window.addEventListener('resize', () => { setShift(); setHH(); for (const t of tracks) drawLane(t); liveDirty = true; for (const w of document.querySelectorAll('.eqw')) w.draw(); });
 
-buildRuler(); ui(); requestAnimationFrame(frame);
+buildRuler(); drawScenes(); ui(); requestAnimationFrame(frame);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* for debugging and tests */
