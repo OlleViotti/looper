@@ -73,7 +73,7 @@ body.s-rec .meter i{background:#fff}
 #ruler i.first{height:26px;border-left:2px solid var(--mut)}
 #ruler i.on{background:linear-gradient(var(--amber),var(--amber)) left bottom/100% 5px no-repeat;color:var(--amber)}
 
-.track{margin-bottom:12px}
+.track{margin-bottom:6px}
 .thead{display:flex;gap:6px;margin-bottom:4px}
 .tname{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:48px;padding:0 8px;border-radius:8px;background:var(--panel);text-align:left}
 .tname i{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--tape);color:var(--ink);font:400 16px/1 var(--pen);font-style:normal}
@@ -88,7 +88,9 @@ body.s-rec .meter i{background:#fff}
 .trkbtn{display:block;width:100%;border-radius:2px}
 .track .trk{height:52px;background:var(--tape);border-radius:2px;
   clip-path:polygon(0 0,100% 0,calc(100% - 3px) 22%,100% 48%,calc(100% - 2px) 76%,100% 100%,0 100%,3px 72%,0 46%,2px 20%)}
+.track.silent .tname{opacity:.4}
 .track.silent .trk{opacity:.32}
+.lpanel .trk{margin:6px 0 4px}
 .addtrk{display:block;width:100%;min-height:48px;border:1px dashed var(--line);border-radius:8px;color:var(--mut);font-weight:600;margin:0 0 12px}
 
 .live .trk{border:1px dashed var(--line);height:40px;border-radius:4px}
@@ -260,7 +262,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
   <h3>Compressor</h3>
   <div id="gComp"></div>
   <div class="acts"><button class="btn" id="fxReset">Reset effects</button></div>
-  <p class="note">Mix send feeds the whole mix into the delay or reverb. Each track also has its own volume, pan, EQ, filter, delay and reverb: tap a track's name or strip to open them. Double-tap a slider to reset it. The compressor delays click and tracks by the same few milliseconds, so timing is unaffected.</p>
+  <p class="note">Mix send feeds the whole mix into the delay or reverb. Each track also has its own volume, pan, EQ, filter, delay and reverb: tap a track's name to open them. Double-tap a slider to reset it. The compressor delays click and tracks by the same few milliseconds, so timing is unaffected.</p>
 </div></div>
 
 <div class="sheet" id="sheetMore" hidden><div class="sheet-in" role="dialog" aria-labelledby="hMore">
@@ -733,10 +735,7 @@ function mountTrack(t, idx) {
     mk('arm', 'Arm', () => { armedId = armedId === t.id ? null : t.id; drawHeads(); ui(); }),
     mk('solo', 'Solo', () => { t.solo = !t.solo; applyAll(); markDirty(); }),
     mk('mute', 'Mute', () => toggleMute(t)));
-  const tb = el('button', 'trkbtn'), trk = el('div', 'trk'); t.cv = el('canvas'); trk.append(t.cv, el('i', 'ph')); tb.append(trk);
-  tb.setAttribute('aria-label', 'Settings for ' + t.name);
-  tb.addEventListener('click', () => togglePanel(t));
-  row.append(head, tb); t.row = row;
+  row.append(head); t.row = row;
   const host = $('#lanes'); host.insertBefore(row, host.children[idx] || null);
   buildTrackNodes(t);
   drawLane(t);
@@ -828,14 +827,15 @@ function hold(btn, fn) {
 function togglePanel(t) {
   const was = tracks.find(x => x.id === openId);
   openId = openId === t.id ? null : t.id;
-  if (was && was.row) { const p = $('.lpanel', was.row); if (p) p.remove(); }
-  if (openId === t.id) t.row.append(buildPanel(t));
+  if (was && was.row) { const p = $('.lpanel', was.row); if (p) p.remove(); was.cv = null; }
+  if (openId === t.id) { t.row.append(buildPanel(t)); drawLane(t); }
   drawHeads();
 }
 function refreshPanel(t) {
   if (openId !== t.id || !t.row) return;
   const old = $('.lpanel', t.row), p = buildPanel(t);
   if (old) old.replaceWith(p); else t.row.append(p);
+  drawLane(t);
 }
 function buildPanel(t) {
   const p = el('div', 'lpanel'), ap = k => v => { t[k] = v; applyTrack(t); markDirty(); };
@@ -853,6 +853,7 @@ function buildPanel(t) {
     sliderRow('Delay', 0, 1, 0.01, t.echo, 0, pct, ap('echo')),
     sliderRow('Reverb', 0, 1, 0.01, t.rev, 0, pct, ap('rev')));
   const ks = t.takes.filter(k => k.started);
+  if (ks.length) { const trk = el('div', 'trk'); t.cv = el('canvas'); trk.append(t.cv, el('i', 'ph')); p.append(trk); } else t.cv = null;
   if (!ks.length) p.append(el('p', 'note', 'No recording yet. Arm this track and tap Record. With no track armed, Record fills empty tracks from the top.'));
   ks.forEach((k, i) => p.append(takeRow(k, ks.length > 1 ? 'Take ' + (i + 1) : 'Latency')));
   return p;
