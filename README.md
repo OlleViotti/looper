@@ -8,12 +8,21 @@
 
 **Open it:** https://olleviotti.github.io/looper/. On an iPhone, open it in Safari, allow the microphone, and choose Add to Home Screen from the share menu. It then runs full screen, works offline, and keeps your saved projects.
 
+## Three views
+
+The app has three views, reached by swiping or with the two buttons in the header.
+
+- **Play** is the live view. Each track is a name and a tape strip showing its waveform.
+  - **Tap a strip** to mute or unmute the track.
+  - **Hold a strip** to arm it; a red fill shows the hold, and the armed track gets a red frame.
+  - **Tap a name** to solo the track.
+- **Swipe right for Edit.** The strips slide away and the names stay as a track list; tap one to edit it, or tap Master for the master effects. Swipe left on the names, or tap the edit button, to go back.
+- **Swipe left for Settings:** tempo, latency, project, click, recording, mute timing and microphone. Swipe right or tap Done to go back.
+
 ## Latency correction
 
 - **Per recording.** Every recording is shifted back by the latency in force when it was made. Each one keeps its own value, which you can nudge afterwards in steps of 1 or 10 ms while the loop plays, watching the hits line up with the beat lines.
-- **Setups.** Save one latency value per combination of headphones and microphone, for example AirPods and wired, and switch between them.
-- **Automatic measurement, exact.** The app plays ten clicks and listens for them through the microphone, using a matched filter tuned to the click, so no human timing is involved. Hold the phone's microphone against an earbud. It finds a faint click buried in noise and reports nothing rather than a wrong value when it cannot hear the clicks.
-- **Measurement by clapping.** Clap along with ten clicks. People clap slightly ahead of a click, so this reads somewhat short; the app says so.
+- **Automatic measurement, exact.** The app plays ten clicks and listens for them through the microphone, using a matched filter tuned to the click, so no human timing is involved. Hold the phone's microphone against an earbud and tap Measure exactly. It finds a faint click buried in noise and reports nothing rather than a wrong value when it cannot hear the clicks.
 - **Microphone choice.** By default the app records with the phone's own microphone even when headphones are connected, and switches back to it if the system changes the input.
 
 ## Recording
@@ -27,15 +36,21 @@
 ## Tracks
 
 - Add tracks before you start, name them and give them their own effects.
-- **Arm** a track to record into it. With no track armed, Record fills the empty tracks from the top, then creates new ones. The status bar always says where the next recording will go.
+- **Arm** a track (hold its strip) to record into it. With no track armed, Record fills the empty tracks from the top, then creates new ones. The status bar always says where the next recording will go.
 - Recording again into a track that already holds audio adds another take on top (overdub). Each take has its own latency, reverse and remove.
-- Large **Arm**, **Solo** and **Mute** buttons on every track, made for live use.
-- Per track: volume, pan, three-band EQ (low, mid, high), filter (darker or thinner), delay send and reverb send.
+- **Mute timing:** mute and solo act immediately by default. In Settings they can instead land on the next beat or the next bar, so you can tap a little ahead.
+- Per track, in Edit: name, arm, solo and mute buttons, volume, pan, graphical EQ, filter (darker or thinner), delay send and reverb send, plus the waveform and each take's latency, reverse and remove.
+
+## Graphical EQ
+
+Each track and the master have a three-band EQ drawn as its response curve. Drag the L, M or H handle sideways to set the frequency and up or down to set the level, from −12 to +12 dB; double-tap a handle to flatten it. The low and high bands are shelves and the mid band is a bell. The curve is the real response of the filters, the filter setting included.
 
 ## Master effects
 
-- Volume, three-band EQ and filter.
-- Delay: time as 1/16, 1/8, dotted 1/8 or 1/4 note, or free in milliseconds; feedback, level and mix send.
+Under Master in the Edit view:
+
+- Volume, graphical EQ and filter.
+- Delay: time as 1/16, 1/8, dotted 1/8 or 1/4 note, or free in milliseconds; repeats, level and mix send.
 - Reverb: size, level and mix send.
 - Compressor: threshold and amount. The click goes through a matching neutral compressor, so click and tracks are delayed by the same few milliseconds and timing is unaffected.
 
@@ -49,10 +64,10 @@
 ## Live use
 
 - The screen stays awake while playing. Large transport buttons: Start, Undo, Record, Capture last and Click on or off.
-- Keys, and Bluetooth pedals that send them: <kbd>Space</kbd> start and stop, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> record, <kbd>←</kbd> undo, <kbd>C</kbd> capture last, <kbd>K</kbd> click, <kbd>1</kbd> to <kbd>9</kbd> mute a track.
+- Keys, and Bluetooth pedals that send them: <kbd>Space</kbd> start and stop, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> record, <kbd>←</kbd> undo, <kbd>C</kbd> capture last, <kbd>K</kbd> click, <kbd>1</kbd> to <kbd>9</kbd> mute a track, <kbd>E</kbd> edit, <kbd>S</kbd> settings.
 
 ## Technical notes
 
 Everything lives in `index.html`, with no build step and no dependencies apart from two web fonts. Recording runs in an AudioWorklet that writes the microphone into a ring buffer indexed by the audio clock, which is what makes sample-accurate alignment possible. The page must be served over https for the microphone to work. `sw.js` makes the app work offline.
 
-Alignment, measurement, projects and the track features are verified with automated tests in Chrome using simulated audio.
+Alignment, measurement, the gestures, the EQ, projects and the track features are verified with automated tests in Chrome using simulated audio.
