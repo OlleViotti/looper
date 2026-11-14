@@ -1,12 +1,13 @@
 # Varv
 
-Loopstation i webbläsaren med latenskompensation per lager. Gjord för att lyssna i Bluetooth-hörlurar och spela in med telefonens mikrofon.
+A loop station in the browser with latency compensation per layer. Made for listening in Bluetooth headphones while recording with the phone's microphone.
 
-- Klick med inräkning, tempo, taktart och 1 till 8 takter per varv
-- Varje varv blir ett eget lager som flyttas bakåt med inställd latens, och latensen kan justeras i efterhand per lager
-- Latensen kan mätas: håll en hörlur mot mikrofonen, eller klappa i takt
-- Tysta, volym, filter, eko, rum, baklänges och radera per lager, samt filter, eko och rum på hela mixen
-- Fånga förra varvet i efterhand, ångra senaste lagret, exportera varvet som WAV
-- Tangenter och Bluetooth-pedal: mellanslag, R eller pil höger, pil vänster, C, 1 till 9
+- Click with count-in, tempo, time signature and 1 to 8 bars per lap
+- Every lap becomes its own layer, shifted back by the set latency; the latency can be adjusted afterwards per layer
+- Latency can be measured, either exactly (the app listens for its own clicks) or by clapping along
+- Per layer: mute, volume, three-band EQ, filter, delay, reverb, reverse and delete
+- Master: EQ, filter, delay (time, feedback, level), reverb (size, level) and compressor
+- Capture the last lap after the fact, undo the latest layer, restore deleted layers, export the lap as WAV
+- Keys and Bluetooth pedal: space, R or right arrow, left arrow, C, K, 1 to 9
 
-Allt ligger i `index.html`. Sidan måste öppnas via https för att mikrofonen ska fungera.
+Everything lives in `index.html`. The page must be opened over https for the microphone to work.

@@ -1,5 +1,5 @@
-// Nätet först, cachen som reserv: alltid senaste versionen när det finns nät, och appen startar ändå utan.
-const CACHE = 'varv-1';
+// Network first, cache as fallback: always the latest version when online, and the app still starts offline.
+const CACHE = 'varv-2';
 const FILES = ['./', 'index.html', 'manifest.json', 'icon-180.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
