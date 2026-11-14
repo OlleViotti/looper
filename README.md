@@ -16,7 +16,7 @@ The top bar is a single row: the bar and beat counter on the left, the Varv logo
   - **Tap a strip** to mute or unmute the track.
   - **Hold a strip** to arm it for the next recording; a red fill shows the hold, and the armed track gets a red frame. The track disarms itself once the recording is in.
   - **Tap a name** to solo the track.
-- **Swipe right for Edit.** The track names travel to the right edge and the edit window comes in from the left. It opens on the track you last touched; tap another name to edit that one, or tap Master for the master effects. Double-tap any slider or EQ handle to return it to its default. Swipe left on the names, or tap the logo, to go back.
+- **Swipe right for Edit.** The track names travel to the right edge and the edit window comes in from the left. It opens on the track you last touched; tap another name to edit that one, or tap Master for the master effects. Double-tap any setting to return it to its default: sliders, EQ handles and switches anywhere, and the number on a stepper (tempo, beats, bars, latency). Settings locked by recordings stay as they are. Swipe left on the names, or tap the logo, to go back.
 - **Swipe left for Settings,** which slide in under the top bar: loop length, tempo, latency, project, performance recording, click, recording, mute timing and microphone. Swipe right, tap Done or tap the logo to go back.
 
 ## Latency correction

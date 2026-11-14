@@ -315,7 +315,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 
   <h3>Keys and pedal</h3>
   <p class="note"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>L</kbd> One lap or Auto. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p>
-  <p class="note">Version 15 Nov 01:10</p>
+  <p class="note">Version 15 Nov 01:15</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -1033,13 +1033,21 @@ function hold(btn, fn) {
   for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, end);
   btn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } });
 }
-function seg(host, opts, get, set) {
+/* Double tap (two presses within 320 ms) on a setting returns it to its default. Pointer events, so it works with touch. */
+function dbl(node, fn) {
+  let last = 0;
+  node.addEventListener('pointerdown', () => { const now = performance.now(); if (now - last < 320) { last = 0; setTimeout(fn, 0); } else last = now; });
+}
+function seg(host, opts, get, set, def) {
   host.textContent = '';
+  const mark = () => { for (const c of host.children) c.classList.toggle('on', c._v === get()); };
   for (const [v, label] of opts) {
-    const b = el('button', get() === v ? 'on' : '', label);
-    b.addEventListener('click', () => { set(v); for (const c of host.children) c.classList.remove('on'); b.classList.add('on'); });
+    const b = el('button', '', label); b._v = v;
+    b.addEventListener('click', () => { set(v); mark(); });
     host.append(b);
   }
+  mark();
+  if (def !== undefined) { host._reset = () => { if (get() !== def) set(def); mark(); }; if (!host._dbl) { host._dbl = 1; dbl(host, () => host._reset()); } }
   return host;
 }
 
@@ -1147,6 +1155,7 @@ function trackPane(t) {
     const show = () => { out.innerHTML = trackBars(t) + (t.bars ? '' : '<small>as lap</small>'); };
     const mkb = d => { const b = el('button', 'sbtn', d > 0 ? '+' : '−'); b.disabled = has; hold(b, () => setTrackBars(t, trackBars(t) + d, show)); return b; };
     mini.append(mkb(-1), out, mkb(1)); row.append(el('span', '', 'Bars'), mini); p.append(row); show();
+    if (!has) dbl(out, () => setTrackBars(t, st.bars, show));
     if (has) p.append(el('p', 'note', 'Fixed while the track has recordings.'));
   }
   p.append(
@@ -1174,6 +1183,7 @@ function takeRow(k, label) {
   const show = () => { out.textContent = k.lat + ' ms'; use.hidden = k.lat === prof().ms; use.textContent = 'Use for new'; };
   const mk = d => { const b = el('button', 'sbtn', (d > 0 ? '+' : '−') + Math.abs(d)); hold(b, () => { k.lat = clamp(k.lat + d, 0, MAXLAT_MS); k.final = false; show(); markDirty(); }); return b; };
   s.append(mk(-10), mk(-1), out, mk(1), mk(10));
+  dbl(out, () => { k.lat = prof().ms; k.final = false; show(); markDirty(); });     // back to the current latency setting
   use.addEventListener('click', () => { prof().ms = k.lat; prof().guess = false; save(); show(); ui(); toast('New recordings shift by ' + k.lat + ' ms.'); });
   const rv = el('button', 'btn' + (k.reverse ? ' on' : ''), 'Reverse');
   rv.addEventListener('click', () => { k.reverse = !k.reverse; k.final = false; rv.classList.toggle('on', k.reverse); markDirty(); });
@@ -1186,7 +1196,7 @@ function masterPane() {
   const fx = (k, label, min, max, step, def, fmt) => sliderRow(label, min, max, step, st[k], def, fmt, v => { st[k] = v; save(); if (k === 'revSize') setRevSize(); applyGlobalFx(); markDirty(); if (k === 'gFilter') { const w = $('.eqw', $('#epane')); if (w) w.draw(); } });
   const timeRow = sliderRow('Time', 20, 1500, 5, Math.round(echoSec() * 1000), 375, v => Math.round(v) + ' ms', v => { st.echoDiv = 'free'; st.echoMs = v; save(); applyGlobalFx(); markDirty(); drawSeg(); });
   const segHost = el('div', 'seg full');
-  const drawSeg = () => seg(segHost, [[0.25, '1/16'], [0.5, '1/8'], [0.75, '1/8.'], [1, '1/4'], ['free', 'Free']], () => st.echoDiv, v => { st.echoDiv = v; save(); applyGlobalFx(); timeRow.set(Math.round(echoSec() * 1000)); markDirty(); });
+  const drawSeg = () => seg(segHost, [[0.25, '1/16'], [0.5, '1/8'], [0.75, '1/8.'], [1, '1/4'], ['free', 'Free']], () => st.echoDiv, v => { st.echoDiv = v; save(); applyGlobalFx(); timeRow.set(Math.round(echoSec() * 1000)); markDirty(); }, 0.75);
   drawSeg();
   const reset = el('button', 'btn', 'Reset effects');
   reset.addEventListener('click', () => {
@@ -1677,7 +1687,7 @@ function setClick(v) {
   drawClick();
 }
 function drawClick() {
-  seg($('#clickSeg'), [[true, 'On'], [false, 'Off']], () => st.clickOn, setClick);
+  seg($('#clickSeg'), [[true, 'On'], [false, 'Off']], () => st.clickOn, setClick, true);
   const b = $('#clickBtn'); b.classList.toggle('off', !st.clickOn);
   $('#clickLbl').textContent = st.clickOn ? 'Click' : 'Click off';
   b.setAttribute('aria-pressed', st.clickOn);
@@ -1712,24 +1722,28 @@ function drawLenSeg() {
   seg($('#lenSeg'), [['bars', 'Bars'], ['free', 'Free']], () => st.lenMode, v => {
     if (locked()) { toast('Start a new project to change this.'); drawLenSeg(); return; }
     stop(); st.lenMode = v; freeL = 0; save(); L = loopFrames(); buildRuler(); for (const t of tracks) drawLane(t); renderPane(); ui();
-  });
+  }, 'bars');
 }
 drawLenSeg();
 
+dbl($('#bpmVal'), () => setTempo(() => { st.bpm = 100; }));
+dbl($('#beatsVal'), () => setTempo(() => { st.beats = 4; }));
+dbl($('#barsVal'), () => setTempo(() => { st.bars = 2; }));
+dbl($('#latVal'), () => { prof().ms = 180; save(); ui(); });
 for (const b of document.querySelectorAll('#latStep .sbtn')) hold(b, () => { const p = prof(); p.ms = clamp(p.ms + +b.dataset.d, 0, MAXLAT_MS); p.guess = false; save(); ui(); });
 $('#measLoop').addEventListener('click', measure);
 $('#measUse').addEventListener('click', () => { if (!measOut) return; prof().ms = measOut.ms; prof().guess = false; save(); $('#measUse').hidden = true; ui(); toast('New recordings shift by ' + measOut.ms + ' ms.'); });
 
 $('#clickVolRow').append(sliderRow('Volume', 0, 1, 0.01, st.clickVol, 0.6, pct, v => { st.clickVol = v; save(); if (ctx && running && st.clickOn && nowF() >= epoch) clickGain.gain.setTargetAtTime(v, ctx.currentTime, 0.01); }));
 $('#inGainRow').append(sliderRow('Input gain', -12, 30, 0.5, st.inGain, 0, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + ' dB', v => { st.inGain = v; save(); if (inG) inG.gain.setTargetAtTime(dbLin(v), ctx.currentTime, 0.02); }));
-seg($('#lowCutSeg'), [[false, 'Off'], [true, 'On']], () => st.lowCut, v => { st.lowCut = v; save(); if (inHP) inHP.frequency.setTargetAtTime(v ? 80 : 10, ctx.currentTime, 0.02); });
-seg($('#autoLvlSeg'), [[false, 'Off'], [true, 'On']], () => st.autoLevel, v => { st.autoLevel = v; save(); });
-seg($('#perfMicSeg'), [[true, 'On'], [false, 'Off']], () => st.perfMic, v => { st.perfMic = v; save(); });
+seg($('#lowCutSeg'), [[false, 'Off'], [true, 'On']], () => st.lowCut, v => { st.lowCut = v; save(); if (inHP) inHP.frequency.setTargetAtTime(v ? 80 : 10, ctx.currentTime, 0.02); }, false);
+seg($('#autoLvlSeg'), [[false, 'Off'], [true, 'On']], () => st.autoLevel, v => { st.autoLevel = v; save(); }, false);
+seg($('#perfMicSeg'), [[true, 'On'], [false, 'Off']], () => st.perfMic, v => { st.perfMic = v; save(); }, true);
 $('#perfBtn').addEventListener('click', togglePerf);
-const drawModeSeg = () => seg($('#modeSeg'), [['one', 'One lap'], ['cont', 'Auto']], () => st.mode, v => { st.mode = v; save(); ui(); });
+const drawModeSeg = () => seg($('#modeSeg'), [['one', 'One lap'], ['cont', 'Auto']], () => st.mode, v => { st.mode = v; save(); ui(); }, 'one');
 drawModeSeg();
 $('#lapTog').addEventListener('click', () => { hintDone('scenes'); st.mode = st.mode === 'one' ? 'cont' : 'one'; save(); drawModeSeg(); ui(); });
-seg($('#muteSeg'), [['now', 'Immediately'], ['beat', 'Next beat'], ['bar', 'Next bar']], () => st.muteQ, v => { st.muteQ = v; save(); ui(); });
+seg($('#muteSeg'), [['now', 'Immediately'], ['beat', 'Next beat'], ['bar', 'Next bar']], () => st.muteQ, v => { st.muteQ = v; save(); ui(); }, 'bar');
 $('#micSel').addEventListener('change', e => { if (!ctx) return; st.micId = e.target.value; save(); openMic(chosenMic(mics), wantsBuiltin()); });
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (performance.now() - micOpenAt > 1500) keepMic(false); });
 $('#exportBtn').addEventListener('click', exportWav);
