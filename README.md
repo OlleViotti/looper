@@ -10,13 +10,13 @@
 
 ## Three views
 
-The app has three views, reached by swiping or with the buttons in the top bar: edit on the left, settings on the right. Tapping the Varv logo in the middle always brings you back to play.
+The top bar is a single row: the bar and beat counter on the left, the Varv logo in the middle and the in and out meters on the right. Its bottom edge is amber while playing and the whole bar turns red while recording. The app has three views, reached by swiping (or the <kbd>E</kbd> and <kbd>S</kbd> keys); tapping the logo always brings you back to play.
 
 - **Play** is the live view. Each track is a name and a tape strip showing its waveform.
   - **Tap a strip** to mute or unmute the track.
   - **Hold a strip** to arm it for the next recording; a red fill shows the hold, and the armed track gets a red frame. The track disarms itself once the recording is in.
   - **Tap a name** to solo the track.
-- **Swipe right for Edit.** The track names travel to the right edge and the edit window comes in from the left. It opens on the track you last touched; tap another name to edit that one, or tap Master for the master effects. Double-tap any slider or EQ handle to return it to its default. Swipe left on the names, or tap the edit button, to go back.
+- **Swipe right for Edit.** The track names travel to the right edge and the edit window comes in from the left. It opens on the track you last touched; tap another name to edit that one, or tap Master for the master effects. Double-tap any slider or EQ handle to return it to its default. Swipe left on the names, or tap the logo, to go back.
 - **Swipe left for Settings,** which slide in under the top bar: loop length, tempo, latency, project, performance recording, click, recording, mute timing and microphone. Swipe right, tap Done or tap the logo to go back.
 
 ## Latency correction
@@ -38,7 +38,7 @@ The app has three views, reached by swiping or with the buttons in the top bar: 
 - **One lap** records a single lap. **Continuous** records every lap until you tap again; silent laps are thrown away.
 - **Capture last** keeps the lap you just played even if you never pressed Record.
 - **Undo** removes the latest recording. Removed recordings and deleted tracks stay in a bar at the bottom with a Restore button until you dismiss it.
-- **Levels.** Input gain (−12 to +30 dB) and an optional 80 Hz low cut sit before the recording. Recordings are kept at the level they were played; automatic levelling is an option. The top bar has in and out meters: amber near full scale, red on clipping or when the output limiter has to work hard. Each track shows its own level under its name.
+- **Levels.** Input gain (−12 to +30 dB) and an optional 80 Hz low cut sit before the recording. Recordings are kept at the level they were played; automatic levelling is an option. The in and out meters in the top bar turn amber near full scale, red on clipping or when the output limiter has to work hard. Each track shows its own level under its name.
 - A live strip shows what the microphone hears, already shifted by the current latency.
 
 ## Tracks
