@@ -65,8 +65,11 @@ body.s-rec .meter i{background:#fff}
 .trk canvas{display:block;width:100%;height:100%}
 .ph{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;left:calc(var(--ph)*100%);background:var(--amber);display:none;pointer-events:none}
 .tape.run .ph,.epane.run .ph{display:block}
-.slide{transition:transform .25s ease,opacity .25s ease}
-[data-mode=edit] .slide{transform:translateX(110%);opacity:0;pointer-events:none}
+.slide{transition:transform .25s ease,opacity .2s ease}
+[data-mode=edit] .slide{transform:translateX(40%);opacity:0;pointer-events:none}
+/* in edit mode the names travel to the right edge and the edit pane comes in from the left */
+.nmcol{transition:transform .25s ease;position:relative;z-index:1}
+[data-mode=edit] .nmcol{transform:translateX(var(--shift,0px))}
 
 .ruler{margin-bottom:10px}
 #ruler{display:flex;height:26px;align-items:flex-end}
@@ -104,7 +107,7 @@ body.s-rec .live .trk{border-color:var(--rec)}
 .empty b{color:var(--text);font-weight:600}
 
 /* Edit pane */
-.epane{position:absolute;top:0;bottom:0;left:calc(16px + var(--nw) + 10px);right:0;overflow-y:auto;padding:10px 16px 28px 0;transform:translateX(105%);transition:transform .25s ease;--ph:0}
+.epane{position:absolute;top:0;bottom:0;left:0;right:calc(16px + var(--nw) + 10px);overflow-y:auto;padding:10px 0 28px 16px;transform:translateX(-105%);transition:transform .25s ease;--ph:0}
 [data-mode=edit] .epane{transform:none}
 .epane h3{font-size:15px;font-weight:600;color:var(--mut);margin:14px 0 2px}
 .epane .trk{height:48px;background:var(--tape);border-radius:2px;margin:6px 0 2px}
@@ -131,6 +134,9 @@ input[type=range].bi::-webkit-slider-runnable-track{background:linear-gradient(9
 .btn.danger{color:#ff8b9a}
 .btn.wide{width:100%}
 .btn:disabled,.sbtn:disabled{opacity:.4}
+.mini{display:grid;grid-template-columns:48px 1fr 48px;gap:6px;align-items:center;min-width:150px}
+.mini output{text-align:center;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.mini output small{display:block;font-size:12px;font-weight:500;color:var(--mut)}
 .tgl{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:6px 0 4px}
 .txt{height:44px;border-radius:8px;border:1px solid var(--line);background:var(--panel);padding:0 12px;flex:1;min-width:0;-webkit-user-select:text;user-select:text}
 select.txt{appearance:auto}
@@ -190,7 +196,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 .undo:not([hidden])~.toast{bottom:calc(166px + env(safe-area-inset-bottom))}
 .undo button{flex:none;min-height:40px;padding:0 12px;border-radius:8px;font-weight:700;background:#1b1f2e;color:var(--tape)}
 .undo button.x{background:transparent;color:#1b1f2e;font-size:24px;line-height:1;padding:0 10px}
-@media (prefers-reduced-motion:reduce){.slide,.epane,.spage,.trk.pressing .lp{transition:none}body.s-armed #recBtn{animation:none}}
+@media (prefers-reduced-motion:reduce){.slide,.nmcol,.epane,.spage,.trk.pressing .lp{transition:none}body.s-armed #recBtn{animation:none}}
 </style>
 </head>
 <body class="s-stop" data-mode="play">
@@ -211,8 +217,8 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
       <div class="row ruler"><div></div><div id="ruler" class="slide"></div></div>
       <p class="empty" id="empty"><b>Tap Record to start.</b> Tap a track to mute it, hold it to arm it, tap its name to solo. Swipe right to edit tracks, left for settings.</p>
       <div id="lanes"></div>
-      <div class="row"><button class="addtrk" id="addTrk">+ Track</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
-      <div class="row masterrow" id="masterRow"><button class="tname" id="masterName"><b>Master</b><small>effects</small></button><div></div></div>
+      <div class="row"><button class="addtrk nmcol" id="addTrk">+ Track</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
+      <div class="row masterrow" id="masterRow"><button class="tname nmcol" id="masterName"><b>Master</b><small>effects</small></button><div></div></div>
     </main>
     <section class="epane" id="epane" aria-label="Edit"></section>
   </div>
@@ -229,12 +235,16 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 <div class="spage" id="spage" role="dialog" aria-labelledby="hSet"><div class="sp-in">
   <div class="sp-head"><h2 id="hSet">Settings</h2><button class="btn" id="setDone">Done</button></div>
 
-  <h3 class="first">Tempo</h3>
+  <h3 class="first">Loop</h3>
+  <div class="field"><span>Length</span><div class="seg" id="lenSeg"></div></div>
   <p class="note warn" id="tempoLock" hidden>Locked while there are recordings. Start a new project to change it.</p>
-  <div class="big" id="bpmStep"><button class="sbtn" data-d="-5">−5</button><button class="sbtn" data-d="-1">−1</button><output id="bpmVal"></output><button class="sbtn" data-d="1">+1</button><button class="sbtn" data-d="5">+5</button></div>
-  <button class="btn wide" id="tapBtn">Tap tempo</button>
-  <div class="field"><span>Beats per bar</span><div class="seg" id="beatsSeg"></div></div>
-  <div class="field"><span>Bars per lap</span><div class="seg" id="barsSeg"></div></div>
+  <div id="barsBox">
+    <div class="big" id="bpmStep"><button class="sbtn" data-d="-5">−5</button><button class="sbtn" data-d="-1">−1</button><output id="bpmVal"></output><button class="sbtn" data-d="1">+1</button><button class="sbtn" data-d="5">+5</button></div>
+    <button class="btn wide" id="tapBtn">Tap tempo</button>
+    <div class="field"><span>Beats per bar</span><div class="mini" id="beatsStep"><button class="sbtn" data-d="-1">−</button><output id="beatsVal"></output><button class="sbtn" data-d="1">+</button></div></div>
+    <div class="field"><span>Bars per lap</span><div class="mini" id="barsStep"><button class="sbtn" data-d="-1">−</button><output id="barsVal"></output><button class="sbtn" data-d="1">+</button></div></div>
+  </div>
+  <p class="note" id="freeNote" hidden></p>
 
   <h3>Latency</h3>
   <div class="big" id="latStep"><button class="sbtn" data-d="-10">−10</button><button class="sbtn" data-d="-1">−1</button><output id="latVal"></output><button class="sbtn" data-d="1">+1</button><button class="sbtn" data-d="10">+10</button></div>
@@ -286,12 +296,12 @@ const rid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 
 /* ---------- settings ---------- */
 const KEY = 'varv.settings.1';
-const MAXLAT_MS = 600, PRE_MS = 60, XF_MS = 20, LEAD_S = 0.09, SAFE_S = 0.04, GRACE_S = 0.15, HOLD_MS = 450;
+const MAXLAT_MS = 600, PRE_MS = 60, XF_MS = 20, LEAD_S = 0.09, SAFE_S = 0.04, GRACE_S = 0.15, HOLD_MS = 450, FREE_MAX_S = 30;
 const INKS = ['#20232b', '#2146b5', '#1d7a4a', '#7a3cae', '#b3501a', '#0e7482', '#ad2f6c'];
 const EQ_DEF = { eqL: 0, eqM: 0, eqH: 0, eqLf: 200, eqMf: 1000, eqHf: 4000 };
 const FX_KEYS = ['master', 'gFilter', 'eqL', 'eqM', 'eqH', 'eqLf', 'eqMf', 'eqHf', 'gEcho', 'echoDiv', 'echoMs', 'echoFb', 'echoLvl', 'gRev', 'revSize', 'revLvl', 'compThr', 'compAmt'];
 const st = Object.assign({
-  bpm: 100, beats: 4, bars: 2, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now',
+  bpm: 100, beats: 4, bars: 2, lenMode: 'bars', clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now',
   profiles: [{ name: 'AirPods', ms: 180, guess: true }, { name: 'Wired or speaker', ms: 20, guess: true }],
   active: 0, micId: '', master: 0.9, gFilter: 0,
   gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1,
@@ -307,11 +317,11 @@ let ctx = null, sr = 48000, limiter, comp, clickComp, outGain, pre, gLP, gHP, mE
 let capNode = null, capMode = '', micStream = null, micSrc = null, micOK = false, micLabel = '', mics = [], initP = null;
 let ring = null, R = 0, capEnd = 0, capFirst = -1, inPeak = 0, synth = null;
 let L = 0, PRE = 0, XF = 0, MAXLAT = 0, OPEN_LP = 20000, epoch = 0, running = false, runId = 0, clickSrc = null;
-let recPass = null, stopAfter = false, lastRec = null, measuring = false;
+let rec = null, recTail = null, defining = null, freeL = 0, measuring = false;
 
 /* Tracks are the lanes on screen and hold the settings; takes are the recordings inside a track. */
 let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, selId = null, mode = 'play';
-const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false }, EQ_DEF);
+const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null }, EQ_DEF);
 const TRACK_KEYS = Object.keys(TRACK_DEF);
 const allTakes = () => { const a = []; for (const t of tracks) for (const k of t.takes) a.push(k); return a; };
 const anySolo = () => tracks.some(t => t.solo);
@@ -319,7 +329,13 @@ const audible = t => !t.mute && (!anySolo() || t.solo);
 
 const nowF = () => Math.round(ctx.currentTime * sr);
 const latN = ms => Math.round(ms / 1000 * sr);
-const loopFrames = () => Math.round(st.bars * st.beats * 60 / st.bpm * sr);
+/* Loop lengths. In bar mode each track can have its own number of bars (null follows the lap);
+   in free mode every track has the length set by the first recording. */
+const isFree = () => st.lenMode === 'free';
+const barsLen = b => Math.round(b * st.beats * 60 / st.bpm * sr);
+const loopFrames = () => isFree() ? freeL : barsLen(st.bars);
+const trackBars = t => t.bars || st.bars;
+const trackLen = t => isFree() ? freeL : barsLen(trackBars(t));
 const echoSec = () => clamp(st.echoDiv === 'free' ? st.echoMs / 1000 : st.echoDiv * 60 / st.bpm, 0.02, 2.9);
 const bq = (type, f) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = 0.9; return b; };
 const gn = v => { const g = ctx.createGain(); g.gain.value = v; return g; };
@@ -423,8 +439,8 @@ registerProcessor('varv-cap',C)`;
   const z = gn(0); capNode.connect(z); z.connect(ctx.destination);
 }
 
-function ensureRing() {
-  const need = Math.max(12 * sr, 2 * L + 4 * sr + MAXLAT) | 0;
+function ensureRing(min) {
+  const need = Math.max(12 * sr, 2 * L + 4 * sr + MAXLAT, min || 0) | 0;
   if (ring && R >= need) return;
   const had = !!ring; ring = new Float32Array(need); R = need; capFirst = had ? capEnd : -1;
 }
@@ -508,28 +524,33 @@ function buildClick() {
 }
 
 async function start(countIn) {
-  if (measuring) return false;
+  if (measuring || defining) return false;
   const ok = await initAudio(); if (!ok) return false;
   if (running) return true;
+  if (isFree() && !freeL) { toast('Tap Record and play the first loop, then End loop to set its length.'); return false; }
   L = loopFrames(); ensureRing(); applyGlobalFx();
   const t0 = nowF() + Math.round(0.1 * sr);
-  const cin = countIn ? (st.bars > 1 ? Math.round(L / st.bars) : L) : 0;
+  const cin = countIn && !isFree() ? barsLen(1) : 0;      // count-in: one bar (free mode has no click)
   epoch = t0 + cin;
-  clickSrc = ctx.createBufferSource(); clickSrc.buffer = buildClick(); clickSrc.loop = true; clickSrc.connect(clickGain);
-  clickSrc.start(t0 / sr, ((L - cin) % L) / sr);
-  const g = clickGain.gain; g.cancelScheduledValues(0);
-  if (countIn) { g.setValueAtTime(Math.max(st.clickVol, 0.4), t0 / sr); g.setValueAtTime(st.clickOn ? st.clickVol : 0, epoch / sr); }
-  else g.setValueAtTime(st.clickOn ? st.clickVol : 0, t0 / sr);
-  running = true; runId++; recPass = null; stopAfter = false; lastRec = null; livePass = null;
+  clickSrc = null;
+  if (!isFree()) {
+    clickSrc = ctx.createBufferSource(); clickSrc.buffer = buildClick(); clickSrc.loop = true; clickSrc.connect(clickGain);
+    clickSrc.start(t0 / sr, ((L - cin % L) % L) / sr);
+    const g = clickGain.gain; g.cancelScheduledValues(0);
+    if (countIn) { g.setValueAtTime(Math.max(st.clickVol, 0.4), t0 / sr); g.setValueAtTime(st.clickOn ? st.clickVol : 0, epoch / sr); }
+    else g.setValueAtTime(st.clickOn ? st.clickVol : 0, t0 / sr);
+  }
+  running = true; runId++; rec = null; recTail = null; livePass = null;
   for (const k of allTakes()) if (k.buf && k.tg) startSource(k, epoch);
   wake(true); ui(); return true;
 }
 
 function stopSrc(k) { if (k.src) { try { k.src.stop(); } catch (e) {} k.src = null; } }
 function stop() {
+  if (defining) { defining = null; wake(false); toast('Loop cancelled.'); ui(); return; }
   if (!running) return;
-  running = false; recPass = null; stopAfter = false; lastRec = null;
-  try { clickSrc.stop(); } catch (e) {} clickSrc = null;
+  running = false; rec = null; recTail = null;
+  if (clickSrc) { try { clickSrc.stop(); } catch (e) {} clickSrc = null; }
   for (const k of allTakes()) stopSrc(k);
   wake(false); ui();
 }
@@ -538,7 +559,7 @@ function startSource(k, at) {
   if (!k.tg || !k.buf) return;
   at = Math.max(at, epoch);
   const s = ctx.createBufferSource(); s.buffer = k.buf; s.loop = true; s.connect(k.tg);
-  s.start(at / sr, (((at - epoch) % L + L) % L) / sr);
+  s.start(at / sr, (((at - epoch) % k.len + k.len) % k.len) / sr);
   if (k.src) { try { k.src.stop(at / sr); } catch (e) {} }
   k.src = s;
 }
@@ -551,40 +572,78 @@ const armedTrack = () => tracks.find(t => t.id === armedId);
 const targetTrack = () => armedTrack() || tracks.find(t => !t.takes.length);
 const targetName = () => { const t = targetTrack(); return t ? t.name : 'a new track'; };
 
+/* A planned recording: target track (null = a new one), its loop length, and which pass of that length to record.
+   Passes are counted from the epoch, so a 4-bar track records on 4-bar boundaries and a 1-bar track on any bar. */
+function plan(from) {
+  const t = targetTrack(), len = t ? trackLen(t) : loopFrames();
+  return { tid: t ? t.id : null, len, k: Math.max(0, Math.ceil(from / len - 1e-9)), cont: st.mode === 'cont', last: false };
+}
+const inTail = p => recTail && p >= recTail.start && p < recTail.end;
+const taken = r => { const t = tracks.find(x => x.id === r.tid); return t && t.takes.some(x => x.run === runId && x.k === r.k && x.len === r.len); };
+
 async function toggleRec() {
   if (measuring) return;
+  if (isFree() && !freeL) { if (defining) endDefine(); else beginDefine(); return; }
   if (!running) {
     if (!(await start(true))) return;
     if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
-    recPass = 0; ui(); return;
+    rec = plan(isFree() ? L : 0); ui(); return;            // free mode: hear the loop once, then record
   }
   if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
-  const p = heardPos(), k = Math.floor(p / L);
-  if (recPass != null) {
-    if (p < 0 || (k < recPass && lastRec !== k)) recPass = null;          // was waiting: cancel
-    else if (st.mode === 'cont') stopAfter = !stopAfter;                   // continuous: last lap
-    else { recPass = null; toast('Recording cancelled.'); }
+  const p = heardPos();
+  if (rec) {
+    if (p < rec.k * rec.len && !inTail(p)) rec = null;                     // was waiting: cancel
+    else if (rec.cont) rec.last = !rec.last;                              // continuous: last lap
+    else { rec = null; toast('Recording cancelled.'); }
     ui(); return;
   }
-  let target = p < 0 ? 0 : (p - k * L < GRACE_S * sr ? k : k + 1);
-  while (allTakes().some(x => x.run === runId && x.k === target)) target++;
-  recPass = target; stopAfter = false; ui();
+  const r = plan(0), kk = Math.floor(p / r.len);
+  r.k = p < 0 ? 0 : (p - kk * r.len < GRACE_S * sr ? kk : kk + 1);
+  while (taken(r)) r.k++;
+  rec = r; ui();
 }
 
 function capturePrev() {
   if (!running || !micOK) { toast('Start first, then there is a lap to capture.'); return; }
-  const k = Math.floor(heardPos() / L) - 1;
-  if (k < 0) { toast('No full lap has passed yet.'); return; }
-  if (allTakes().some(x => x.run === runId && x.k === k)) { toast('That lap is already saved.'); return; }
-  addTake(k, false); tick();
+  const r = plan(0); r.k = Math.floor(heardPos() / r.len) - 1;
+  if (r.k < 0) { toast('No full lap has passed yet.'); return; }
+  if (taken(r)) { toast('That lap is already saved.'); return; }
+  addTake(r, false); tick();
 }
 
-function addTake(k, auto) {
-  const t = targetTrack() || newTrack({ auto: true }), F0 = epoch + k * L;
-  t.takes.push({ id: ++uid, key: rid(), k, run: runId, F0, rawStart: F0 - PRE, raw: new Float32Array(L + XF + MAXLAT + 8), filled: 0,
-    lat: prof().ms, reverse: false, norm: null, peak: 0, peaks: null, buf: null, src: null, tg: null,
+function addTake(r, auto, lat) {
+  let t = r.tid != null ? tracks.find(x => x.id === r.tid) : null;
+  if (!t) t = newTrack({ auto: true });
+  if (!isFree() && trackLen(t) !== r.len) { const b = Math.round(r.len / barsLen(1)); t.bars = b === st.bars ? null : b; }
+  const F0 = epoch + r.k * r.len;
+  t.takes.push({ id: ++uid, key: rid(), k: r.k, len: r.len, run: runId, F0, rawStart: F0 - PRE, raw: new Float32Array(r.len + XF + MAXLAT + 8), filled: 0,
+    lat: lat == null ? prof().ms : lat, reverse: false, norm: null, peak: 0, peaks: null, buf: null, src: null, tg: null,
     final: false, started: false, full: false, auto, track: t, savedTo: null });
   drawHead(t);
+}
+
+/* Free mode, first recording: starts at once and runs until End loop, which fixes the loop length.
+   Nothing is playing yet, so there is no output latency to correct and the take is not shifted. */
+async function beginDefine() {
+  const ok = await initAudio(); if (!ok) return;
+  if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
+  if (running) stop();
+  L = 0; ensureRing(Math.round((2 * FREE_MAX_S + 6) * sr));
+  defining = { T0: nowF() }; wake(true); ui();
+}
+function endDefine() {
+  const T0 = defining.T0, len = nowF() - T0; defining = null;
+  if (len < 0.3 * sr) { wake(false); toast('Too short, try again.'); ui(); return; }
+  freeL = len; L = len; epoch = T0; running = true; runId++; rec = null; recTail = { start: 0, end: len }; livePass = null; clickSrc = null;
+  const t = targetTrack();
+  addTake({ tid: t ? t.id : null, len, k: 0 }, false, 0);
+  if (st.mode === 'cont') rec = plan(len);
+  buildRuler(); ui(); markDirty(); tick();
+}
+/* In free mode the length is released again once nothing is left that could need it. */
+function releaseFree() {
+  if (!isFree() || !freeL || locked()) return;
+  stop(); freeL = 0; L = 0; buildRuler(); ui();
 }
 
 function fillRaw(k) {
@@ -600,23 +659,23 @@ function fillRaw(k) {
    The seam sits PRE before the downbeat so an early hit on the one is kept whole,
    and XF crossfades the seam. Two consecutive laps then sum to exactly the original. */
 function render(k) {
-  const d = clamp(latN(k.lat), 0, MAXLAT), out = new Float32Array(L), raw = k.raw, filled = k.filled;
-  for (let i = 0; i < L + XF; i++) {
+  const N = k.len, d = clamp(latN(k.lat), 0, MAXLAT), out = new Float32Array(N), raw = k.raw, filled = k.filled;
+  for (let i = 0; i < N + XF; i++) {
     const ri = d + i; if (ri >= filled) break;
-    const w = i < XF ? i / XF : i >= L ? 1 - (i - L) / XF : 1;
-    let pos = i - PRE; if (pos < 0) pos += L; else if (pos >= L) pos -= L;
+    const w = i < XF ? i / XF : i >= N ? 1 - (i - N) / XF : 1;
+    let pos = i - PRE; if (pos < 0) pos += N; else if (pos >= N) pos -= N;
     out[pos] += w * raw[ri];
   }
   if (k.reverse) out.reverse();
   let pk = 0; const NB = 600, peaks = new Float32Array(NB);
   for (let b = 0; b < NB; b++) {
-    const a = Math.floor(b * L / NB), e = Math.floor((b + 1) * L / NB); let m = 0;
+    const a = Math.floor(b * N / NB), e = Math.floor((b + 1) * N / NB); let m = 0;
     for (let i = a; i < e; i++) { const v = Math.abs(out[i]); if (v > m) m = v; }
     peaks[b] = m; if (m > pk) pk = m;
   }
   k.peaks = peaks; k.peak = pk;
   if (k.norm == null) k.norm = pk > 0.003 ? clamp(0.6 / pk, 1, 12) : 1;
-  const buf = ctx.createBuffer(1, L, sr);
+  const buf = ctx.createBuffer(1, N, sr);
   if (buf.copyToChannel) buf.copyToChannel(out, 0); else buf.getChannelData(0).set(out);
   k.buf = buf;
 }
@@ -624,7 +683,7 @@ function render(k) {
 function serviceTake(k, now) {
   fillRaw(k);
   if (!k.full && k.filled >= k.raw.length) { k.full = true; markDirty(); }
-  const need = Math.min(clamp(latN(k.lat), 0, MAXLAT) + L + XF, k.raw.length), end = k.F0 + L;
+  const need = Math.min(clamp(latN(k.lat), 0, MAXLAT) + k.len + XF, k.raw.length), end = k.F0 + k.len;
   if (!k.final && k.filled >= need) { render(k); k.final = true; afterRender(k, now, end); }
   else if (!k.started && now >= end - LEAD_S * sr) { render(k); afterRender(k, now, end); }
 }
@@ -655,9 +714,10 @@ let lastState = '';
 function tick() {
   if (!ctx) return;
   const now = nowF();
-  if (running && recPass != null && now >= epoch + (recPass + 1) * L - LEAD_S * sr) {
-    addTake(recPass, st.mode === 'cont'); lastRec = recPass;
-    if (st.mode === 'cont' && !stopAfter) recPass++; else { recPass = null; stopAfter = false; }
+  if (defining && now - defining.T0 >= FREE_MAX_S * sr) endDefine();
+  if (running && rec && now >= epoch + (rec.k + 1) * rec.len - LEAD_S * sr) {
+    const r = rec; addTake(r, r.cont); recTail = { start: r.k * r.len, end: (r.k + 1) * r.len };
+    rec = r.cont && !r.last ? plan((r.k + 1) * r.len) : null;
   }
   for (const k of allTakes()) serviceTake(k, now);
   for (const it of trash) for (const k of (it.take ? [it.take] : it.track.takes)) fillRaw(k);   // keeps removed takes complete for a restore
@@ -668,12 +728,12 @@ setInterval(tick, 25);
 
 function stateNow() {
   if (measuring) return 'meas';
+  if (defining) return 'define';
   if (!running) return 'stop';
   const p = heardPos();
-  if (p < 0) return recPass === 0 ? 'countrec' : 'count';
-  const k = Math.floor(p / L);
-  if (recPass != null) { if (k < recPass && lastRec !== k) return 'armed'; return stopAfter ? 'reclast' : 'rec'; }
-  return lastRec === k ? 'rec' : 'play';
+  if (rec) { if (p < rec.k * rec.len && !inTail(p)) return p < 0 ? 'countrec' : 'armed'; return rec.last ? 'reclast' : 'rec'; }
+  if (p < 0) return 'count';
+  return inTail(p) ? 'rec' : 'play';
 }
 
 /* ---------- tracks: audio nodes ---------- */
@@ -705,7 +765,7 @@ function applyTrack(t, at) {
 }
 function switchAt() {
   if (!ctx || !running || st.muteQ === 'now') return 0;
-  const unit = st.muteQ === 'bar' ? L / st.bars : L / (st.bars * st.beats);
+  const unit = isFree() ? L : st.muteQ === 'bar' ? barsLen(1) : barsLen(1) / st.beats;
   return (epoch + Math.ceil((nowF() - epoch + 0.01 * sr) / unit) * unit) / sr;
 }
 function toggleMute(t) { t.mute = !t.mute; applyTrack(t, switchAt()); drawHeads(); markDirty(); }
@@ -723,7 +783,7 @@ function newTrack(opts, idx) {
 }
 function mountTrack(t, idx) {
   const row = el('div', 'row track'); row.style.setProperty('--ink', t.ink);
-  const nb = el('button', 'tname'); nb.append(el('b'), el('small'));
+  const nb = el('button', 'tname nmcol'); nb.append(el('b'), el('small'));
   nb.addEventListener('click', () => { if (mode === 'edit') selectTrack(t.id); else toggleSolo(t); });
   const trk = el('div', 'trk slide'); trk.tabIndex = 0; trk.setAttribute('role', 'button');
   t.cv = el('canvas'); trk.append(t.cv, el('i', 'ph'), el('i', 'lp'), el('em', '', 'muted'));
@@ -944,7 +1004,15 @@ function trackPane(t) {
   const tg = el('div', 'tgl');
   const mk = (label, cls, on, fn) => { const b = el('button', 'btn ' + cls + (on ? ' on' : ''), label); b.addEventListener('click', () => { fn(); renderPane(); }); return b; };
   tg.append(mk('Arm', 'rec', armedId === t.id, () => toggleArm(t)), mk('Solo', '', t.solo, () => toggleSolo(t)), mk('Mute', '', t.mute, () => toggleMute(t)));
-  p.append(f, tg,
+  p.append(f, tg);
+  if (!isFree()) {
+    const has = t.takes.length > 0, row = el('div', 'field'), mini = el('div', 'mini'), out = el('output');
+    const show = () => { out.innerHTML = trackBars(t) + (t.bars ? '' : '<small>as lap</small>'); };
+    const mkb = d => { const b = el('button', 'sbtn', d > 0 ? '+' : '−'); b.disabled = has; hold(b, () => setTrackBars(t, trackBars(t) + d, show)); return b; };
+    mini.append(mkb(-1), out, mkb(1)); row.append(el('span', '', 'Bars'), mini); p.append(row); show();
+    if (has) p.append(el('p', 'note', 'Fixed while the track has recordings.'));
+  }
+  p.append(
     sliderRow('Volume', 0, 1.5, 0.01, t.vol, 1, pct, ap('vol')),
     sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan')),
     el('h3', '', 'EQ'), eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }),
@@ -957,6 +1025,12 @@ function trackPane(t) {
   else p.append(el('p', 'note', 'Empty. Arm it and tap Record.'));
   ks.forEach((k, i) => p.append(takeRow(k, ks.length > 1 ? 'Take ' + (i + 1) + ' latency' : 'Latency')));
   return p;
+}
+function setTrackBars(t, b, show) {
+  if (t.takes.length) return;
+  b = clamp(b, 1, 32); t.bars = b === st.bars ? null : b;
+  if (rec && rec.tid === t.id) { const p = heardPos(); if (p < rec.k * rec.len) { rec.len = trackLen(t); rec.k = Math.max(0, Math.ceil(Math.max(p, 0) / rec.len)); } }
+  show(); drawLane(t); markDirty(); ui();
 }
 function takeRow(k, label) {
   const box = el('div', 'take'), s = el('div', 'step'), out = el('output'), use = el('button', 'btn');
@@ -998,9 +1072,10 @@ function masterPane() {
 }
 
 /* ---------- modes: play, edit (swipe right), settings (swipe left) ---------- */
+function setShift() { const tp = $('#tape'); tp.style.setProperty('--shift', Math.max(0, tp.clientWidth - 32 - parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nw'))) + 'px'); }
 function setMode(m) {
   if (m === mode) return;
-  mode = m; document.body.dataset.mode = m;
+  setShift(); mode = m; document.body.dataset.mode = m;
   if (m === 'edit') { if (selId == null) selId = tracks.length ? tracks[0].id : 'master'; renderPane(); }
   else renderPane();
   if (m === 'set') { drawProjects(); $('#spage').scrollTop = 0; }
@@ -1040,7 +1115,7 @@ function sizeCanvas(cv) {
 }
 function drawLane(t) { for (const cv of [t.cv, t.pcv]) if (cv) drawWave(t, cv); }
 function drawWave(t, cv) {
-  const { g, w, h } = sizeCanvas(cv), tot = st.bars * st.beats, mid = h / 2;
+  const { g, w, h } = sizeCanvas(cv), tot = isFree() ? 0 : trackBars(t) * st.beats, mid = h / 2;
   if (!w) return;
   for (let j = 1; j < tot; j++) {
     const x = Math.round(j / tot * w) + 0.5, bar = j % st.beats === 0;
@@ -1085,7 +1160,7 @@ function drawLive() {
 let beatEls = [], lastBeat = -2;
 function buildRuler() {
   const r = $('#ruler'); r.textContent = ''; beatEls = []; lastBeat = -2;
-  for (let j = 0; j < st.bars * st.beats; j++) {
+  for (let j = 0; j < (isFree() ? 1 : st.bars * st.beats); j++) {
     const bar = j % st.beats === 0, b = el('i', bar ? 'first' : '', bar ? j / st.beats + 1 : null);
     r.append(b); beatEls.push(b);
   }
@@ -1095,16 +1170,22 @@ function frame() {
   requestAnimationFrame(frame);
   if (!ctx) return;
   $('#meterFill').style.transform = 'scaleX(' + Math.min(1, Math.sqrt(inPeak) * 1.5).toFixed(3) + ')'; inPeak *= 0.86;
+  if (defining) { $('#pos').textContent = ((nowF() - defining.T0) / sr).toFixed(1); return; }
   if (!running) { if (lastBeat !== -2) { setBeat(-2); $('#pos').textContent = '–'; } return; }
-  const p = heardPos(), tot = st.bars * st.beats, bl = L / tot;
+  const p = heardPos(), tot = isFree() ? 1 : st.bars * st.beats, bl = isFree() ? L : barsLen(1) / st.beats;
+  const phase = (len, el) => { if (el) el.style.setProperty('--ph', p < 0 ? 0 : ((((p % len) + len) % len) / len).toFixed(4)); };
+  phase(L, $('#tape'));
+  for (const t of tracks) phase(trackLen(t), t.row);           // each track has its own loop length and playhead
+  const sel = tracks.find(t => t.id === selId); phase(sel ? trackLen(sel) : L, $('#epane'));
   if (p < 0) {
     const left = Math.ceil(-p / bl);
     if (lastBeat !== -100 - left) { setBeat(-1); lastBeat = -100 - left; $('#pos').textContent = left; }
-    $('#tape').style.setProperty('--ph', 0); $('#epane').style.setProperty('--ph', 0); return;
+    return;
   }
   const x = (p % L) / L, j = Math.min(tot - 1, Math.floor(x * tot));
-  $('#tape').style.setProperty('--ph', x.toFixed(4)); $('#epane').style.setProperty('--ph', x.toFixed(4));
-  if (j !== lastBeat) { setBeat(j); $('#pos').textContent = (Math.floor(j / st.beats) + 1) + '.' + (j % st.beats + 1); }
+  if (isFree()) $('#pos').textContent = ((p % L) / sr).toFixed(1);
+  else if (j !== lastBeat) $('#pos').textContent = (Math.floor(j / st.beats) + 1) + '.' + (j % st.beats + 1);
+  if (j !== lastBeat) setBeat(j);
   if (liveDirty) drawLive();
 }
 function setBeat(j) { for (let i = 0; i < beatEls.length; i++) beatEls[i].classList.toggle('on', i === j); lastBeat = j; }
@@ -1203,12 +1284,12 @@ async function saveProject() {
   saving = (async () => {
     dirty = false;
     const pid = project.id, tx = (await db()).transaction(['projects', 'audio'], 'readwrite'), A = tx.objectStore('audio'), keep = new Set();
-    const meta = { id: pid, name: project.name, saved: Date.now(), sr, bpm: st.bpm, beats: st.beats, bars: st.bars, fx: pick(st, FX_KEYS),
+    const meta = { id: pid, name: project.name, saved: Date.now(), sr, bpm: st.bpm, beats: st.beats, bars: st.bars, lenMode: st.lenMode, freeLen: freeL / sr, fx: pick(st, FX_KEYS),
       tracks: tracks.map(t => Object.assign(pick(t, TRACK_KEYS), { name: t.name, auto: t.auto,
         takes: t.takes.filter(k => k.full && k.started).map(k => {
           keep.add(k.key);
           if (k.savedTo !== pid) { A.put(k.raw.slice(0, k.filled), pid + '/' + k.key); k.savedTo = pid; }
-          return { key: k.key, lat: k.lat, reverse: k.reverse, norm: k.norm };
+          return { key: k.key, lat: k.lat, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
         }) })) };
     tx.objectStore('projects').put(meta);
     const keys = A.getAllKeys(IDBKeyRange.bound(pid + '/', pid + '/￿'));
@@ -1235,7 +1316,8 @@ function resample(x, ratio) {
 }
 function clearAll() {
   for (const t of tracks) unmountTrack(t);
-  tracks = []; trash = []; laneCount = 0; inkN = 0; armedId = null; selId = null; recPass = null; stopAfter = false;
+  tracks = []; trash = []; laneCount = 0; inkN = 0; armedId = null; selId = null; rec = null; recTail = null;
+  if (isFree()) { stop(); freeL = 0; L = 0; buildRuler(); }
   drawTrash(); renderPane(); ui();
 }
 const hasContent = () => allTakes().length > 0 || trash.length > 0;
@@ -1245,17 +1327,19 @@ async function openProject(id) {
   let meta; try { meta = await dbGet('projects', id); } catch (e) {}
   if (!meta) { toast('That project could not be read.'); return; }
   await leaveProject(); stop(); clearAll();
-  Object.assign(st, { bpm: meta.bpm, beats: meta.beats, bars: meta.bars }, EQ_DEF, meta.fx || {}); save();
-  L = loopFrames(); ensureRing(); buildRuler(); setRevSize(); applyGlobalFx();
+  Object.assign(st, { bpm: meta.bpm, beats: meta.beats, bars: meta.bars, lenMode: meta.lenMode || 'bars' }, EQ_DEF, meta.fx || {}); save();
+  freeL = st.lenMode === 'free' && meta.freeLen ? Math.round(meta.freeLen * sr) : 0;
+  L = loopFrames(); ensureRing(); buildRuler(); setRevSize(); applyGlobalFx(); drawLenSeg();
   const ratio = sr / (meta.sr || sr), same = Math.abs(ratio - 1) < 1e-6;
   let missing = 0;
   for (const tm of meta.tracks || []) {
     const t = newTrack(Object.assign({}, EQ_DEF, pick(tm, TRACK_KEYS), { name: tm.name, auto: !!tm.auto }));
     for (const km of tm.takes || []) {
       let raw = null; try { raw = await dbGet('audio', id + '/' + km.key); } catch (e) {}
-      if (!raw) { missing++; continue; }
+      if (!raw || (isFree() && !freeL)) { missing++; continue; }
       if (!same) raw = resample(raw, ratio);
-      const k = { id: ++uid, key: km.key, k: -1, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, reverse: !!km.reverse,
+      const len = isFree() ? freeL : barsLen(km.bars || tm.bars || meta.bars);
+      const k = { id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, reverse: !!km.reverse,
         norm: km.norm == null ? null : km.norm, peak: 0, peaks: null, buf: null, src: null, tg: null,
         final: true, started: true, full: true, auto: false, track: t, savedTo: same ? id : null };
       render(k); t.takes.push(k); attachTake(k);
@@ -1271,16 +1355,23 @@ async function openProject(id) {
 function exportWav() {
   const act = allTakes().filter(k => k.buf && k.tg && audible(k.track));
   if (!act.length) { toast('There are no audible tracks to export.'); return; }
-  const m = new Float32Array(L); let pk = 0;
-  for (const k of act) { const d = k.buf.getChannelData(0), g = k.norm * k.track.vol; for (let i = 0; i < L; i++) m[i] += g * d[i]; }
-  for (let i = 0; i < L; i++) { const v = Math.abs(m[i]); if (v > pk) pk = v; }
+  let N = Math.max(...act.map(k => k.len));
+  if (!isFree()) {
+    const gcd = (a, b) => b ? gcd(b, a % b) : a;
+    const lcm = act.map(k => Math.round(k.len / barsLen(1))).reduce((a, b) => a * b / gcd(a, b), 1);
+    if (lcm <= 64) N = barsLen(lcm);
+  }
+  const m = new Float32Array(N); let pk = 0;
+  for (const k of act) { const d = k.buf.getChannelData(0), n = k.len, g = k.norm * k.track.vol; for (let i = 0; i < N; i++) m[i] += g * d[i % n]; }
+  for (let i = 0; i < N; i++) { const v = Math.abs(m[i]); if (v > pk) pk = v; }
+  const L = N;
   const sc = pk > 0.98 ? 0.98 / pk : 1, ab = new ArrayBuffer(44 + L * 2), v = new DataView(ab);
   const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
   str(0, 'RIFF'); v.setUint32(4, 36 + L * 2, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
   v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, L * 2, true);
   for (let i = 0; i < L; i++) v.setInt16(44 + i * 2, Math.round(clamp(m[i] * sc, -1, 1) * 32767), true);
   const base = (project ? project.name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') : '') || 'varv';
-  const name = base + '-' + st.bpm + 'bpm-' + st.bars + 'x' + st.beats + '.wav', blob = new Blob([ab], { type: 'audio/wav' });
+  const name = base + (isFree() ? '-free' : '-' + st.bpm + 'bpm-' + Math.round(N / barsLen(1)) + 'x' + st.beats) + '.wav', blob = new Blob([ab], { type: 'audio/wav' });
   try {
     const file = new File([blob], name, { type: 'audio/wav' });
     if (matchMedia('(pointer:coarse)').matches && navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file] }).catch(() => {}); return; }
@@ -1293,25 +1384,29 @@ function exportWav() {
 function stateText(s) {
   const to = targetName();
   return { stop: 'Stopped', count: 'Counting in', countrec: 'Count-in, then into ' + to, armed: 'Next lap into ' + to,
-    rec: 'Recording into ' + to, reclast: 'Last lap into ' + to, play: 'Playing', meas: 'Measuring latency' }[s];
+    rec: 'Recording into ' + to, reclast: 'Last lap into ' + to, play: 'Playing', meas: 'Measuring latency', define: 'Recording the loop' }[s];
 }
 const locked = () => allTakes().length > 0 || trash.some(it => it.take || it.track.takes.length);
 function ui() {
   const s = stateNow(); lastState = s;
   $('#stateText').textContent = stateText(s);
-  document.body.className = s === 'rec' || s === 'reclast' ? 's-rec' : s === 'armed' || s === 'countrec' ? 's-armed' : s === 'stop' || s === 'meas' ? 's-stop' : 's-play';
+  document.body.className = s === 'rec' || s === 'reclast' || s === 'define' ? 's-rec' : s === 'armed' || s === 'countrec' ? 's-armed' : s === 'stop' || s === 'meas' ? 's-stop' : 's-play';
   $('#tape').classList.toggle('run', running); $('#epane').classList.toggle('run', running);
   $('#playLbl').textContent = running ? 'Stop' : 'Start';
   $('#playIco').innerHTML = running ? '<path d="M6 6h12v12H6z"/>' : '<path d="M7 4l13 8-13 8z"/>';
-  $('#recLbl').textContent = s === 'armed' || s === 'countrec' ? 'Cancel' : s === 'rec' && st.mode === 'cont' ? 'Last lap' : s === 'reclast' ? 'Continue' : s === 'rec' ? 'Cancel' : 'Record';
+  $('#recLbl').textContent = s === 'define' ? 'End loop' : s === 'armed' || s === 'countrec' ? 'Cancel' : s === 'rec' && rec && rec.cont ? 'Last lap' : s === 'reclast' ? 'Continue' : s === 'rec' && rec ? 'Cancel' : 'Record';
   $('#empty').hidden = tracks.length > 0;
   $('#projName').textContent = project ? project.name : hasContent() ? 'unsaved' : '';
   const lk = locked(); $('#tempoLock').hidden = !lk;
-  for (const b of document.querySelectorAll('#bpmStep .sbtn, #beatsSeg button, #barsSeg button, #tapBtn')) b.disabled = lk;
+  for (const b of document.querySelectorAll('#bpmStep .sbtn, #beatsStep .sbtn, #barsStep .sbtn, #tapBtn, #lenSeg button')) b.disabled = lk;
+  $('#barsBox').hidden = isFree(); $('#freeNote').hidden = !isFree();
+  $('#freeNote').textContent = freeL ? 'The loop is ' + (freeL / sr).toFixed(2) + ' s long, set by the first recording.' : 'Tap Record, play, and tap End loop. That sets the length of every track. No click in this mode.';
+  $('#beatsVal').textContent = st.beats; $('#barsVal').textContent = st.bars;
   $('#bpmVal').innerHTML = st.bpm + '<small>bpm</small>';
   $('#latVal').innerHTML = prof().ms + '<small>ms</small>';
   $('#modeNote').textContent = st.mode === 'one' ? 'One lap, then the loop carries on.' : 'Every lap until you tap again. Silent laps are dropped.';
-  $('#muteNote').textContent = st.muteQ === 'now' ? 'Mute and solo act the moment you lift your finger.' : 'Tap ahead: the change lands on the next ' + (st.muteQ === 'bar' ? 'bar' : 'beat') + '.';
+  $('#muteNote').textContent = st.muteQ === 'now' ? 'Mute and solo act the moment you lift your finger.'
+    : isFree() ? 'In free mode the change lands at the start of the next pass of the loop.' : 'Tap ahead: the change lands on the next ' + (st.muteQ === 'bar' ? 'bar' : 'beat') + '.';
   if (document.activeElement !== $('#projInput')) $('#projInput').value = project ? project.name : '';
   $('#projNote').textContent = project ? 'Saves automatically.' : 'Not saved yet.';
 }
@@ -1398,7 +1493,7 @@ $('#capBtn').addEventListener('click', capturePrev);
 $('#clickBtn').addEventListener('click', () => setClick(!st.clickOn));
 $('#addTrk').addEventListener('click', () => { const t = newTrack(); ui(); if (mode === 'edit') selectTrack(t.id); t.row.scrollIntoView({ block: 'nearest' }); });
 $('#undoRestore').addEventListener('click', restoreLast);
-$('#undoClose').addEventListener('click', () => { trash = []; drawTrash(); ui(); });
+$('#undoClose').addEventListener('click', () => { trash = []; drawTrash(); releaseFree(); ui(); });
 drawClick();
 
 for (const b of document.querySelectorAll('#bpmStep .sbtn')) hold(b, () => setTempo(() => { st.bpm += +b.dataset.d; }));
@@ -1408,8 +1503,15 @@ $('#tapBtn').addEventListener('pointerdown', () => {
   taps.push(t); if (taps.length > 5) taps.shift();
   if (taps.length >= 2) setTempo(() => { st.bpm = 60000 / ((taps[taps.length - 1] - taps[0]) / (taps.length - 1)); });
 });
-seg($('#beatsSeg'), [2, 3, 4, 5, 6, 7].map(v => [v, v]), () => st.beats, v => setTempo(() => { st.beats = v; }));
-seg($('#barsSeg'), [1, 2, 4, 8].map(v => [v, v]), () => st.bars, v => setTempo(() => { st.bars = v; }));
+for (const b of document.querySelectorAll('#beatsStep .sbtn')) hold(b, () => setTempo(() => { st.beats = clamp(st.beats + +b.dataset.d, 1, 16); }));
+for (const b of document.querySelectorAll('#barsStep .sbtn')) hold(b, () => setTempo(() => { st.bars = clamp(st.bars + +b.dataset.d, 1, 32); }));
+function drawLenSeg() {
+  seg($('#lenSeg'), [['bars', 'Bars'], ['free', 'Free']], () => st.lenMode, v => {
+    if (locked()) { toast('Start a new project to change this.'); drawLenSeg(); return; }
+    stop(); st.lenMode = v; freeL = 0; save(); L = loopFrames(); buildRuler(); for (const t of tracks) drawLane(t); renderPane(); ui();
+  });
+}
+drawLenSeg();
 
 for (const b of document.querySelectorAll('#latStep .sbtn')) hold(b, () => { const p = prof(); p.ms = clamp(p.ms + +b.dataset.d, 0, MAXLAT_MS); p.guess = false; save(); ui(); });
 $('#measLoop').addEventListener('click', measure);
@@ -1454,15 +1556,15 @@ document.addEventListener('visibilitychange', () => {
   else if (ctx) keepMic(false);
 });
 window.addEventListener('pagehide', () => { if (project && dirty) saveProject(); });
-window.addEventListener('resize', () => { for (const t of tracks) drawLane(t); liveDirty = true; for (const w of document.querySelectorAll('.eqw')) w.draw(); });
+window.addEventListener('resize', () => { setShift(); for (const t of tracks) drawLane(t); liveDirty = true; for (const w of document.querySelectorAll('.eqw')) w.draw(); });
 
 buildRuler(); ui(); requestAnimationFrame(frame);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* for debugging and tests */
 window.__varv = { st, analyzeLoop, get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
-  get mode() { return mode; }, get selId() { return selId; },
-  get info() { return { sr, L, epoch, running, capEnd, capFirst, R, PRE, XF, capMode, micOK, recPass, armedId, state: stateNow() }; },
+  get mode() { return mode; }, get selId() { return selId; }, get freeL() { return freeL; }, get rec() { return rec; },
+  get info() { return { sr, L, epoch, running, capEnd, capFirst, R, PRE, XF, capMode, micOK, armedId, state: stateNow() }; },
   set synth(f) { synth = f; }, start, stop, toggleRec, capturePrev, measure, initAudio, saveProject, openProject, listProjects, setMode, eqResponse, nowF: () => nowF(),
   get nodes() { return { comp, clickComp, echoDelay, echoFbG, echoOut, revOut, mEq, conv }; } };
 })();

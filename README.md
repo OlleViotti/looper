@@ -16,8 +16,8 @@ The app has three views, reached by swiping or with the two buttons in the heade
   - **Tap a strip** to mute or unmute the track.
   - **Hold a strip** to arm it; a red fill shows the hold, and the armed track gets a red frame.
   - **Tap a name** to solo the track.
-- **Swipe right for Edit.** The strips slide away and the names stay as a track list; tap one to edit it, or tap Master for the master effects. Swipe left on the names, or tap the edit button, to go back.
-- **Swipe left for Settings:** tempo, latency, project, click, recording, mute timing and microphone. Swipe right or tap Done to go back.
+- **Swipe right for Edit.** The track names travel to the right edge and the edit window comes in from the left. Tap a name to edit that track, or tap Master for the master effects. Swipe left on the names, or tap the edit button, to go back.
+- **Swipe left for Settings:** loop length, tempo, latency, project, click, recording, mute timing and microphone. Swipe right or tap Done to go back.
 
 ## Latency correction
 
@@ -25,9 +25,14 @@ The app has three views, reached by swiping or with the two buttons in the heade
 - **Automatic measurement, exact.** The app plays ten clicks and listens for them through the microphone, using a matched filter tuned to the click, so no human timing is involved. Hold the phone's microphone against an earbud and tap Measure exactly. It finds a faint click buried in noise and reports nothing rather than a wrong value when it cannot hear the clicks.
 - **Microphone choice.** By default the app records with the phone's own microphone even when headphones are connected, and switches back to it if the system changes the input.
 
+## Loop length
+
+- **Bars.** Tempo 40 to 240 bpm with tap tempo, 1 to 16 beats per bar and 1 to 32 bars per lap, with a click and a one-bar count-in.
+- **Bars per track.** In Edit each track can have its own number of bars, for example a 4-bar melody over a 1-bar beat. It records on its own boundaries and its strip shows its own bars and playhead. The setting is fixed once the track holds a recording.
+- **Free.** No tempo and no click. The first Record starts at once; play, then tap **End loop** to set the length (up to 30 seconds). Every track then has that length. Since nothing is playing during that first recording, it is not shifted for latency; later recordings are, so they land on the first one.
+
 ## Recording
 
-- Click with a count-in of one bar, tempo 40 to 240 bpm with tap tempo, 2 to 7 beats per bar and 1, 2, 4 or 8 bars per lap.
 - **One lap** records a single lap. **Continuous** records every lap until you tap again; silent laps are thrown away.
 - **Capture last** keeps the lap you just played even if you never pressed Record.
 - **Undo** removes the latest recording. Removed recordings and deleted tracks stay in a bar at the bottom with a Restore button until you dismiss it.
@@ -38,7 +43,7 @@ The app has three views, reached by swiping or with the two buttons in the heade
 - Add tracks before you start, name them and give them their own effects.
 - **Arm** a track (hold its strip) to record into it. With no track armed, Record fills the empty tracks from the top, then creates new ones. The status bar always says where the next recording will go.
 - Recording again into a track that already holds audio adds another take on top (overdub). Each take has its own latency, reverse and remove.
-- **Mute timing:** mute and solo act immediately by default. In Settings they can instead land on the next beat or the next bar, so you can tap a little ahead.
+- **Mute timing:** mute and solo act immediately by default. In Settings they can instead land on the next beat or the next bar (in free mode: the next pass of the loop), so you can tap a little ahead.
 - Per track, in Edit: name, arm, solo and mute buttons, volume, pan, graphical EQ, filter (darker or thinner), delay send and reverb send, plus the waveform and each take's latency, reverse and remove.
 
 ## Graphical EQ
@@ -56,10 +61,10 @@ Under Master in the Edit view:
 
 ## Projects
 
-- Save the session as a named project: tracks, takes, track settings, tempo and master effects. Once saved, changes are saved automatically.
+- Save the session as a named project: tracks, takes, track settings, loop length, tempo and master effects. Once saved, changes are saved automatically.
 - The raw recordings are stored, not the finished loops, so the latency of every take can still be changed after a project is reopened.
 - Projects are stored in the browser on the device (IndexedDB) and are not synced anywhere.
-- Export the current lap as a WAV file of the audible tracks, without effects or pan.
+- Export as a WAV file of the audible tracks, without effects or pan. With tracks of different lengths, the export runs until they all line up again.
 
 ## Live use
 
