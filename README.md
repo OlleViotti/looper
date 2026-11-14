@@ -14,4 +14,5 @@ Everything lives in `index.html`. The page must be opened over https for the mic
 
 Todo:
 - Save projects
+- Solo button on main screen
 - Overdub recording?
