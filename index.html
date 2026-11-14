@@ -71,7 +71,10 @@ body.s-rec .meter i{background:#fff}
 .lane.muted .mute i{background:transparent;color:var(--mut);border:2px dashed var(--line)}
 .lane.muted .trk{opacity:.32}
 
-.ruler{margin-bottom:6px}
+.ruler{margin-bottom:6px;align-items:end}
+#clickBtn{height:44px}
+#clickBtn i{font:600 13px/1 var(--ui);--ink:#1b1f2e}
+#clickBtn.off i{background:transparent;color:var(--mut);border:2px dashed var(--line)}
 #ruler{display:flex;height:26px;align-items:flex-end}
 #ruler i{flex:1;height:10px;border-left:1px solid var(--line);font:500 13px/1 var(--ui);font-style:normal;color:var(--mut);padding-left:4px;position:relative}
 #ruler i.first{height:26px;border-left:2px solid var(--mut)}
@@ -173,7 +176,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
   </nav>
 
   <main class="tape" id="tape">
-    <div class="lane ruler"><div></div><div id="ruler"></div></div>
+    <div class="lane ruler"><button class="mute" id="clickBtn"><i>klick</i></button><div id="ruler"></div></div>
     <div id="lanes"></div>
     <div class="lane live" id="liveLane"><div class="gut">in</div><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i></div></div>
     <p class="empty" id="empty"><b>Tryck på Spela in.</b> Klicket räknar in en takt och sedan spelas ett varv in. Varje nytt varv blir ett eget lager som flyttas bakåt med latensen, så att det hamnar på slaget.</p>
@@ -204,7 +207,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
   <div class="big" id="latStep"><button class="sbtn" data-d="-10">−10</button><button class="sbtn" data-d="-1">−1</button><output id="latVal"></output><button class="sbtn" data-d="1">+1</button><button class="sbtn" data-d="10">+10</button></div>
   <div class="field"><input class="txt" id="profName" aria-label="Namn på uppsättningen" maxlength="28"><button class="btn danger" id="profDel">Ta bort</button></div>
   <h3>Mät upp</h3>
-  <p class="note">Håll ena hörluren mot telefonens mikrofon och tryck Mät. Tio klick spelas, och appen mäter hur sent de kommer tillbaka. Med högtalare räcker det att vara tyst. Vill du hellre mäta så som du upplever det, behåll hörlurarna i och klappa i takt med klicken.</p>
+  <p class="note">Behåll hörlurarna i öronen, tryck Mät och klappa i takt med de tio klicken. Appen mäter hur sent klappen kommer in jämfört med klicken. Mätningen gäller den ljudväg klicken faktiskt hörs i. Tar du ut hörlurarna flyttar telefonen ofta ljudet till högtalaren, och då mäts den i stället. Med sladd eller högtalare räcker det att vara tyst.</p>
   <button class="btn wide" id="measBtn">Mät</button>
   <div class="dots" id="measDots" hidden></div>
   <p id="measRes" hidden></p>
@@ -232,7 +235,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
   <div class="acts"><button class="btn" id="exportBtn">Exportera varvet som WAV</button><button class="btn danger" id="clearBtn">Rensa alla lager</button></div>
   <p class="note">Exporten innehåller de lager som hörs, utan effekter. Lagren sparas inte när sidan stängs.</p>
   <h3>Tangenter och pedal</h3>
-  <p class="note"><kbd>Mellanslag</kbd> startar och stoppar. <kbd>R</kbd>, <kbd>Enter</kbd> eller <kbd>→</kbd> spelar in. <kbd>←</kbd> ångrar senaste lagret. <kbd>C</kbd> fångar förra varvet. <kbd>1</kbd> till <kbd>9</kbd> tystar ett lager. En Bluetooth-pedal som skickar piltangenter fungerar alltså som inspelningspedal.</p>
+  <p class="note"><kbd>Mellanslag</kbd> startar och stoppar. <kbd>R</kbd>, <kbd>Enter</kbd> eller <kbd>→</kbd> spelar in. <kbd>←</kbd> ångrar senaste lagret. <kbd>C</kbd> fångar förra varvet. <kbd>K</kbd> slår av och på klicket. <kbd>1</kbd> till <kbd>9</kbd> tystar ett lager. En Bluetooth-pedal som skickar piltangenter fungerar alltså som inspelningspedal.</p>
 </div></div>
 
 <div class="toast" id="toast" hidden><span id="toastTxt"></span><button id="toastAct" hidden></button></div>
@@ -780,10 +783,11 @@ async function measure() {
   try { g.disconnect(); } catch (e) {}
   measuring = false; $('#measBtn').disabled = false;
   const res = $('#measRes'); res.hidden = false;
-  if (!measOut) res.textContent = 'Klicken hördes inte tydligt nog i mikrofonen. Höj volymen, håll hörluren tätt mot mikrofonen och mät igen.';
+  if (!measOut) res.textContent = 'Mikrofonen hörde inga tydliga klapp eller klick. Klappa nära telefonen på varje klick och mät igen.';
   else {
     res.textContent = measOut.ms + ' ms, spridning ±' + measOut.spread.toFixed(1) + ' ms över ' + measOut.n + ' av ' + measOut.of + ' klick.' +
-      (measOut.spread > 12 ? ' Spridningen är stor, så mät gärna en gång till.' : '');
+      (measOut.spread > 12 ? ' Spridningen är stor, så mät gärna en gång till.' : '') +
+      (measOut.ms < 60 ? ' Ett så lågt värde tyder på sladd eller telefonens högtalare, inte Bluetooth.' : '');
     const u = $('#measUse'); u.hidden = false; u.textContent = 'Använd ' + measOut.ms + ' ms för ' + prof().name;
   }
   ui();
@@ -939,7 +943,22 @@ $('#gfx').append(...gRows);
 seg($('#echoSeg'), [[0.5, 'Åttondel'], [0.75, 'Punkterad'], [1, 'Fjärdedel']], () => st.echoDiv, v => { st.echoDiv = v; save(); applyGlobalFx(); });
 $('#fxReset').addEventListener('click', () => { st.gFilter = st.gEcho = st.gRev = 0; gRows[1].set(0); gRows[2].set(0); gRows[3].set(0); save(); applyGlobalFx(); ui(); });
 
-seg($('#clickSeg'), [[true, 'På'], [false, 'Av']], () => st.clickOn, v => { st.clickOn = v; save(); if (ctx && running && nowF() >= epoch) clickGain.gain.setTargetAtTime(v ? st.clickVol : 0, ctx.currentTime, 0.01); });
+function setClick(v) {
+  st.clickOn = v; save();
+  if (ctx && running) {
+    const g = clickGain.gain, t = ctx.currentTime;
+    if (nowF() >= epoch) g.setTargetAtTime(v ? st.clickVol : 0, t, 0.01);
+    else { g.cancelScheduledValues(t); g.setValueAtTime(v ? st.clickVol : 0, epoch / sr); }   // inräkningen hörs alltid
+  }
+  drawClick();
+}
+function drawClick() {
+  seg($('#clickSeg'), [[true, 'På'], [false, 'Av']], () => st.clickOn, setClick);
+  const b = $('#clickBtn'); b.classList.toggle('off', !st.clickOn);
+  b.setAttribute('aria-pressed', st.clickOn); b.setAttribute('aria-label', st.clickOn ? 'Klick på, tryck för att stänga av' : 'Klick av, tryck för att slå på');
+}
+drawClick();
+$('#clickBtn').addEventListener('click', () => setClick(!st.clickOn));
 $('#clickVolRow').append(sliderRow('Klickvolym', 0, 1, 0.01, st.clickVol, 0.6, pct, v => { st.clickVol = v; save(); if (ctx && running && st.clickOn && nowF() >= epoch) clickGain.gain.setTargetAtTime(v, ctx.currentTime, 0.01); }, 'g'));
 seg($('#modeSeg'), [['one', 'Ett varv'], ['cont', 'Löpande']], () => st.mode, v => { st.mode = v; save(); ui(); });
 $('#micSel').addEventListener('change', e => { if (!ctx) return; st.micId = e.target.value; save(); openMic(st.micId, !st.micId); });
@@ -962,6 +981,7 @@ document.addEventListener('keydown', e => {
   else if (k === 'r' || k === 'R' || k === 'Enter' || k === 'ArrowRight' || k === 'PageDown') { if (e.target.closest && e.target.closest('button') && k === 'Enter') return; e.preventDefault(); if (!e.repeat) toggleRec(); }
   else if (k === 'ArrowLeft' || k === 'PageUp' || k === 'Backspace') { e.preventDefault(); if (!e.repeat) undoLast(); }
   else if (k === 'c' || k === 'C') capturePrev();
+  else if (k === 'k' || k === 'K') setClick(!st.clickOn);
   else if (k === 'Escape') for (const s of document.querySelectorAll('.sheet')) s.hidden = true;
   else if (k >= '1' && k <= '9') { const l = layers.find(x => x.mounted && x.n === +k); if (l) toggleMute(l); }
 });
