@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1f2e">
+<title>Varv route test</title>
+<style>
+:root{--desk:#1b1f2e;--panel:#252a3b;--raise:#2f3549;--text:#ece5d0;--mut:#a0a8c0;--amber:#ffb224;--rec:#ff3d57;--ok:#7fd49a}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--desk);color:var(--text);font:16px/1.45 -apple-system,system-ui,sans-serif;padding:max(16px,env(safe-area-inset-top)) 16px 40px}
+h1{font-size:22px;margin:4px 0 6px}
+p{margin:0 0 12px;color:var(--mut)}
+.card{background:var(--panel);border-radius:14px;padding:14px;margin:12px 0}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between}
+button{font:inherit;color:var(--text);background:var(--raise);border:0;border-radius:12px;padding:12px 14px;min-height:46px}
+button.go{background:var(--amber);color:var(--desk);font-weight:700;width:100%}
+button.yes{background:var(--ok);color:var(--desk);font-weight:600;flex:1}
+button.no{background:var(--rec);color:#fff;font-weight:600;flex:1}
+.st{font-weight:600}
+.small{font-size:13px;color:var(--mut)}
+ol{padding-left:20px;margin:0}
+li{margin:6px 0}
+li b{color:var(--text)}
+.res li{color:var(--mut)}
+textarea{width:100%;height:150px;background:var(--desk);color:var(--text);border:1px solid var(--raise);border-radius:10px;font:12px/1.4 ui-monospace,monospace;padding:8px}
+</style>
+</head>
+<body>
+<h1>Where does the sound go?</h1>
+<p>A test for the AirPods problem. Run test 1 first. Connect the AirPods, then run each test below. Each one plays a soft beep, starts the microphone in a different way, and asks where you hear the beep a few seconds later. Allow the microphone when asked.</p>
+
+<div class="card" id="runCard" hidden>
+  <div class="st" id="runName"></div>
+  <p class="small" id="runInfo"></p>
+  <p id="runStatus">Starting…</p>
+  <div class="row" id="ask" hidden>
+    <button class="yes" id="inPods">In the AirPods</button>
+    <button class="no" id="inSpk">In the speaker</button>
+  </div>
+</div>
+
+<div class="card">
+  <ol id="list"></ol>
+  <p class="small" style="margin-top:10px">The page reloads before each test, so one test cannot affect the next.</p>
+</div>
+
+<div class="card">
+  <div class="st">Results</div>
+  <ol class="res" id="res"></ol>
+  <p class="small" style="margin:10px 0 6px">Send this text back to Claude:</p>
+  <textarea id="report" readonly></textarea>
+  <div class="row" style="margin-top:8px"><button id="copy">Copy</button><button id="clear">Clear results</button></div>
+</div>
+
+<script>
+const T = [
+  ['now', 'As Varv does now', 'Opens the default microphone (the AirPods), then switches to the phone microphone.'],
+  ['direct', 'Phone microphone directly', 'Opens the phone microphone straight away, without the AirPods microphone first.'],
+  ['nosession', 'Without the audio-session hint', 'As Varv does now, but without telling Safari that the page plays and records.'],
+  ['echo', 'With voice processing', 'As Varv does now, but with echo cancellation on (the phone-call sound path).'],
+  ['reassert', 'Re-assert after the switch', 'As Varv does now, then sets the audio session again after the switch.'],
+  ['ctxafter', 'Microphone before sound', 'Starts the microphone first and the sound engine afterwards.'],
+  ['pods', 'AirPods microphone only', 'Never switches; records with the AirPods microphone. For comparison.']
+];
+const BUILTIN = /iphone|ipad|built-?in|inbyggd|intern/i;
+const $ = s => document.querySelector(s);
+const load = () => { try { return JSON.parse(localStorage.getItem('varv.routetest') || '{}'); } catch (e) { return {}; } };
+const store = o => { try { localStorage.setItem('varv.routetest', JSON.stringify(o)); } catch (e) {} };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let ctx = null, stream = null;
+
+function draw() {
+  const r = load(), list = $('#list'), res = $('#res'); list.textContent = ''; res.textContent = '';
+  for (const [id, name, what] of T) {
+    const li = document.createElement('li'), b = document.createElement('button');
+    b.textContent = (r[id] ? '✓ ' : '') + name; b.style.width = '100%'; b.style.textAlign = 'left';
+    b.onclick = () => { location.href = location.pathname + '?t=' + id; };
+    const d = document.createElement('div'); d.className = 'small'; d.textContent = what; d.style.margin = '4px 2px 0';
+    li.append(b, d); list.append(li);
+    if (r[id]) { const x = document.createElement('li'); x.innerHTML = '<b>' + name + ':</b> ' + r[id].where + (r[id].mic ? ' (mic: ' + r[id].mic + ')' : ''); res.append(x); }
+  }
+  const lines = ['Varv route test', 'Device: ' + navigator.userAgent, 'audioSession API: ' + ('audioSession' in navigator ? 'yes' : 'no')];
+  for (const [id, name] of T) if (r[id]) lines.push(name + ': ' + r[id].where + (r[id].mic ? ' | mic ' + r[id].mic : '') + (r[id].note ? ' | ' + r[id].note : ''));
+  $('#report').value = lines.join('\n');
+}
+
+function beep() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  ctx = ctx || new AC({ latencyHint: 'interactive' });
+  ctx.resume();
+  const sr = ctx.sampleRate, b = ctx.createBuffer(1, sr, sr), d = b.getChannelData(0);
+  for (let p of [0, sr / 2]) for (let i = 0; i < 0.12 * sr; i++) d[p + i] = 0.25 * Math.sin(2 * Math.PI * 660 * i / sr) * Math.min(1, i / 200, (0.12 * sr - i) / 400);
+  const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; s.connect(ctx.destination); s.start();
+}
+const base = echo => ({ echoCancellation: !!echo, noiseSuppression: false, autoGainControl: false, channelCount: 1 });
+async function mic(c) { const s = await navigator.mediaDevices.getUserMedia({ audio: c }); if (stream) stream.getTracks().forEach(t => t.stop()); stream = s; if (ctx) ctx.createMediaStreamSource(s); return s; }
+async function toBuiltin(echo) {
+  const tr = stream.getAudioTracks()[0];
+  if (BUILTIN.test(tr.label)) return 'already the phone mic';
+  const bi = (await navigator.mediaDevices.enumerateDevices()).find(d => d.kind === 'audioinput' && BUILTIN.test(d.label));
+  if (!bi) return 'no phone mic found';
+  try { localStorage.setItem('varv.routetest.bi', bi.deviceId); } catch (e) {}
+  await mic(Object.assign({ deviceId: { exact: bi.deviceId } }, base(echo)));
+  return 'switched';
+}
+const label = () => stream ? stream.getAudioTracks()[0].label : '';
+const session = v => { try { if (navigator.audioSession) navigator.audioSession.type = v; } catch (e) {} };
+
+async function run(id) {
+  const t = T.find(x => x[0] === id); if (!t) return;
+  $('#runCard').hidden = false; $('#runName').textContent = t[1]; $('#runInfo').textContent = t[2];
+  const go = document.createElement('button'); go.className = 'go'; go.textContent = 'Start this test';
+  $('#runStatus').textContent = ''; $('#runStatus').append(go);
+  await new Promise(r => go.onclick = r);                          // sound needs a tap to start
+  $('#runStatus').textContent = 'Running… listen to the beep.';
+  let note = '';
+  try {
+    if (id === 'now' || id === 'echo' || id === 'reassert') {
+      session('play-and-record'); beep(); await sleep(1500);
+      await mic(base(id === 'echo')); await sleep(800); note = await toBuiltin(id === 'echo');
+      if (id === 'reassert') { await sleep(500); session('auto'); await sleep(200); session('play-and-record'); ctx.resume(); }
+    } else if (id === 'nosession') {
+      beep(); await sleep(1500); await mic(base()); await sleep(800); note = await toBuiltin();
+    } else if (id === 'direct') {
+      session('play-and-record'); beep(); await sleep(1500);
+      let id0 = ''; try { id0 = localStorage.getItem('varv.routetest.bi') || ''; } catch (e) {}
+      const bi = (await navigator.mediaDevices.enumerateDevices()).find(d => d.kind === 'audioinput' && BUILTIN.test(d.label));
+      if (bi) id0 = bi.deviceId;
+      let ok = false;
+      if (id0) { try { await mic(Object.assign({ deviceId: { exact: id0 } }, base())); ok = BUILTIN.test(label()); } catch (e) {} }
+      if (ok) note = 'opened directly';
+      else { if (!stream) await mic(base()); note = 'could not open it directly; run test 1 first, then this one again'; await sleep(800); await toBuiltin(); }
+    } else if (id === 'ctxafter') {
+      session('play-and-record'); await mic(base()); await sleep(800); note = await toBuiltin(); await sleep(300); beep();
+    } else if (id === 'pods') {
+      session('play-and-record'); beep(); await sleep(1500); await mic(base()); note = 'no switch';
+    }
+  } catch (e) { note = 'error: ' + (e && e.message || e); }
+  $('#runStatus').textContent = 'Microphone in use: ' + (label() || 'none') + '. Wait a few seconds. Where do you hear the beep now?';
+  await sleep(2500); $('#ask').hidden = false;
+  const answer = where => { const r = load(); r[id] = { where, mic: label(), note }; store(r); if (stream) stream.getTracks().forEach(t => t.stop()); location.href = location.pathname; };
+  $('#inPods').onclick = () => answer('AirPods'); $('#inSpk').onclick = () => answer('speaker');
+}
+
+$('#copy').onclick = async () => { try { await navigator.clipboard.writeText($('#report').value); $('#copy').textContent = 'Copied'; } catch (e) { $('#report').select(); } };
+$('#clear').onclick = () => { store({}); draw(); };
+draw();
+const q = new URLSearchParams(location.search).get('t'); if (q) run(q);
+</script>
+</body>
+</html>
