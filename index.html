@@ -60,7 +60,10 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 
 /* Play view: name block and tape strip per track */
 #main{position:relative;flex:1;min-height:0;display:flex;overflow:hidden}
-.tape{flex:1;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;padding:10px 16px 16px;--ph:0}
+.tape{flex:1;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;padding:10px 16px 16px;--ph:0;display:flex;flex-direction:column}
+.tape>*{flex:none}
+#lanes{flex:1 1 auto;display:flex;flex-direction:column;min-height:min-content}
+#lanes .track{flex:1 1 0;min-height:48px;max-height:200px}
 .row{display:grid;grid-template-columns:var(--nw) 1fr;column-gap:8px;margin-bottom:8px}
 .trk{position:relative;overflow:hidden}
 .trk canvas{display:block;width:100%;height:100%}
@@ -80,19 +83,20 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 #ruler i.first{height:26px;border-left:2px solid var(--mut)}
 #ruler i.on{background:linear-gradient(var(--amber),var(--amber)) left bottom/100% 5px no-repeat;color:var(--amber)}
 
-.tname{position:relative;overflow:hidden;height:52px;border-radius:8px;background:var(--panel);padding:0 10px;text-align:left;display:flex;flex-direction:column;justify-content:center;min-width:0;line-height:1.15;transition:background .1s}
+.tname{position:relative;overflow:hidden;min-height:48px;border-radius:8px;background:var(--panel);padding:0 10px;text-align:left;display:flex;flex-direction:column;justify-content:center;min-width:0;line-height:1.15;transition:background .1s}
 .tname b{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tname small{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tname .lv{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--mut);transform-origin:left;transform:scaleX(0);pointer-events:none}
 .track.solo .tname{background:var(--amber);color:#1b1f2e}
 .track.solo .tname .lv{background:#1b1f2e}
-.scenes{margin:0;padding:8px 16px;border-top:1px solid var(--line);background:var(--desk)}
+.scenes{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:0;padding:8px 10px 6px;border-top:1px solid var(--line);background:var(--desk)}
 [data-mode=edit] .scenes{display:none!important}
 .sclab{display:flex;align-items:center;padding-left:10px;color:var(--mut);font-size:14px}
-.scn{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.scb{position:relative;overflow:hidden;height:44px;display:flex;align-items:center;justify-content:center;line-height:1;border-radius:8px;background:var(--raise);font-weight:700;cursor:pointer}
+.scn{display:contents}
+.scb{position:relative;overflow:hidden;height:44px;display:block;padding:0;border-radius:8px;background:var(--raise);font-weight:700;cursor:pointer}
 .scb.empty{background:transparent;border:1px dashed var(--line);color:var(--mut)}
 .scb.on{background:var(--amber);color:#1b1f2e}
+.scb span{position:relative;display:block;width:100%;line-height:42px;text-align:center}
 .scb .lp{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,178,36,.35);pointer-events:none}
 .scb.pressing .lp{width:100%;transition:width .45s linear}
 .cont{margin:0 0 14px}
@@ -104,7 +108,7 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 .track.silent .tname b{opacity:.45}
 [data-mode=edit] .track.sel .tname,[data-mode=edit] .masterrow.sel .tname{box-shadow:inset 0 0 0 2px var(--amber)}
 [data-mode=edit] .track.sel.armed .tname{box-shadow:inset 5px 0 0 var(--rec),inset 0 0 0 2px var(--amber)}
-.track .trk{height:52px;background:var(--tape);border-radius:2px;cursor:pointer;
+.track .trk{min-height:48px;background:var(--tape);border-radius:2px;cursor:pointer;
   clip-path:polygon(0 0,100% 0,calc(100% - 3px) 22%,100% 48%,calc(100% - 2px) 76%,100% 100%,0 100%,3px 72%,0 46%,2px 20%)}
 .track.silent .trk canvas{opacity:.25}
 .track .trk em{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:700 13px/1 var(--ui);font-style:normal;color:#1b1f2e;display:none;pointer-events:none}
@@ -112,8 +116,8 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 .track.armed .trk::after{content:'';position:absolute;inset:0;box-shadow:inset 0 0 0 3px var(--rec);pointer-events:none}
 .trk .lp{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,61,87,.35);pointer-events:none}
 .trk.pressing .lp{width:100%;transition:width .45s linear}
-.addtrk{height:52px;border:1px dashed var(--line);border-radius:8px;color:var(--mut);font-weight:600}
-.live .trk{border:1px dashed var(--line);height:52px;border-radius:4px}
+.addtrk{height:48px;border:1px dashed var(--line);border-radius:8px;color:var(--mut);font-weight:600}
+.live .trk{border:1px dashed var(--line);height:48px;border-radius:4px}
 .live .trk span{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--mut);pointer-events:none}
 body.s-rec .live .trk{border-color:var(--rec)}
 .masterrow{display:none}
@@ -178,7 +182,7 @@ select.txt{appearance:auto}
 .eqw output{display:block;font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums;min-height:20px;margin-top:4px}
 
 /* Transport */
-.bar{display:grid;grid-template-columns:1fr 1fr 1.25fr 1fr 1fr;gap:6px;padding:4px 10px calc(10px + env(safe-area-inset-bottom));background:var(--desk)}
+.bar{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:4px 10px calc(10px + env(safe-area-inset-bottom));background:var(--desk)}
 .bar button{height:70px;border-radius:14px;background:var(--raise);font-weight:600;font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;line-height:1.05;padding:0 2px}
 .bar svg{width:22px;height:22px;fill:currentColor}
 #recBtn{background:var(--rec);color:#fff}
@@ -239,14 +243,12 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
   <div id="main">
     <main class="tape" id="tape">
       <div class="empty" id="empty">
-        <p><b>Varv is a looper.</b> Everything you record repeats in time with the click, and you build a piece layer by layer.</p>
-        <p><b>Tap Record to start.</b> The click counts in one bar, then one lap is recorded into a new track. Tap Record again for the next layer.</p>
-        <p><b>Bluetooth headphones lag.</b> Varv moves every recording back by that delay so it lands on the beat. Measure it once: swipe left for settings, then Measure exactly.</p>
-        <p><b>Hold Record</b> to start or stop playback without recording. <b>+ Track</b> adds empty tracks you can name and shape before you record.</p>
+        <p><b>Varv is a looper:</b> what you record repeats in time with the click, layer by layer. <b>Tap Record</b>: one bar of count-in, then it records lap after lap, each into the next empty track, until you tap Record again. <b>Hold Record</b> to start or stop without recording.</p>
+        <p><b>Bluetooth headphones lag,</b> so Varv moves each recording back to land on the beat. Measure the delay once: swipe left, Measure exactly.</p>
       </div>
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
-      <p class="hint" id="hTrack" hidden><b>Tap</b> a track to mute it. <b>Hold</b> it to record into it from the next lap; hold again to cancel. Tap its <b>name</b> to solo it.</p>
+      <p class="hint" id="hTrack" hidden><b>Tap</b> a track to mute it. <b>Hold</b> it to record one lap into it, from its next lap; hold again to cancel. Tap its <b>name</b> to solo it.</p>
       <p class="hint" id="hSwipe" hidden><b>Swipe right</b> to edit a track's sound and timing, <b>left</b> for settings. Tap the logo to come back.</p>
       <p class="hint" id="hUndo" hidden><b>Undo</b> removes the latest recording, and the bar that appears can bring it back. <b>Capture last</b> keeps the lap you just played, even without pressing Record.</p>
       <div class="row"><button class="addtrk nmcol" id="addTrk">+ Track</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
@@ -256,10 +258,9 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
   </div>
 
   <div class="hintbar" id="hintBar">
-    <p class="hint" id="hMode" hidden><b>One lap</b> records a single lap. <b>Auto</b> keeps recording lap after lap until you tap Record again. Tap the button to switch.</p>
-    <p class="hint" id="hScenes" hidden><b>Scenes A–D</b> remember which tracks are muted: hold one to store, tap it to bring that mix back, for a verse and a chorus say.</p>
+    <p class="hint" id="hScenes" hidden><b>Scenes A–E</b> remember which tracks are muted: hold one to store, tap it to bring that mix back, for a verse and a chorus say.</p>
   </div>
-  <div class="row scenes" id="sceneRow"><button class="laptog" id="lapTog" aria-label="Recording length: tap to switch"></button><div class="scn" id="scn" aria-label="Scenes"></div></div>
+  <div class="scenes" id="sceneRow"><div class="scn" id="scn" aria-label="Scenes"></div></div>
   <footer class="bar">
     <button id="playBtn"><svg viewBox="0 0 24 24" id="playIco"><path d="M7 4l13 8-13 8z"/></svg><span id="playLbl">Start</span></button>
     <button id="undoBtn"><svg viewBox="0 0 24 24"><path d="M9 5L3 11l6 6v-4h5a4 4 0 010 8h-3v2h3a6 6 0 000-12H9z"/></svg><span>Undo</span></button>
@@ -302,10 +303,6 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
   <div class="field"><span>Click</span><div class="seg" id="clickSeg"></div></div>
   <div id="clickVolRow"></div>
 
-  <h3>Recording</h3>
-  <div class="field"><span>Length</span><div class="seg" id="modeSeg"></div></div>
-  <p class="note" id="modeNote"></p>
-
   <h3>Mute and solo</h3>
   <div class="seg full" id="muteSeg"></div>
   <p class="note" id="muteNote"></p>
@@ -328,8 +325,8 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
   <button class="btn" id="hintReset">Show the guide again</button>
 
   <h3>Keys and pedal</h3>
-  <p class="note"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>L</kbd> One lap or Auto. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p>
-  <p class="note">Version 15 Nov 01:25</p>
+  <p class="note"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p>
+  <p class="note">Version 15 Nov 01:45</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -376,7 +373,8 @@ let L = 0, PRE = 0, XF = 0, MAXLAT = 0, OPEN_LP = 20000, epoch = 0, running = fa
 let rec = null, recTail = null, defining = null, freeL = 0, measuring = false;
 
 /* Tracks are the lanes on screen and hold the settings; takes are the recordings inside a track. */
-let scenes = [null, null, null, null];
+const NSCN = 5;
+let scenes = Array(NSCN).fill(null);
 let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, selId = null, mode = 'play';
 const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null }, EQ_DEF);
 const TRACK_KEYS = Object.keys(TRACK_DEF);
@@ -640,7 +638,7 @@ const targetName = () => { const t = targetTrack(); return t ? t.name : 'a new t
    Passes are counted from the epoch, so a 4-bar track records on 4-bar boundaries and a 1-bar track on any bar. */
 function plan(from) {
   const t = targetTrack(), len = t ? trackLen(t) : loopFrames();
-  return { tid: t ? t.id : null, len, k: Math.max(0, Math.ceil(from / len - 1e-9)), cont: st.mode === 'cont', last: false };
+  return { tid: t ? t.id : null, len, k: Math.max(0, Math.ceil(from / len - 1e-9)), cont: true, last: false };   // the Record button keeps going lap after lap
 }
 const inTail = p => recTail && p >= recTail.start && p < recTail.end;
 const taken = r => { const t = tracks.find(x => x.id === r.tid); return t && t.takes.some(x => x.run === runId && x.k === r.k && x.len === r.len); };
@@ -658,7 +656,7 @@ async function toggleRec() {
   if (rec) {
     if (p < rec.k * rec.len && !inTail(p)) rec = null;                     // was waiting: cancel
     else if (rec.cont) rec.last = !rec.last;                              // continuous: last lap, or carry on
-    else { rec.cont = true; rec.stay = true; rec.last = false; }          // one lap: keep going, stacking takes in the same track
+    else { rec = null; toast('Recording cancelled.'); }                   // a one-lap recording from a hold: cancel
     ui(); return;
   }
   const r = plan(0), kk = Math.floor(p / r.len);
@@ -704,7 +702,6 @@ function endDefine() {
   freeL = len; L = len; epoch = T0; running = true; runId++; rec = null; recTail = { start: 0, end: len }; livePass = null; clickSrc = null;
   const t = tracks.find(x => x.id === defineInto) || targetTrack(); defineInto = null;
   addTake({ tid: t ? t.id : null, len, k: 0 }, false, 0);
-  if (st.mode === 'cont') rec = plan(len);
   buildRuler(); ui(); markDirty(); tick();
 }
 /* In free mode the length is released again once nothing is left that could need it. */
@@ -902,7 +899,7 @@ async function recordInto(t) {
   if (!running) {
     if (!(await start(true))) return;
     if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
-    rec = { tid: t.id, len: trackLen(t), k: isFree() ? 1 : 0, cont: st.mode === 'cont', last: false, stay: true }; ui(); return;
+    rec = { tid: t.id, len: trackLen(t), k: isFree() ? 1 : 0, cont: false, last: false, stay: true }; ui(); return;
   }
   const p = heardPos();
   if (recInto(t)) {
@@ -912,7 +909,7 @@ async function recordInto(t) {
   }
   if (rec && !(p < rec.k * rec.len && !inTail(p))) { toast('Wait for the recording into ' + (tracks.find(x => x.id === rec.tid) || {}).name + ' to finish.'); return; }
   const len = trackLen(t), kk = Math.floor(p / len);
-  rec = { tid: t.id, len, k: p < 0 ? 0 : (p - kk * len < GRACE_S * sr ? kk : kk + 1), cont: st.mode === 'cont', last: false, stay: true };
+  rec = { tid: t.id, len, k: p < 0 ? 0 : (p - kk * len < GRACE_S * sr ? kk : kk + 1), cont: false, last: false, stay: true };   // a hold records one lap
   while (taken(rec)) rec.k++;
   ui();
 }
@@ -978,7 +975,7 @@ function drawHead(t) {
 const drawHeads = () => { for (const t of tracks) drawHead(t); $('#masterRow').classList.toggle('sel', selId === 'master'); drawScenes(); };
 
 /* Scenes store which tracks are muted and soloed. Tap recalls (on the mute timing), hold stores. */
-const SCN = 'ABCD';
+const SCN = 'ABCDE';
 function sceneStore(i) {
   scenes[i] = { mute: {}, solo: {} };
   for (const t of tracks) { scenes[i].mute[t.key] = t.mute; scenes[i].solo[t.key] = t.solo; }
@@ -997,7 +994,7 @@ const sceneOn = sc => !!sc && tracks.length > 0 && tracks.every(t => !(t.key in 
 function drawScenes() {
   const host = $('#scn');
   if (!host.children.length) SCN.split('').forEach((c, i) => {
-    const b = el('button', 'scb'); b.append(el('i', 'lp'), document.createTextNode(c));
+    const b = el('button', 'scb'); b.append(el('i', 'lp'), el('span', '', c));
     b.setAttribute('aria-label', 'Scene ' + c + ': tap to recall, hold to store');
     pressable(b, () => sceneRecall(i), () => sceneStore(i)); host.append(b);
   });
@@ -1547,17 +1544,20 @@ async function deleteProject(id) {
   tx.objectStore('projects').delete(id); tx.objectStore('audio').delete(IDBKeyRange.bound(id + '/', id + '/￿'));
   await txDone(tx);
   try { if (localStorage.getItem('varv.last') === id) localStorage.removeItem('varv.last'); } catch (e) {}
-  if (project && project.id === id) { project = null; clearAll(); }
+  if (project && project.id === id) { project = null; clearAll(true); }
 }
 function resample(x, ratio) {
   const n = Math.floor(x.length * ratio), y = new Float32Array(n);
   for (let i = 0; i < n; i++) { const p = i / ratio, j = Math.floor(p), f = p - j; y[i] = (x[j] || 0) * (1 - f) + (x[j + 1] || 0) * f; }
   return y;
 }
-function clearAll() {
+const START_TRACKS = 4;
+function freshTracks() { for (let i = 0; i < START_TRACKS; i++) newTrack(); }
+function clearAll(fresh) {
   for (const t of tracks) unmountTrack(t);
-  tracks = []; trash = []; laneCount = 0; inkN = 0; armedId = null; selId = null; rec = null; recTail = null; scenes = [null, null, null, null];
+  tracks = []; trash = []; laneCount = 0; inkN = 0; armedId = null; selId = null; rec = null; recTail = null; scenes = Array(NSCN).fill(null);
   if (isFree()) { stop(); freeL = 0; L = 0; buildRuler(); }
+  if (fresh) freshTracks();
   drawTrash(); renderPane(); ui();
 }
 const hasContent = () => allTakes().length > 0 || trash.length > 0;
@@ -1595,7 +1595,7 @@ async function openProject(id) {
     drawLane(t);
   }
   project = { id, name: meta.name }; dirty = !same; clearTimeout(saveT); $('#cont').hidden = true;
-  scenes = Array.isArray(meta.scenes) ? meta.scenes.slice(0, 4) : [null, null, null, null]; while (scenes.length < 4) scenes.push(null);
+  scenes = Array.isArray(meta.scenes) ? meta.scenes.slice(0, NSCN) : []; while (scenes.length < NSCN) scenes.push(null);
   try { localStorage.setItem('varv.last', id); } catch (e) {}
   drawHeads(); ui(); drawProjects(); renderPane();
   toast('Opened ' + meta.name + (missing ? ', ' + missing + ' recordings missing' : '') + '.');
@@ -1644,18 +1644,17 @@ function ui() {
   $('#tape').classList.toggle('run', running); $('#epane').classList.toggle('run', running);
   $('#playLbl').textContent = running ? 'Stop' : 'Start';
   $('#playIco').innerHTML = running ? '<path d="M6 6h12v12H6z"/>' : '<path d="M7 4l13 8-13 8z"/>';
-  $('#recLbl').textContent = s === 'define' ? 'End loop' : s === 'armed' || s === 'countrec' ? 'Cancel' : s === 'rec' && rec && rec.cont ? 'Last lap' : s === 'reclast' ? 'Continue' : s === 'rec' && rec ? 'Keep going' : 'Record';
+  $('#recLbl').textContent = s === 'define' ? 'End loop' : s === 'armed' || s === 'countrec' ? 'Cancel' : s === 'rec' && rec && rec.cont ? 'Last lap' : s === 'reclast' ? 'Continue' : s === 'rec' && rec ? 'Cancel' : 'Record';
   drawHeads();
   const h = st.hints, played = allTakes().some(k => k.started), filled = tracks.filter(t => t.takes.some(k => k.started)).length;
-  $('#empty').hidden = tracks.length > 0 || !!h.start;                 // guide lines, each gone for good once used
-  const want = { hTrack: tracks.length > 0 && !h.track, hSwipe: played && !h.swipe, hUndo: played && !h.undo, hMode: !h.mode, hScenes: filled > 0 && !h.scenes };
+  $('#empty').hidden = played || !!h.start;                 // guide lines, each gone for good once used
+  const want = { hTrack: tracks.length > 0 && !h.track && (played || !!h.start), hSwipe: played && !h.swipe, hUndo: played && !h.undo, hScenes: filled > 0 && !h.scenes };
   let n = 0; for (const id of ['hTrack', 'hSwipe', 'hUndo']) { const on = want[id] && n < 2; if (on) n++; $('#' + id).hidden = !on; }
-  const bottom = ['hMode', 'hScenes'].find(id => want[id]);
-  for (const id of ['hMode', 'hScenes']) $('#' + id).hidden = id !== bottom;
+  const bottom = want.hScenes ? 'hScenes' : null;
+  $('#hScenes').hidden = !bottom;
   $('#hintBar').hidden = !bottom;
   $('#hMeasure').hidden = !!h.measure;
-  $('#lapTog').textContent = st.mode === 'one' ? 'One lap' : 'Auto'; $('#lapTog').classList.toggle('on', st.mode === 'cont');
-  if (tracks.length) $('#cont').hidden = true;
+  if (allTakes().length) $('#cont').hidden = true;
   $('#perfInd').hidden = !perf; $('#perfBtn').textContent = perf ? 'Stop recording performance' : 'Record performance'; $('#perfBtn').classList.toggle('on', !!perf);
   $('#projName').textContent = project ? project.name : hasContent() ? 'unsaved' : '';
   const lk = locked(); $('#tempoLock').hidden = !lk;
@@ -1665,7 +1664,6 @@ function ui() {
   $('#beatsVal').textContent = st.beats; $('#barsVal').textContent = st.bars;
   $('#bpmVal').innerHTML = st.bpm + '<small>bpm</small>';
   $('#latVal').innerHTML = prof().ms + '<small>ms</small>';
-  $('#modeNote').textContent = st.mode === 'one' ? 'One lap, then the loop carries on.' : 'Every lap until you tap again. Silent laps are dropped.';
   $('#muteNote').textContent = st.muteQ === 'now' ? 'Mute and solo act the moment you lift your finger.'
     : isFree() ? 'In free mode the change lands at the start of the next pass of the loop.' : 'Tap ahead: the change lands on the next ' + (st.muteQ === 'bar' ? 'bar' : 'beat') + '.';
   if (document.activeElement !== $('#projInput')) $('#projInput').value = project ? project.name : '';
@@ -1790,9 +1788,6 @@ seg($('#lowCutSeg'), [[false, 'Off'], [true, 'On']], () => st.lowCut, v => { st.
 seg($('#autoLvlSeg'), [[false, 'Off'], [true, 'On']], () => st.autoLevel, v => { st.autoLevel = v; save(); }, false);
 seg($('#perfMicSeg'), [[true, 'On'], [false, 'Off']], () => st.perfMic, v => { st.perfMic = v; save(); }, true);
 $('#perfBtn').addEventListener('click', togglePerf);
-const drawModeSeg = () => seg($('#modeSeg'), [['one', 'One lap'], ['cont', 'Auto']], () => st.mode, v => { st.mode = v; save(); ui(); }, 'one');
-drawModeSeg();
-$('#lapTog').addEventListener('click', () => { hintDone('mode'); st.mode = st.mode === 'one' ? 'cont' : 'one'; save(); drawModeSeg(); ui(); });
 seg($('#muteSeg'), [['now', 'Immediately'], ['beat', 'Next beat'], ['bar', 'Next bar']], () => st.muteQ, v => { st.muteQ = v; save(); ui(); }, 'bar');
 $('#micSel').addEventListener('change', e => { if (!ctx) return; st.micId = e.target.value; save(); openMic(chosenMic(mics), wantsBuiltin()); });
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (performance.now() - micOpenAt > 1500) keepMic(false); });
@@ -1804,13 +1799,13 @@ $('#saveBtn').addEventListener('click', async () => {
   ensureProject($('#projInput').value.trim());
   if (await saveProject()) { toast('Saved ' + project.name + '.'); ui(); drawProjects(); }
 });
-$('#newBtn').addEventListener('click', async () => { await leaveProject(); clearAll(); ui(); drawProjects(); toast('New project.'); });
+$('#newBtn').addEventListener('click', async () => { await leaveProject(); clearAll(true); ui(); drawProjects(); toast('New project.'); });
 /* After a reload, offer to continue the last session. */
 (async () => {
   let id = null; try { id = localStorage.getItem('varv.last'); } catch (e) {}
   if (!id) return;
   let meta = null; try { meta = await dbGet('projects', id); } catch (e) {}
-  if (!meta || project || tracks.length) return;
+  if (!meta || project || allTakes().length) return;
   $('#contBtn').textContent = 'Continue ' + meta.name; $('#cont').hidden = false;
   $('#contBtn').onclick = () => openProject(id);
 })();
@@ -1832,7 +1827,6 @@ document.addEventListener('keydown', e => {
   else if (k === 'e' || k === 'E') setMode(mode === 'edit' ? 'play' : 'edit');
   else if (k === 's' || k === 'S') setMode(mode === 'set' ? 'play' : 'set');
   else if (k === 'Escape') setMode('play');
-  else if (k === 'l' || k === 'L') $('#lapTog').click();
   else if (/^Digit[1-9]$/.test(e.code)) { const t = tracks[+e.code.slice(5) - 1]; if (t) { if (e.shiftKey) toggleSolo(t); else toggleMute(t); } }
 });
 document.addEventListener('keyup', e => {
@@ -1849,7 +1843,10 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => { if (project && dirty) saveProject(); });
 window.addEventListener('resize', () => { setShift(); setHH(); for (const t of tracks) drawLane(t); liveDirty = true; for (const w of document.querySelectorAll('.eqw')) w.draw(); });
 
+freshTracks(); dirty = false;
 buildRuler(); drawScenes(); ui(); requestAnimationFrame(frame);
+/* redraw the waveforms whenever the rows change height */
+if (window.ResizeObserver) new ResizeObserver(() => { for (const t of tracks) drawLane(t); }).observe($('#lanes'));
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* for debugging and tests */
