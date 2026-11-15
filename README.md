@@ -1,12 +1,12 @@
 <p align="center"><img src="icon.svg" alt="" width="140"></p>
 
-<h1 align="center">Varv</h1>
+<h1 align="center">Varv one</h1>
 
-**Varv** is a loop station that runs in the browser, built for the phone. You listen to the click and your loops in Bluetooth headphones and record with the phone's own microphone. Bluetooth delays everything you hear by a couple of hundred milliseconds, so anything you play along is recorded late. Varv corrects that: every recording is shifted back by a latency you set, or have the app measure for you, so it lands on the beat.
+**Varv one** is a loop station that runs in the browser, built for the phone. You listen to the click and your loops in Bluetooth headphones and record with the phone's own microphone. Bluetooth delays everything you hear by a couple of hundred milliseconds, so anything you play along is recorded late. Varv corrects that: every recording is shifted back by a latency you set, or have the app measure for you, so it lands on the beat.
 
 *Varv* is Swedish for lap, or one turn round the loop.
 
-**Open it:** https://olleviotti.github.io/looper/. On an iPhone, open it in Safari, allow the microphone, and choose Add to Home Screen from the share menu. It then runs full screen, works offline, and keeps your saved projects.
+**Open it:** https://olleviotti.github.io/varv/. On an iPhone, open it in Safari, allow the microphone, and choose Add to Home Screen from the share menu. It then runs full screen, works offline, and keeps your saved projects.
 
 ## Guide
 
