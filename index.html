@@ -122,9 +122,13 @@ body.s-rec .live .trk{border-color:var(--rec)}
 .empty,.hint{color:var(--mut);padding:2px 0 14px;max-width:34em;margin:0}
 .hint{font-size:15px;padding:0 0 12px}
 .hint b{color:var(--text);font-weight:600}
-.hint-bar{padding:8px 16px 0;border-top:1px solid var(--line)}
-.hint-bar+.scenes{border-top:0}
-[data-mode=edit] .hint{display:none}
+.empty p{margin:0 0 10px}
+.hintbar{padding:8px 16px 0;border-top:1px solid var(--line)}
+.hintbar .hint{padding:0 0 4px}
+.hintbar:not([hidden])+.scenes{border-top:0}
+[data-mode=edit] .hintbar{display:none}
+.epane .hint{padding:2px 0 8px}
+[data-mode=edit] .tape .hint{display:none}
 .empty b{color:var(--text);font-weight:600}
 
 /* Edit pane */
@@ -234,18 +238,27 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 
   <div id="main">
     <main class="tape" id="tape">
-      <p class="empty" id="empty"><b>Tap Record to start.</b> Tap a track to mute it, hold it to arm it, tap its name to solo. Hold Record to start or stop. Swipe right to edit tracks, left for settings.</p>
+      <div class="empty" id="empty">
+        <p><b>Varv is a looper.</b> Everything you record repeats in time with the click, and you build a piece layer by layer.</p>
+        <p><b>Tap Record to start.</b> The click counts in one bar, then one lap is recorded into a new track. Tap Record again for the next layer.</p>
+        <p><b>Bluetooth headphones lag.</b> Varv moves every recording back by that delay so it lands on the beat. Measure it once: swipe left for settings, then Measure exactly.</p>
+        <p><b>Hold Record</b> to start or stop playback without recording. <b>+ Track</b> adds empty tracks you can name and shape before you record.</p>
+      </div>
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
-      <p class="hint" id="hTrack" hidden><b>Tap</b> a track to mute it, <b>hold</b> it to arm the next recording, tap its <b>name</b> to solo.</p>
-      <p class="hint" id="hSwipe" hidden><b>Swipe right</b> to edit a track's sound, <b>left</b> for settings. Tap the logo to come back.</p>
+      <p class="hint" id="hTrack" hidden><b>Tap</b> a track to mute it. <b>Hold</b> it to record into it from the next lap; hold again to cancel. Tap its <b>name</b> to solo it.</p>
+      <p class="hint" id="hSwipe" hidden><b>Swipe right</b> to edit a track's sound and timing, <b>left</b> for settings. Tap the logo to come back.</p>
+      <p class="hint" id="hUndo" hidden><b>Undo</b> removes the latest recording, and the bar that appears can bring it back. <b>Capture last</b> keeps the lap you just played, even without pressing Record.</p>
       <div class="row"><button class="addtrk nmcol" id="addTrk">+ Track</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
       <div class="row masterrow" id="masterRow"><button class="tname nmcol" id="masterName"><b>Master</b><small>effects</small></button><div></div></div>
     </main>
     <section class="epane" id="epane" aria-label="Edit"></section>
   </div>
 
-  <p class="hint hint-bar" id="hScenes" hidden><b>Scenes A–D:</b> hold one to store which tracks are muted, tap it to bring that back. <b>One lap</b> records a lap, <b>Auto</b> keeps recording until you tap again.</p>
+  <div class="hintbar" id="hintBar">
+    <p class="hint" id="hMode" hidden><b>One lap</b> records a single lap. <b>Auto</b> keeps recording lap after lap until you tap Record again. Tap the button to switch.</p>
+    <p class="hint" id="hScenes" hidden><b>Scenes A–D</b> remember which tracks are muted: hold one to store, tap it to bring that mix back, for a verse and a chorus say.</p>
+  </div>
   <div class="row scenes" id="sceneRow"><button class="laptog" id="lapTog" aria-label="Recording length: tap to switch"></button><div class="scn" id="scn" aria-label="Scenes"></div></div>
   <footer class="bar">
     <button id="playBtn"><svg viewBox="0 0 24 24" id="playIco"><path d="M7 4l13 8-13 8z"/></svg><span id="playLbl">Start</span></button>
@@ -258,6 +271,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 
 <div class="spage" id="spage" role="dialog" aria-labelledby="hSet"><div class="sp-in">
   <div class="sp-head"><h2 id="hSet">Settings</h2></div>
+  <p class="hint" id="hMeasure" hidden><b>Start here:</b> with your headphones on, measure the latency once under Latency, Measure exactly. Do it again if you change headphones.</p>
 
   <h3 class="first">Loop</h3>
   <div class="field"><span>Length</span><div class="seg" id="lenSeg"></div></div>
@@ -315,7 +329,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 
   <h3>Keys and pedal</h3>
   <p class="note"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>L</kbd> One lap or Auto. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p>
-  <p class="note">Version 15 Nov 01:15</p>
+  <p class="note">Version 15 Nov 01:25</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -597,7 +611,7 @@ async function start(countIn) {
 
 function stopSrc(k) { if (k.src) { try { k.src.stop(); } catch (e) {} k.src = null; } }
 function stop() {
-  if (defining) { defining = null; wake(false); toast('Loop cancelled.'); ui(); return; }
+  if (defining) { defining = null; defineInto = null; wake(false); toast('Loop cancelled.'); ui(); return; }
   if (!running) return;
   running = false; rec = null; recTail = null;
   if (clickSrc) { try { clickSrc.stop(); } catch (e) {} clickSrc = null; }
@@ -654,6 +668,7 @@ async function toggleRec() {
 }
 
 function capturePrev() {
+  hintDone('undo');
   if (!running || !micOK) { toast('Start first, then there is a lap to capture.'); return; }
   const r = plan(0); r.k = Math.floor(heardPos() / r.len) - 1;
   if (r.k < 0) { toast('No full lap has passed yet.'); return; }
@@ -687,7 +702,7 @@ function endDefine() {
   const T0 = defining.T0, len = nowF() - T0; defining = null;
   if (len < 0.3 * sr) { wake(false); toast('Too short, try again.'); ui(); return; }
   freeL = len; L = len; epoch = T0; running = true; runId++; rec = null; recTail = { start: 0, end: len }; livePass = null; clickSrc = null;
-  const t = targetTrack();
+  const t = tracks.find(x => x.id === defineInto) || targetTrack(); defineInto = null;
   addTake({ tid: t ? t.id : null, len, k: 0 }, false, 0);
   if (st.mode === 'cont') rec = plan(len);
   buildRuler(); ui(); markDirty(); tick();
@@ -877,6 +892,31 @@ async function drawPerf() {
   }
 }
 function toggleSolo(t) { touched(t); hintDone('track'); t.solo = !t.solo; const at = switchAt(); for (const x of tracks) applyTrack(x, at); drawHeads(); markDirty(); }
+/* Hold a track: record into it from its next lap. Stopped: start with the count-in first.
+   Holding again cancels a recording that has not started, or makes a running Auto recording end after this lap. */
+const recInto = t => rec && rec.tid === t.id;
+async function recordInto(t) {
+  touched(t); hintDone('track');
+  if (measuring) return;
+  if (isFree() && !freeL) { if (defining) return; defineInto = t.id; beginDefine(); return; }
+  if (!running) {
+    if (!(await start(true))) return;
+    if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
+    rec = { tid: t.id, len: trackLen(t), k: isFree() ? 1 : 0, cont: st.mode === 'cont', last: false, stay: true }; ui(); return;
+  }
+  const p = heardPos();
+  if (recInto(t)) {
+    if (!rec.cont || (p < rec.k * rec.len && !inTail(p))) { rec = null; toast('Recording into ' + t.name + ' cancelled.'); }
+    else rec.last = !rec.last;
+    ui(); return;
+  }
+  if (rec && !(p < rec.k * rec.len && !inTail(p))) { toast('Wait for the recording into ' + (tracks.find(x => x.id === rec.tid) || {}).name + ' to finish.'); return; }
+  const len = trackLen(t), kk = Math.floor(p / len);
+  rec = { tid: t.id, len, k: p < 0 ? 0 : (p - kk * len < GRACE_S * sr ? kk : kk + 1), cont: st.mode === 'cont', last: false, stay: true };
+  while (taken(rec)) rec.k++;
+  ui();
+}
+let defineInto = null;
 function toggleArm(t) { touched(t); hintDone('track'); armedId = armedId === t.id ? null : t.id; drawHeads(); ui(); }
 
 /* ---------- tracks: rows on screen ---------- */
@@ -894,7 +934,7 @@ function mountTrack(t, idx) {
   nb.addEventListener('click', () => { if (mode === 'edit') selectTrack(t.id); else toggleSolo(t); });
   const trk = el('div', 'trk slide'); trk.tabIndex = 0; trk.setAttribute('role', 'button');
   t.cv = el('canvas'); trk.append(t.cv, el('i', 'ph'), el('i', 'lp'), el('em', '', 'muted'));
-  pressable(trk, () => toggleMute(t), () => toggleArm(t));
+  pressable(trk, () => toggleMute(t), () => recordInto(t));
   row.append(nb, trk); t.row = row;
   const host = $('#lanes'); host.insertBefore(row, host.children[idx] || null);
   buildTrackNodes(t);
@@ -926,8 +966,10 @@ function drawHead(t) {
   if (!t.row) return;
   const n = t.takes.filter(k => k.started).length, pend = t.takes.length > n;
   $('.tname b', t.row).textContent = t.name;
-  $('.tname small', t.row).textContent = pend ? 'recording' : armedId === t.id ? 'armed' : t.solo ? 'solo' : !n ? 'empty' : n > 1 ? n + ' takes' : '';
-  t.row.classList.toggle('armed', armedId === t.id);
+  const queued = (recInto(t) && running && heardPos() < rec.k * rec.len) || (defining && defineInto === t.id);
+  const into = recInto(t) && !queued;
+  $('.tname small', t.row).textContent = pend || into || (defining && defineInto === t.id) ? 'recording' : queued ? 'next lap' : armedId === t.id ? 'armed' : t.solo ? 'solo' : !n ? 'empty' : n > 1 ? n + ' takes' : '';
+  t.row.classList.toggle('armed', armedId === t.id || queued || into);
   t.row.classList.toggle('solo', t.solo);
   t.row.classList.toggle('muted', t.mute);
   t.row.classList.toggle('silent', !audible(t));
@@ -997,6 +1039,7 @@ function drawTrash() {
     : it.take ? (it.idx >= 0 ? it.track.name + ' removed' : 'Removed a take from ' + it.track.name) : it.track.name + ' deleted';
 }
 function undoLast() {
+  hintDone('undo');
   const ks = allTakes().filter(k => k.started);
   if (!ks.length) { toast('There is no recording to undo.'); return; }
   removeTake(ks.reduce((a, b) => (b.id > a.id ? b : a)));
@@ -1138,6 +1181,7 @@ function renderPane() {
   for (const t of tracks) t.pcv = null;
   if (mode !== 'edit') return;
   if (selId !== 'master' && !tracks.some(t => t.id === selId)) selId = tracks.length ? tracks[0].id : 'master';
+  if (!st.hints.edit) { const g = el('p', 'hint'); g.innerHTML = 'Tap a <b>name</b> on the right to edit that track, or <b>Master</b> for the whole mix. <b>Double-tap</b> any setting to reset it. Swipe left on the names to go back.'; pane.append(g); }
   pane.append(selId === 'master' ? masterPane() : trackPane(tracks.find(t => t.id === selId)));
   paneFor = selId; pane.scrollTop = keep;
   drawHeads();
@@ -1222,6 +1266,7 @@ function masterPane() {
 function setShift() { const tp = $('#tape'); tp.style.setProperty('--shift', Math.max(0, tp.clientWidth - 32 - parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nw'))) + 'px'); }
 function setMode(m) {
   if (m === mode) return;
+  if (mode === 'edit' && !st.hints.edit) { st.hints.edit = 1; save(); }
   setShift(); setHH(); $('#tape').scrollLeft = 0; mode = m; document.body.dataset.mode = m;
   if (m === 'edit') {
     if (tracks.some(t => t.id === lastTouched)) selId = lastTouched;
@@ -1373,6 +1418,7 @@ function setBeat(j) { for (let i = 0; i < beatEls.length; i++) beatEls[i].classL
 const MEAS_HZ = 2000, MEAS_DECAY = 0.004, MEAS_LEN = 0.02;
 let measOut = null;
 async function measure() {
+  hintDone('measure');
   if (measuring) return;
   if (running) stop();
   const ok = await initAudio();
@@ -1599,11 +1645,15 @@ function ui() {
   $('#playLbl').textContent = running ? 'Stop' : 'Start';
   $('#playIco').innerHTML = running ? '<path d="M6 6h12v12H6z"/>' : '<path d="M7 4l13 8-13 8z"/>';
   $('#recLbl').textContent = s === 'define' ? 'End loop' : s === 'armed' || s === 'countrec' ? 'Cancel' : s === 'rec' && rec && rec.cont ? 'Last lap' : s === 'reclast' ? 'Continue' : s === 'rec' && rec ? 'Keep going' : 'Record';
+  drawHeads();
   const h = st.hints, played = allTakes().some(k => k.started), filled = tracks.filter(t => t.takes.some(k => k.started)).length;
   $('#empty').hidden = tracks.length > 0 || !!h.start;                 // guide lines, each gone for good once used
-  $('#hTrack').hidden = !tracks.length || !!h.track;
-  $('#hSwipe').hidden = !played || !!h.swipe;
-  $('#hScenes').hidden = filled < 2 || !!h.scenes;
+  const want = { hTrack: tracks.length > 0 && !h.track, hSwipe: played && !h.swipe, hUndo: played && !h.undo, hMode: !h.mode, hScenes: filled > 0 && !h.scenes };
+  let n = 0; for (const id of ['hTrack', 'hSwipe', 'hUndo']) { const on = want[id] && n < 2; if (on) n++; $('#' + id).hidden = !on; }
+  const bottom = ['hMode', 'hScenes'].find(id => want[id]);
+  for (const id of ['hMode', 'hScenes']) $('#' + id).hidden = id !== bottom;
+  $('#hintBar').hidden = !bottom;
+  $('#hMeasure').hidden = !!h.measure;
   $('#lapTog').textContent = st.mode === 'one' ? 'One lap' : 'Auto'; $('#lapTog').classList.toggle('on', st.mode === 'cont');
   if (tracks.length) $('#cont').hidden = true;
   $('#perfInd').hidden = !perf; $('#perfBtn').textContent = perf ? 'Stop recording performance' : 'Record performance'; $('#perfBtn').classList.toggle('on', !!perf);
@@ -1742,7 +1792,7 @@ seg($('#perfMicSeg'), [[true, 'On'], [false, 'Off']], () => st.perfMic, v => { s
 $('#perfBtn').addEventListener('click', togglePerf);
 const drawModeSeg = () => seg($('#modeSeg'), [['one', 'One lap'], ['cont', 'Auto']], () => st.mode, v => { st.mode = v; save(); ui(); }, 'one');
 drawModeSeg();
-$('#lapTog').addEventListener('click', () => { hintDone('scenes'); st.mode = st.mode === 'one' ? 'cont' : 'one'; save(); drawModeSeg(); ui(); });
+$('#lapTog').addEventListener('click', () => { hintDone('mode'); st.mode = st.mode === 'one' ? 'cont' : 'one'; save(); drawModeSeg(); ui(); });
 seg($('#muteSeg'), [['now', 'Immediately'], ['beat', 'Next beat'], ['bar', 'Next bar']], () => st.muteQ, v => { st.muteQ = v; save(); ui(); }, 'bar');
 $('#micSel').addEventListener('change', e => { if (!ctx) return; st.micId = e.target.value; save(); openMic(chosenMic(mics), wantsBuiltin()); });
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (performance.now() - micOpenAt > 1500) keepMic(false); });
@@ -1805,6 +1855,7 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.se
 /* for debugging and tests */
 window.__varv = { st, analyzeLoop, get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
   ringPeak: sec => { let pk = 0; for (let f = Math.max(availStart(), capEnd - Math.round(sec * sr)); f < capEnd; f++) pk = Math.max(pk, Math.abs(ring[f % R])); return pk; },
+  arm: i => toggleArm(tracks[i]),
   get scenes() { return scenes; }, get perf() { return perf; }, togglePerf, get inG() { return inG; },
   get mode() { return mode; }, get selId() { return selId; }, get freeL() { return freeL; }, get rec() { return rec; },
   get info() { return { sr, L, epoch, running, capEnd, capFirst, R, PRE, XF, capMode, micOK, armedId, state: stateNow() }; },

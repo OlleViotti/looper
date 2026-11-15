@@ -8,13 +8,17 @@
 
 **Open it:** https://olleviotti.github.io/looper/. On an iPhone, open it in Safari, allow the microphone, and choose Add to Home Screen from the share menu. It then runs full screen, works offline, and keeps your saved projects.
 
+## Guide
+
+Short guide lines on the play screen, in edit mode and in settings explain each part when it first becomes relevant, and each one disappears for good once you have used what it describes. Settings has a button to show them again.
+
 ## Three views
 
 The top bar is a single row: the bar and beat counter on the left, the Varv logo in the middle and the in and out meters on the right. Its bottom edge is amber while playing and the whole bar turns red while recording. The app has three views, reached by swiping (or the <kbd>E</kbd> and <kbd>S</kbd> keys); tapping the logo always brings you back to play.
 
 - **Play** is the live view. Each track is a name and a tape strip showing its waveform.
   - **Tap a strip** to mute or unmute the track.
-  - **Hold a strip** to arm it for the next recording; a red fill shows the hold, and the armed track gets a red frame. The track disarms itself once the recording is in.
+  - **Hold a strip** to record into that track from its next lap; a red fill shows the hold, and the track gets a red frame and says "next lap", then "recording". When stopped, playback starts with the count-in first. Hold again to cancel, or, in Auto, to make this lap the last.
   - **Tap a name** to solo the track.
 - **Swipe right for Edit.** The track names travel to the right edge and the edit window comes in from the left. It opens on the track you last touched; tap another name to edit that one, or tap Master for the master effects. Double-tap any setting to return it to its default: sliders, EQ handles and switches anywhere, and the number on a stepper (tempo, beats, bars, latency). Settings locked by recordings stay as they are. Swipe left on the names, or tap the logo, to go back.
 - **Swipe left for Settings,** which slide in under the top bar: loop length, tempo, latency, project, performance recording, click, recording, mute timing and microphone. Swipe right, tap Done or tap the logo to go back.
@@ -44,7 +48,7 @@ The top bar is a single row: the bar and beat counter on the left, the Varv logo
 ## Tracks
 
 - Add tracks before you start, name them and give them their own effects.
-- **Arm** a track (hold its strip) to record into it. With no track armed, Record fills the empty tracks from the top, then creates new ones. The status bar always says where the next recording will go.
+- **Hold a track** to record into it from its next lap. The Record button and the pedal fill the empty tracks from the top, then create new ones.
 - Recording again into a track that already holds audio adds another take on top (overdub). Each take has its own latency, reverse and remove.
 - **Mute timing:** mute and solo land on the next bar by default (in free mode: the next pass of the loop), so you can tap a little ahead. In Settings they can instead act immediately or on the next beat.
 - Per track, in Edit: name, bars, volume, pan, graphical EQ, filter (darker or thinner), delay send and reverb send, plus the waveform and each take's latency, reverse and remove.
