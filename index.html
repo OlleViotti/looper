@@ -387,7 +387,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 15 Nov 08:15</p>
+  <p class="ver">Varv one, build 15 Nov 13:55</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -842,8 +842,10 @@ function tick() {
   if (defining && now - defining.T0 >= FREE_MAX_S * sr) endDefine();
   if (running && rec && now >= epoch + (rec.k + 1) * rec.len - LEAD_S * sr) {
     const armedBefore = armedId, r = rec, t = addTake(r, r.cont); recTail = { start: r.k * r.len, end: (r.k + 1) * r.len };
+    serviceTake(t.takes[t.takes.length - 1], now);                        // judge the lap now: a silent one is dropped, so its track stays first in line
     const stay = r.stay || armedBefore === t.id;
     rec = !r.cont || r.last ? null : stay ? { tid: t.id, len: r.len, k: r.k + 1, cont: true, last: false, stay: true } : plan((r.k + 1) * r.len);
+    ui();                                                                    // the target may have moved on
   }
   for (const k of allTakes()) serviceTake(k, now);
   for (const it of trash) for (const k of (it.take ? [it.take] : it.track.takes)) fillRaw(k);   // keeps removed takes complete for a restore
@@ -1026,7 +1028,7 @@ function drawHead(t) {
   $('.tname b', t.row).textContent = t.name;
   const queued = (recInto(t) && running && heardPos() < rec.k * rec.len) || (defining && defineInto === t.id);
   const into = recInto(t) && !queued;
-  $('.tname small', t.row).textContent = pend || into || (defining && defineInto === t.id) ? 'recording' : queued ? 'next lap' : armedId === t.id ? 'armed' : t.solo ? 'solo' : !n ? 'empty' : n > 1 ? n + ' takes' : '';
+  $('.tname small', t.row).textContent = pend || into || (defining && defineInto === t.id) ? (rec && rec.cont && recInto(t) ? 'auto' : 'recording') : queued ? (rec && rec.cont ? 'auto' : 'next lap') : armedId === t.id ? 'armed' : t.solo ? 'solo' : !n ? 'empty' : n > 1 ? n + ' takes' : '';
   t.row.classList.toggle('armed', armedId === t.id || queued || into);
   t.row.classList.toggle('solo', t.solo);
   t.row.classList.toggle('muted', t.mute);

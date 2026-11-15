@@ -37,7 +37,7 @@ The top bar is a single row: the bar and beat counter on the left, the Varv logo
 
 ## Recording
 
-- **One button.** Tap Record and it records lap after lap, each lap into the next empty track (or a new one), until you tap Record again; the lap in progress is then the last. Silent laps are thrown away. Hold Record to start or stop playback. This all works from a single pedal button.
+- **One button.** Tap Record and it records lap after lap, each lap into the next empty track (or a new one), until you tap Record again; the lap in progress is then the last. The track waiting for the next lap is marked **auto**. A lap with nothing played in it is thrown away and the same track waits for the next lap, so the tracks fill in order, top down. Hold Record to start or stop playback. This all works from a single pedal button.
 
 - **Hold a track** instead to record exactly one lap into that track.
 - **Capture last** keeps the lap you just played even if you never pressed Record.
