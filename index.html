@@ -388,7 +388,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 15 Nov 19:20</p>
+  <p class="ver">Varv one, build 15 Nov 20:10</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -438,7 +438,7 @@ let rec = null, recTail = null, defining = null, freeL = 0, measuring = false;
 const NSCN = 5;
 let scenes = Array(NSCN).fill(null);
 let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, selId = null, mode = 'play';
-const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0 }, EQ_DEF);
+const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'major', tSpeed: 20, tAmt: 1 }, EQ_DEF);
 const TRACK_KEYS = Object.keys(TRACK_DEF);
 const allTakes = () => { const a = []; for (const t of tracks) for (const k of t.takes) a.push(k); return a; };
 const anySolo = () => tracks.some(t => t.solo);
@@ -801,10 +801,10 @@ function render(k) {
   }
   k.peaks = peaks; k.peak = pk;
   if (k.norm == null) k.norm = st.autoLevel && pk > 0.003 ? clamp(0.6 / pk, 1, 12) : 1;
-  const gen = k.pgen = (k.pgen || 0) + 1, r = pitchRatio(k.track);
-  if (Math.abs(r - 1) < 1e-6) { k.pend = false; k.buf = mkBuf(out); return; }
+  const gen = k.pgen = (k.pgen || 0) + 1, t = k.track, r = pitchRatio(t), tune = tuneOf(t);
+  if (Math.abs(r - 1) < 1e-6 && !tune) { k.pend = false; k.buf = mkBuf(out); return; }
   k.pend = true;                                          // the transposed loop arrives from the worker; until then the old buffer keeps playing
-  pvJob(out, r).then(y => {
+  pvJob(out, r, tune).then(y => {
     if (k.pgen !== gen || !ctx) return;
     k.pend = false;
     if (!y) { k.final = false; return; }                  // the worker failed: render again, on the main thread
@@ -836,23 +836,85 @@ function fftMake(n) {
     }
   };
 }
-function pvShift(x, r) {
+/* Pitch of a loop, frame by frame (YIN, with the difference function computed through the FFT).
+   Returns cents relative to A4 (NaN where nothing is sung or played) at every `hop` samples, read cyclically. */
+function pitchTrack(x, sr, hop) {
+  const N = x.length, W = 1024, tMin = Math.floor(sr / 1100), tMax = Math.min(W - 1, Math.floor(sr / 65)), F = 4096, fft = fftMake(F);
+  const n = Math.ceil(N / hop), out = new Float32Array(n), rms = new Float32Array(n);
+  const ar = new Float64Array(F), ai = new Float64Array(F), br = new Float64Array(F), bi = new Float64Array(F), seg = new Float64Array(W + tMax), cum = new Float64Array(W + tMax + 1);
+  const d = new Float64Array(tMax + 1), dn = new Float64Array(tMax + 1);
+  let top = 0;
+  for (let j = 0; j < n; j++) {
+    const p0 = j * hop - (W >> 1);
+    for (let i = 0; i < W + tMax; i++) seg[i] = x[(((p0 + i) % N) + N) % N];
+    cum[0] = 0; for (let i = 0; i < W + tMax; i++) cum[i + 1] = cum[i] + seg[i] * seg[i];
+    rms[j] = Math.sqrt(cum[W] / W); if (rms[j] > top) top = rms[j];
+    ar.fill(0); ai.fill(0); br.fill(0); bi.fill(0);
+    for (let i = 0; i < W; i++) ar[i] = seg[i];
+    for (let i = 0; i < W + tMax; i++) br[i] = seg[i];
+    fft(ar, ai, false); fft(br, bi, false);
+    for (let k = 0; k < F; k++) { const re = ar[k] * br[k] + ai[k] * bi[k], im = ar[k] * bi[k] - ai[k] * br[k]; ar[k] = re; ai[k] = im; }
+    fft(ar, ai, true);                                             // ar[t] / F = sum x[i] x[i+t]
+    let run = 0; dn[0] = 1;
+    for (let t = 1; t <= tMax; t++) { d[t] = cum[W] + (cum[t + W] - cum[t]) - 2 * ar[t] / F; run += d[t]; dn[t] = run > 0 ? d[t] * t / run : 1; }
+    let best = -1;
+    for (let t = tMin; t <= tMax; t++) if (dn[t] < 0.12) { while (t < tMax && dn[t + 1] < dn[t]) t++; best = t; break; }
+    if (best < 0) { let m = Infinity; for (let t = tMin; t <= tMax; t++) if (dn[t] < m) { m = dn[t]; best = t; } if (m > 0.3) best = -1; }
+    if (best < 0) { out[j] = NaN; continue; }
+    let tt = best;
+    if (best > tMin && best < tMax) { const a = dn[best - 1], b = dn[best], c = dn[best + 1], den = a - 2 * b + c; if (den > 0) tt = best + 0.5 * (a - c) / den; }
+    out[j] = 1200 * Math.log2(sr / tt / 440);
+  }
+  for (let j = 0; j < n; j++) if (rms[j] < top * 0.04) out[j] = NaN;  // too quiet to be a note
+  return out;
+}
+const SCALES = { chrom: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10], pent: [0, 2, 4, 7, 9], mpent: [0, 3, 5, 7, 10] };
+/* Autotune: for every frame, the shift in cents that brings the heard pitch (the sung pitch plus the
+   transposition `base`, in cents) onto the nearest note of the key and scale. A note is held until another
+   note is clearly closer, so a voice hovering between two notes does not flicker. The correction moves
+   towards its target with the retune speed (0 = at once) and is scaled by the amount. Runs round the
+   loop twice so the start already knows where the end left off. */
+function tuneCurve(pc, base, tune, hopMs) {
+  const n = pc.length, sc = SCALES[tune.scale] || SCALES.major, inScale = new Array(12).fill(false);
+  for (const s of sc) inScale[(s + tune.key) % 12] = true;
+  const nearest = m => { let bestN = Math.round(m), bd = Infinity; for (let q = Math.floor(m) - 6; q <= Math.ceil(m) + 6; q++) if (inScale[((q % 12) + 12) % 12] && Math.abs(q - m) < bd) { bd = Math.abs(q - m); bestN = q; } return bestN; };
+  const a = tune.speed > 0 ? 1 - Math.exp(-hopMs / tune.speed) : 1, out = new Float32Array(n);
+  let cur = null, c = 0, want = 0;
+  for (let pass = 0; pass < 2; pass++) for (let j = 0; j < n; j++) {
+    const v = pc[j];
+    if (v === v) {                                                  // voiced
+      const m = 69 + (v + base) / 100, cand = nearest(m);
+      if (cur === null || Math.abs(m - cur) > Math.abs(m - cand) + 0.15) cur = cand;
+      want = (cur - m) * 100 * tune.amount;
+    }
+    c += a * (want - c); if (pass) out[j] = c;
+  }
+  return out;
+}
+function pvShift(x, r, tune, sr) {
   const N = x.length;
-  if (Math.abs(r - 1) < 1e-6 || N < 16) return Float32Array.from(x);
+  if ((!tune && Math.abs(r - 1) < 1e-6) || N < 16) return Float32Array.from(x);
   const F = 2048, Q = F / 4, B = F / 2, fft = fftMake(F), TWO = 2 * Math.PI;
-  const Ha = r >= 1 ? Q / r : Q, Hs = r >= 1 ? Q : Q * r;
   const X = Math.max(16, Math.min(Math.floor(N / 4), 4096)), P = 3 * F, M = P + N + X + 2 * F;
   const u = new Float32Array(M);
   for (let i = 0; i < M; i++) u[i] = x[(((N - P + i) % N) + N) % N];
+  // the shift ratio at each point of the unrolled loop: the transposition, times the autotune correction
+  let ratioAt = () => r, rmax = r;
+  if (tune) {
+    const hop = 384, pc = pitchTrack(x, sr, hop), cc = tuneCurve(pc, 1200 * Math.log2(r), tune, hop / sr * 1000), n = cc.length;
+    ratioAt = c => { const q = ((((N - P + c) % N) + N) % N) / hop, j = Math.floor(q), f = q - j; return r * Math.pow(2, (cc[j % n] * (1 - f) + cc[(j + 1) % n] * f) / 1200); };
+    let mx = 0; for (let j = 0; j < n; j++) mx = Math.max(mx, Math.abs(cc[j])); rmax = r * Math.pow(2, mx / 1200);
+  }
   const win = new Float64Array(F); for (let i = 0; i < F; i++) win[i] = 0.5 - 0.5 * Math.cos(TWO * i / F);
-  const YL = Math.ceil(M * r) + 2 * F, Y = new Float32Array(YL), nrm = new Float32Array(YL);
+  const YL = Math.ceil(M * rmax) + 3 * F, Y = new Float32Array(YL), nrm = new Float32Array(YL);
   const re = new Float64Array(F), im = new Float64Array(F), pw = new Float64Array(B + 1);
   const pre = new Float64Array(B + 1), pim = new Float64Array(B + 1), sre = new Float64Array(B + 1), sim = new Float64Array(B + 1);
-  const peaks = new Int32Array(B + 1);
-  let pta = 0, pts = 0;
+  const peaks = new Int32Array(B + 1), cA = [], cS = [];
+  let fa = 0, fs = 0, pta = 0, pts = 0;
   for (let m = 0; ; m++) {
-    const ta = Math.round(m * Ha), ts = Math.round(m * Hs);
+    const ta = Math.round(fa), ts = Math.round(fs);
     if (ta + F > M || ts + F > YL) break;
+    cA.push(ta + B); cS.push(ts + B);
     for (let i = 0; i < F; i++) { re[i] = u[ta + i] * win[i]; im[i] = 0; }
     fft(re, im, false);
     for (let k = 0; k <= B; k++) pw[k] = re[k] * re[k] + im[k] * im[k];
@@ -878,14 +940,27 @@ function pvShift(x, r) {
     for (let k = 1; k < B; k++) { re[F - k] = re[k]; im[F - k] = -im[k]; }
     fft(re, im, true);
     for (let i = 0; i < F; i++) { Y[ts + i] += re[i] / F * win[i]; nrm[ts + i] += win[i] * win[i]; }
+    // next frame: the hop ratio is the shift ratio here (synthesis hop / analysis hop = ratio)
+    const rr = ratioAt(ta + B);
+    fa += rr >= 1 ? Q / rr : Q; fs += rr >= 1 ? Q : Q * rr;
   }
   let nmax = 0; for (let i = 0; i < YL; i++) if (nrm[i] > nmax) nmax = nrm[i];
   const floor = nmax * 0.1; for (let i = 0; i < YL; i++) Y[i] /= Math.max(nrm[i], floor);
-  // resample with a windowed-sinc table; when going up the cutoff drops so nothing folds back
-  const fc = Math.min(1, 1 / r), A = Math.ceil(8 / fc), R = 256, K = new Float32Array(A * R + 2);
-  for (let i = 0; i < K.length; i++) { const t = i / R, s = t === 0 ? 1 : Math.sin(Math.PI * fc * t) / (Math.PI * fc * t); K[i] = t >= A ? 0 : fc * s * (0.42 + 0.5 * Math.cos(Math.PI * t / A) + 0.08 * Math.cos(2 * Math.PI * t / A)); }
-  const z = i => {
-    const pos = i * r + B * (1 - r), j0 = Math.floor(pos); let s = 0;
+  // Resample: input time c is read from the stretched signal at S(c), the map through the frame centres.
+  // The local slope of S is the ratio; going up, the cutoff drops so nothing folds back.
+  const R = 256, kern = new Map();
+  const table = fc => {
+    const key = Math.round(fc * 64); let K = kern.get(key); if (K) return K;
+    const f = key / 64, A = Math.ceil(8 / f); K = new Float32Array(A * R + 2); K.A = A;
+    for (let i = 0; i < K.length; i++) { const t = i / R, s = t === 0 ? 1 : Math.sin(Math.PI * f * t) / (Math.PI * f * t); K[i] = t >= A ? 0 : f * s * (0.42 + 0.5 * Math.cos(Math.PI * t / A) + 0.08 * Math.cos(2 * Math.PI * t / A)); }
+    kern.set(key, K); return K;
+  };
+  const nc = cA.length; let seg = 0;
+  const z = c => {
+    if (c < cA[seg]) seg = 0;
+    while (seg < nc - 2 && c >= cA[seg + 1]) seg++;
+    const sl = (cS[seg + 1] - cS[seg]) / (cA[seg + 1] - cA[seg]), pos = cS[seg] + (c - cA[seg]) * sl;
+    const K = table(Math.min(1, 1 / sl)), A = K.A, j0 = Math.floor(pos); let s = 0;
     for (let j = j0 - A + 1; j <= j0 + A; j++) {
       if (j < 0 || j >= YL) continue;
       const t = Math.abs(pos - j) * R, ti = t | 0, f = t - ti;
@@ -909,28 +984,34 @@ function pvShift(x, r) {
     if (cr > bc) { bc = cr; best = d; rho = ea > 0 && eb > 0 ? cr / Math.sqrt(ea * eb) : 0; }
   }
   rho = Math.max(0, Math.min(1, rho));
+  const fa2 = new Float64Array(X), fb2 = new Float64Array(X);
+  for (let i = 0; i < X; i++) { const t = i / X; fa2[i] = z(P + N + i - best * t); }
+  for (let i = 0; i < X; i++) { const t = i / X; fb2[i] = z(P + i + best * (1 - t)); }
   for (let i = 0; i < X; i++) {
     const t = i / X, s = t * t * (3 - 2 * t), g = Math.sqrt((1 - s) * (1 - s) + s * s + 2 * rho * s * (1 - s));
-    out[i] = ((1 - s) * z(P + N + i - best * t) + s * z(P + i + best * (1 - t))) / g;
+    out[i] = ((1 - s) * fa2[i] + s * fb2[i]) / g;
   }
   return out;
 }
 let pvW = null, pvN = 0;
 const pvCB = new Map();
-function pvJob(x, r) {
+function pvJob(x, r, tune) {
   if (pvW === null) {
     try {
-      const src = 'const fftMake = ' + fftMake + ';\nconst pvShift = ' + pvShift + ';\nonmessage = e => { const y = pvShift(e.data.x, e.data.r); postMessage({ id: e.data.id, y }, [y.buffer]); };';
+      const src = ['fftMake', 'pitchTrack', 'tuneCurve', 'pvShift'].map(n => 'const ' + n + ' = ' + ({ fftMake, pitchTrack, tuneCurve, pvShift })[n] + ';').join('\n')
+        + '\nconst SCALES = ' + JSON.stringify(SCALES) + ';\nonmessage = e => { const y = pvShift(e.data.x, e.data.r, e.data.tune, e.data.sr); postMessage({ id: e.data.id, y }, [y.buffer]); };';
       pvW = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
       pvW.onmessage = e => { const f = pvCB.get(e.data.id); pvCB.delete(e.data.id); if (f) f(e.data.y); };
       pvW.onerror = () => { pvW = false; for (const f of pvCB.values()) f(null); pvCB.clear(); };
     } catch (e) { pvW = false; }
   }
-  if (!pvW) return new Promise(res => setTimeout(() => res(pvShift(x, r)), 0));
-  return new Promise(res => { const id = ++pvN; pvCB.set(id, res); pvW.postMessage({ id, x, r }, [x.buffer]); });
+  if (!pvW) return new Promise(res => setTimeout(() => res(pvShift(x, r, tune, sr)), 0));
+  return new Promise(res => { const id = ++pvN; pvCB.set(id, res); pvW.postMessage({ id, x, r, tune, sr }, [x.buffer]); });
 }
 const pitchRatio = t => Math.pow(2, (t.oct || 0) + (t.semi || 0) / 12 + (t.cent || 0) / 1200);
-const pitchTxt = t => { const a = []; if (t.oct) a.push((t.oct > 0 ? '+' : '−') + Math.abs(t.oct) + ' oct'); if (t.semi) a.push((t.semi > 0 ? '+' : '−') + Math.abs(t.semi) + ' st'); if (t.cent) a.push((t.cent > 0 ? '+' : '−') + Math.abs(t.cent) + ' ct'); return a.join(' '); };
+const tuneOf = t => t.tune ? { key: t.tKey, scale: t.tScale, speed: t.tSpeed, amount: t.tAmt } : null;
+const KEYS = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+const pitchTxt = t => { const a = []; if (t.oct) a.push((t.oct > 0 ? '+' : '−') + Math.abs(t.oct) + ' oct'); if (t.semi) a.push((t.semi > 0 ? '+' : '−') + Math.abs(t.semi) + ' st'); if (t.cent) a.push((t.cent > 0 ? '+' : '−') + Math.abs(t.cent) + ' ct'); if (t.tune) a.push('tuned'); return a.join(' '); };
 /* Pitch changes are applied a moment after the last touch, so dragging the fine tuner does not queue a render per step. */
 function pitchChanged(t) {
   markDirty(); drawHead(t);
@@ -1416,7 +1497,7 @@ function trackPane(t) {
     el('h3', '', 'EQ'), card(eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }),
       sliderRow('Filter', -1, 1, 0.01, t.filt, 0, filtTxt, v => { t.filt = v; applyTrack(t); markDirty(); const w = $('.eqw', $('#epane')); if (w) w.draw(); })),
     el('h3', '', 'Sends'), card(sliderRow('Delay', 0, 1, 0.01, t.echo, 0, pct, ap('echo')), sliderRow('Reverb', 0, 1, 0.01, t.rev, 0, pct, ap('rev'))),
-    el('h3', '', 'Pitch'), pitchCard(t));
+    el('h3', '', 'Pitch'), pitchCard(t), el('h3', '', 'Autotune'), tuneCard(t));
   const ks = t.takes.filter(k => k.started);
   p.append(el('h3', '', 'Recording'));
   if (ks.length) {
@@ -1437,6 +1518,22 @@ function pitchCard(t) {
   return card(crow('Octave', po), crow('Semitones', ps),
     sliderRow('Fine', -50, 50, 1, t.cent, 0, v => sg(Math.round(v)) + ' cent', v => { v = Math.round(v); if (t.cent !== v) { t.cent = v; pitchChanged(t); } }),
     el('p', 'cnote', 'Changes the pitch of every recording on the track, not the tempo.'));
+}
+/* Autotune: snaps a single voice or instrument to the nearest note of a key and scale. */
+function tuneCard(t) {
+  const on = crow('On', swtch(el('div'), () => t.tune, v => { t.tune = v; pitchChanged(t); renderPane(); }, false));
+  if (!t.tune) return card(on, el('p', 'cnote', 'Pulls a single voice or instrument to the nearest note in a key. Chords confuse it.'));
+  const ko = el('output'), show = () => { ko.textContent = KEYS[t.tKey]; };
+  const setKey = v => { t.tKey = (v + 12) % 12; show(); pitchChanged(t); };
+  dbl(ko, () => setKey(0)); show();
+  const kp = pill(ko, () => setKey(t.tKey - 1), () => setKey(t.tKey + 1)); kp.classList.add('sm');
+  const sg = el('div', 'seg full'), sr2 = el('div', 'cr');
+  seg(sg, [['major', 'Major'], ['minor', 'Minor'], ['pent', 'Penta'], ['chrom', 'All 12']], () => t.tScale, v => { t.tScale = v; pitchChanged(t); }, 'major');
+  sr2.append(sg);
+  return card(on, crow('Key', kp), sr2,
+    sliderRow('Speed', 0, 200, 1, t.tSpeed, 20, v => v < 1 ? 'hard' : Math.round(v) + ' ms', v => { v = Math.round(v); if (t.tSpeed !== v) { t.tSpeed = v; pitchChanged(t); } }),
+    sliderRow('Amount', 0, 1, 0.01, t.tAmt, 1, pct, v => { if (t.tAmt !== v) { t.tAmt = v; pitchChanged(t); } }),
+    el('p', 'cnote', 'The key is what you hear, after any transposing. Speed is how fast a note is pulled in: hard gives the robotic effect, slower keeps vibrato and slides. Penta is the major pentatonic; for minor pentatonic choose its relative major (A minor: C).'));
 }
 function setTrackBars(t, b, show) {
   if (t.takes.length) return;
