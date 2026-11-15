@@ -49,7 +49,7 @@ The top bar is a single row: the bar and beat counter on the left, the Varv logo
 
 - Add tracks before you start, name them and give them their own effects.
 - **Hold a track** to record into it from its next lap. The Record button and the pedal fill the empty tracks from the top, then create new ones.
-- Recording again into a track that already holds audio adds another take on top (overdub). Each take has its own latency, reverse and remove.
+- Recording again into a track that already holds audio adds another take on top (overdub). Each take has its own latency, reverse and remove. With **Overdub** off in Settings, the new take replaces the old one instead, from the moment it starts playing; the earlier takes stay on the track, silent (dimmed in Edit), and Undo brings the previous one back.
 - **Mute timing:** mute and solo land on the next bar by default (in free mode: the next pass of the loop), so you can tap a little ahead. In Settings they can instead act immediately or on the next beat.
 - Per track, in Edit: name, bars, volume, pan, graphical EQ, filter (darker or thinner), delay send and reverb send, plus the waveform and each take's latency, reverse and remove.
 - **Transpose** a track in Edit, under Pitch: octaves (±2), semitones (±11) and a fine tuner in cents (±50). The tempo and the timing stay the same. Every recording on the track is shifted, and the play screen shows the setting under the track name. Double-tap a value to reset it. The shift is computed in the background from the stored recording, so changing it loses nothing; the old version keeps playing until the new one is ready.

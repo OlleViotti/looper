@@ -229,6 +229,8 @@ select.txt.bare{width:100%;color:var(--text)}
 .pill output small{font-size:12px;font-weight:500;color:var(--mut);margin-left:3px}
 .pill .sbtn:disabled{opacity:.3}
 .pill.sm output{min-width:40px}
+.takeoff > .cr:first-child > span{opacity:.45}
+.takeoff > .cr:first-child > span::after{content:' (silent)'}
 /* switch */
 .sw{position:relative;width:52px;height:32px;border-radius:16px;background:var(--raise);transition:background .15s}
 .sw i{position:absolute;left:3px;top:3px;width:26px;height:26px;border-radius:50%;background:var(--tape);transition:transform .15s}
@@ -359,6 +361,12 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
     <div id="clickVolRow"></div>
   </div>
 
+  <h3>Recording onto a track</h3>
+  <div class="card">
+    <div class="cr"><span>Overdub</span><div id="overdubSw"></div></div>
+    <p class="cnote" id="overdubNote"></p>
+  </div>
+
   <h3>Mute and solo</h3>
   <div class="card">
     <div class="cr"><div class="seg full" id="muteSeg"></div></div>
@@ -388,7 +396,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 15 Nov 21:05</p>
+  <p class="ver">Varv one, build 15 Nov 21:40</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -413,7 +421,7 @@ const EQ_DEF = { eqL: 0, eqM: 0, eqH: 0, eqLf: 200, eqMf: 1000, eqHf: 4000 };
 const FX_KEYS = ['master', 'gFilter', 'eqL', 'eqM', 'eqH', 'eqLf', 'eqMf', 'eqHf', 'gEcho', 'echoDiv', 'echoMs', 'echoFb', 'echoLvl', 'gRev', 'revSize', 'revLvl', 'compThr', 'compAmt'];
 const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
 const st = Object.assign({
-  v: 2, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'bar',
+  v: 2, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, overdub: true, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'bar',
   profiles: [{ name: 'AirPods', ms: 180, guess: true }, { name: 'Wired or speaker', ms: 20, guess: true }],
   active: 0, micId: 'builtin', master: 0.9, gFilter: 0,
   gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1,
@@ -1045,6 +1053,18 @@ function serviceTake(k, now) {
   if (!k.final && k.filled >= need) { render(k); k.final = true; afterRender(k, now, end); }
   else if (!k.started && !k.pend && now >= end - LEAD_S * sr) { render(k); afterRender(k, now, end); }
 }
+/* Overdub on: every take on a track plays. Off: only the newest; the earlier ones are kept, silent, so Undo brings them back. */
+const newestTake = t => { let n = null; for (const k of t.takes) if (k.started && (!n || k.id > n.id)) n = k; return n; };
+const takeOn = k => st.overdub || newestTake(k.track) === k;
+function applyTakes(t, at) {
+  if (!ctx) return;
+  for (const k of t.takes) {
+    if (!k.tg) continue;
+    const v = takeOn(k) ? k.norm : 0, g = k.tg.gain;
+    if (at) g.setValueAtTime(v, at);
+    else { g.cancelScheduledValues(0); g.setTargetAtTime(v, ctx.currentTime, 0.008); }
+  }
+}
 function attachTake(k) {
   if (k.tg || !k.buf || !k.track.lp) return;
   k.tg = gn(k.norm); k.tg.connect(k.track.lp);
@@ -1057,10 +1077,11 @@ function afterRender(k, now, end) {
 }
 function goLive(k, now, end, first) {
   attachTake(k);
-  if (k.tg) k.tg.gain.value = k.norm;
   k.started = true;
+  let at = 0;
+  if (running) { at = Math.max(now + Math.round(SAFE_S * sr), first ? end : 0, epoch); startSource(k, at); }
+  applyTakes(k.track, first && running ? at / sr : 0);      // without overdub, the earlier take falls silent as the new one starts
   drawLane(k.track);
-  if (running) startSource(k, Math.max(now + Math.round(SAFE_S * sr), first ? end : 0));
   if (first) { drawHead(k.track); refreshPane(k.track); ui(); }
   markDirty();
 }
@@ -1326,7 +1347,7 @@ function restoreLast() {
   }
   drawLane(t); changed(t);
 }
-function changed(t) { drawHeads(); if (t) { drawLane(t); refreshPane(t); } drawTrash(); ui(); markDirty(); }
+function changed(t) { drawHeads(); if (t) { applyTakes(t); drawLane(t); refreshPane(t); } drawTrash(); ui(); markDirty(); }
 function drawTrash() {
   $('#undoBar').hidden = !trash.length;
   if (!trash.length) return;
@@ -1562,7 +1583,7 @@ function setTrackBars(t, b, show) {
   show(); drawLane(t); markDirty(); ui();
 }
 function takeRow(k, label) {
-  const box = el('div'), out = el('output'), use = el('button', 'tbtn');
+  const box = el('div', takeOn(k) ? '' : 'takeoff'), out = el('output'), use = el('button', 'tbtn');
   const show = () => { out.innerHTML = k.lat + '<small>ms</small>'; use.hidden = k.lat === prof().ms; use.textContent = 'Use for new'; };
   const step = d => () => { k.lat = clamp(k.lat + d, 0, MAXLAT_MS); k.final = false; show(); markDirty(); };
   dbl(out, () => { k.lat = prof().ms; k.final = false; show(); markDirty(); });     // back to the current latency setting
@@ -1654,7 +1675,7 @@ function drawWave(t, cv) {
     g.strokeStyle = bar ? 'rgba(32,35,43,.45)' : 'rgba(32,35,43,.18)'; g.lineWidth = 1;
     g.beginPath(); g.moveTo(x, bar ? 0 : h * 0.2); g.lineTo(x, bar ? h : h * 0.8); g.stroke();
   }
-  const ks = t.takes.filter(k => k.peaks && k.started); if (!ks.length) return;
+  const ks = t.takes.filter(k => k.peaks && k.started && takeOn(k)); if (!ks.length) return;
   const NB = 600, comb = new Float32Array(NB); let top = 1e-4;
   for (const k of ks) for (let b = 0; b < NB; b++) { const v = k.peaks[b] * k.norm; if (v > comb[b]) comb[b] = v; if (v > top) top = v; }
   const sc = (mid - 4) / top;
@@ -1930,7 +1951,7 @@ async function openProject(id) {
         final: true, started: true, full: true, auto: false, track: t, savedTo: same ? id : null };
       render(k); t.takes.push(k); attachTake(k);
     }
-    drawLane(t);
+    applyTakes(t); drawLane(t);
   }
   project = { id, name: meta.name }; dirty = !same; clearTimeout(saveT); $('#cont').hidden = true;
   scenes = Array.isArray(meta.scenes) ? meta.scenes.slice(0, NSCN) : []; while (scenes.length < NSCN) scenes.push(null);
@@ -1941,7 +1962,7 @@ async function openProject(id) {
 
 /* ---------- export ---------- */
 function exportWav() {
-  const act = allTakes().filter(k => k.buf && k.tg && audible(k.track));
+  const act = allTakes().filter(k => k.buf && k.tg && audible(k.track) && takeOn(k));
   if (!act.length) { toast('There are no audible tracks to export.'); return; }
   let N = Math.max(...act.map(k => k.len));
   if (!isFree()) {
@@ -2123,6 +2144,11 @@ $('#measUse').addEventListener('click', () => { if (!measOut) return; prof().ms 
 $('#clickVolRow').append(sliderRow('Volume', 0, 1, 0.01, st.clickVol, 0.6, pct, v => { st.clickVol = v; save(); if (ctx && running && st.clickOn && nowF() >= epoch) clickGain.gain.setTargetAtTime(v, ctx.currentTime, 0.01); }));
 $('#inGainRow').append(sliderRow('Input gain', -12, 30, 0.5, st.inGain, 0, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + ' dB', v => { st.inGain = v; save(); if (inG) inG.gain.setTargetAtTime(dbLin(v), ctx.currentTime, 0.02); }));
 swtch($('#lowCutSw'), () => st.lowCut, v => { st.lowCut = v; save(); if (inHP) inHP.frequency.setTargetAtTime(v ? 80 : 10, ctx.currentTime, 0.02); }, false);
+const drawOverdubNote = () => { $('#overdubNote').textContent = st.overdub
+  ? 'A new lap recorded onto a track that already has one plays together with it.'
+  : 'A new lap recorded onto a track replaces what was there. The earlier laps are kept silent, and Undo brings them back.'; };
+swtch($('#overdubSw'), () => st.overdub, v => { st.overdub = v; save(); drawOverdubNote(); for (const t of tracks) { applyTakes(t); drawLane(t); } renderPane(); }, true);
+drawOverdubNote();
 swtch($('#autoLvlSw'), () => st.autoLevel, v => { st.autoLevel = v; save(); }, false);
 swtch($('#perfMicSw'), () => st.perfMic, v => { st.perfMic = v; save(); }, true);
 $('#perfBtn').addEventListener('click', togglePerf);
