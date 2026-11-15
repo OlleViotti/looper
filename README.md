@@ -21,7 +21,7 @@ The top bar is a single row: the bar and beat counter on the left, the Varv logo
   - **Hold a strip** to record one lap into that track, starting at its next lap; a red fill shows the hold, and the track gets a red frame and says "next lap", then "recording". When stopped, playback starts with the count-in first. Hold again to cancel.
   - **Tap a name** to solo the track.
 - **Swipe right for Edit.** The track names travel to the right edge and the edit window comes in from the left. It opens on the track you last touched; tap another name to edit that one, or tap Master for the master effects. Double-tap any setting to return it to its default: sliders, EQ handles and switches anywhere, and the number on a stepper (tempo, beats, bars, latency). Settings locked by recordings stay as they are. Swipe left on the names, or tap the logo, to go back.
-- **Swipe left for Settings,** which slide in under the top bar: loop length, tempo, latency, project, performance recording, click, recording, mute timing and microphone. Swipe right, tap Done or tap the logo to go back.
+- **Swipe left for Settings,** which slide in under the top bar, grouped in cards with latency first: latency, loop length and tempo, project, performance recording, click, recording, mute timing and microphone. Swipe right, tap Done or tap the logo to go back.
 
 ## Latency correction
 

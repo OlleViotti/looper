@@ -171,8 +171,8 @@ input[type=range].bi::-webkit-slider-runnable-track{background:linear-gradient(9
 select.txt{appearance:auto}
 .field{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:52px}
 .field>span{color:var(--mut)}
-.seg{display:flex;background:var(--raise);border-radius:8px;padding:3px;gap:2px}
-.seg button{flex:1;min-width:38px;height:40px;padding:0 8px;border-radius:6px;font-weight:600;white-space:nowrap}
+.seg{display:flex;background:var(--desk);border-radius:10px;padding:3px;gap:2px}
+.seg button{flex:1;min-width:38px;height:34px;padding:0 10px;border-radius:8px;font-weight:600;font-size:15px;white-space:nowrap;color:var(--mut)}
 .seg button.on{background:var(--tape);color:#1b1f2e}
 .seg.full{width:100%;margin:4px 0}
 
@@ -197,8 +197,56 @@ body.s-rec #recBtn{background:#fff;color:var(--rec)}
 .sp-in{max-width:560px;margin:0 auto;padding:0 16px calc(28px + env(safe-area-inset-bottom))}
 .sp-head{display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--desk);padding:12px 0 8px;z-index:1}
 .spage h2{font-size:24px;font-weight:600}
-.spage h3{font-size:18px;font-weight:600;margin:22px 0 4px;padding-top:14px;border-top:1px solid var(--line)}
-.spage h3.first{border-top:0;padding-top:0;margin-top:6px}
+.spage h3,.epane h3{font-size:13px;font-weight:600;color:var(--mut);margin:22px 6px 6px;padding:0;border:0;letter-spacing:.02em}
+.spage h3.first{margin-top:8px}
+/* grouped cards: rows with hairline dividers, controls on the right */
+.card{background:var(--panel);border-radius:14px;overflow:hidden}
+.cr{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;padding:6px 14px;border-top:1px solid rgba(255,255,255,.06);width:100%;text-align:left}
+.card>:first-child,.card>:first-child>.cr:first-child{border-top:0}
+.cr>span{font-size:16px;color:var(--text)}
+.cr.act{color:var(--amber);font-weight:600}
+.cr.act>span{color:inherit}
+.cr.act small{display:block;font-size:13px;font-weight:500;color:var(--mut);margin-top:2px}
+.cr.act.on{color:var(--rec)}
+.cr.act:disabled{opacity:.4}
+.cr .seg.full{width:100%}
+.cnote{color:var(--mut);font-size:14px;margin:0;padding:2px 14px 12px}
+.cnote.warn{color:var(--amber)}
+.cnote.keys{padding-top:12px;line-height:1.7}
+.cpad{padding:0 14px}
+.card .srow{padding:2px 14px;border-top:1px solid rgba(255,255,255,.06)}
+.card .eqw{padding:10px 14px 4px}
+.card .eqc{background:var(--desk)}
+.card>.trk{margin:10px 14px 4px}
+.txt.bare{border:0;background:transparent;padding:0;height:44px;font-size:16px}
+select.txt.bare{width:100%;color:var(--text)}
+.ver{color:var(--mut);font-size:13px;text-align:center;margin:20px 0 0}
+/* pill stepper: − value + in one shape */
+.pill{display:inline-flex;align-items:center;background:var(--raise);border-radius:999px;height:40px;flex:none}
+.pill .sbtn{width:44px;height:40px;background:transparent;border-radius:999px;font-size:22px;font-weight:500;color:var(--text)}
+.pill output{min-width:64px;text-align:center;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.pill output small{font-size:12px;font-weight:500;color:var(--mut);margin-left:3px}
+.pill .sbtn:disabled{opacity:.3}
+/* switch */
+.sw{position:relative;width:52px;height:32px;border-radius:16px;background:var(--raise);transition:background .15s}
+.sw i{position:absolute;left:3px;top:3px;width:26px;height:26px;border-radius:50%;background:var(--tape);transition:transform .15s}
+.sw.on{background:var(--amber)}
+.sw.on i{transform:translateX(20px)}
+/* text buttons */
+.tbtn{min-height:40px;padding:0 4px;color:var(--amber);font-weight:600;flex:none}
+.tbtn.danger{color:#ff8b9a}
+.tbtn.on{background:var(--amber);color:#1b1f2e;border-radius:999px;padding:0 12px}
+.card .prow{background:transparent;border-radius:0;border-top:1px solid rgba(255,255,255,.06);padding:6px 10px 6px 14px}
+.card .prow .btn{background:transparent;color:var(--amber);padding:0 6px}
+.card .prow .btn.danger{color:#ff8b9a}
+.card .prow.cur b{color:var(--amber)}
+.card .prow.cur{box-shadow:none}
+.epane .card{margin-bottom:2px}
+.epane .card .srow{padding:2px 10px;grid-template-columns:52px 1fr 60px;gap:6px}
+.epane .card .srow output{font-size:14px;white-space:nowrap}
+.epane .cr{padding:6px 10px;min-height:48px}
+.epane .cr>span{font-size:15px;color:var(--mut)}
+.epane .eqw{padding:8px 10px 2px}
 .note{color:var(--mut);font-size:15px;margin:8px 0;max-width:38em}
 .note.warn{color:var(--amber)}
 .big{display:grid;grid-template-columns:repeat(2,52px) 1fr repeat(2,52px);gap:6px;align-items:center;margin:8px 0}
@@ -274,59 +322,71 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
   <div class="sp-head"><h2 id="hSet">Settings</h2></div>
   <p class="hint" id="hMeasure" hidden><b>Start here:</b> with your headphones on, measure the latency once under Latency, Measure exactly. Do it again if you change headphones.</p>
 
-  <h3 class="first">Loop</h3>
-  <div class="field"><span>Length</span><div class="seg" id="lenSeg"></div></div>
-  <p class="note warn" id="tempoLock" hidden>Locked while there are recordings. Start a new project to change it.</p>
-  <div id="barsBox">
-    <div class="big" id="bpmStep"><button class="sbtn" data-d="-5">−5</button><button class="sbtn" data-d="-1">−1</button><output id="bpmVal"></output><button class="sbtn" data-d="1">+1</button><button class="sbtn" data-d="5">+5</button></div>
-    <button class="btn wide" id="tapBtn">Tap tempo</button>
-    <div class="field"><span>Beats per bar</span><div class="mini" id="beatsStep"><button class="sbtn" data-d="-1">−</button><output id="beatsVal"></output><button class="sbtn" data-d="1">+</button></div></div>
-    <div class="field"><span>Bars per lap</span><div class="mini" id="barsStep"><button class="sbtn" data-d="-1">−</button><output id="barsVal"></output><button class="sbtn" data-d="1">+</button></div></div>
+  <h3 class="first">Latency</h3>
+  <div class="card">
+    <div class="cr"><span>Delay</span><div class="pill" id="latStep"><button class="sbtn" data-d="-1" aria-label="Shorter">−</button><output id="latVal"></output><button class="sbtn" data-d="1" aria-label="Longer">+</button></div></div>
+    <button class="cr act" id="measLoop"><span>Measure exactly<small>Hold the phone's microphone against an earbud, volume up.</small></span></button>
+    <div class="cpad"><div class="dots" id="measDots" hidden></div><p id="measRes" hidden></p><button class="btn on wide" id="measUse" hidden></button></div>
   </div>
-  <p class="note" id="freeNote" hidden></p>
 
-  <h3>Latency</h3>
-  <div class="big" id="latStep"><button class="sbtn" data-d="-10">−10</button><button class="sbtn" data-d="-1">−1</button><output id="latVal"></output><button class="sbtn" data-d="1">+1</button><button class="sbtn" data-d="10">+10</button></div>
-  <button class="btn wide" id="measLoop">Measure exactly</button>
-  <p class="note">Hold the phone's microphone against an earbud, volume up.</p>
-  <div class="dots" id="measDots" hidden></div>
-  <p id="measRes" hidden></p>
-  <button class="btn on wide" id="measUse" hidden></button>
+  <h3>Loop</h3>
+  <div class="card">
+    <div class="cr"><span>Length</span><div class="seg" id="lenSeg"></div></div>
+    <div id="barsBox">
+      <div class="cr"><span>Tempo</span><div class="pill" id="bpmStep"><button class="sbtn" data-d="-1" aria-label="Slower">−</button><output id="bpmVal"></output><button class="sbtn" data-d="1" aria-label="Faster">+</button></div></div>
+      <button class="cr act" id="tapBtn"><span>Tap tempo</span></button>
+      <div class="cr"><span>Beats per bar</span><div class="pill" id="beatsStep"><button class="sbtn" data-d="-1" aria-label="Fewer">−</button><output id="beatsVal"></output><button class="sbtn" data-d="1" aria-label="More">+</button></div></div>
+      <div class="cr"><span>Bars per lap</span><div class="pill" id="barsStep"><button class="sbtn" data-d="-1" aria-label="Fewer">−</button><output id="barsVal"></output><button class="sbtn" data-d="1" aria-label="More">+</button></div></div>
+    </div>
+    <p class="cnote" id="freeNote" hidden></p>
+    <p class="cnote warn" id="tempoLock" hidden>Locked while there are recordings. Start a new project to change it.</p>
+  </div>
 
   <h3>Project</h3>
-  <div class="field"><input class="txt" id="projInput" aria-label="Project name" maxlength="40" placeholder="Project name"><button class="btn on" id="saveBtn">Save</button></div>
-  <p class="note" id="projNote"></p>
-  <div class="plist" id="plist"></div>
-  <div class="acts"><button class="btn" id="newBtn">New project</button><button class="btn" id="exportBtn">Export lap as WAV</button></div>
+  <div class="card">
+    <div class="cr"><input class="txt bare" id="projInput" aria-label="Project name" maxlength="40" placeholder="Project name"><button class="tbtn" id="saveBtn">Save</button></div>
+    <p class="cnote" id="projNote"></p>
+    <div id="plist"></div>
+    <button class="cr act" id="newBtn"><span>New project</span></button>
+    <button class="cr act" id="exportBtn"><span>Export lap as WAV</span></button>
+  </div>
 
   <h3>Click</h3>
-  <div class="field"><span>Click</span><div class="seg" id="clickSeg"></div></div>
-  <div id="clickVolRow"></div>
+  <div class="card">
+    <div class="cr"><span>Click</span><div id="clickSw"></div></div>
+    <div id="clickVolRow"></div>
+  </div>
 
   <h3>Mute and solo</h3>
-  <div class="seg full" id="muteSeg"></div>
-  <p class="note" id="muteNote"></p>
+  <div class="card">
+    <div class="cr"><div class="seg full" id="muteSeg"></div></div>
+    <p class="cnote" id="muteNote"></p>
+  </div>
 
-  <h3>Performance</h3>
-  <button class="btn wide" id="perfBtn">Record performance</button>
-  <div class="field"><span>Include microphone</span><div class="seg" id="perfMicSeg"></div></div>
-  <p class="note">Records everything you hear, without the click, as an audio file. With the microphone included, what you play live is in it too, lined up with the loops.</p>
-  <div class="plist" id="perfList"></div>
+  <h3>Performance recording</h3>
+  <div class="card">
+    <button class="cr act" id="perfBtn"><span>Record performance</span></button>
+    <div class="cr"><span>Include microphone</span><div id="perfMicSw"></div></div>
+    <p class="cnote">Records everything you hear, without the click, as an audio file. With the microphone included, what you play live is in it too, lined up with the loops.</p>
+    <div id="perfList"></div>
+  </div>
 
   <h3>Microphone</h3>
-  <div class="field"><select class="txt" id="micSel" aria-label="Microphone"><option value="">Start first to choose</option></select></div>
-  <div id="inGainRow"></div>
-  <div class="field"><span>Low cut (80 Hz)</span><div class="seg" id="lowCutSeg"></div></div>
-  <div class="field"><span>Auto level recordings</span><div class="seg" id="autoLvlSeg"></div></div>
-  <p class="note">Set the gain so loud hits reach the amber part of the in meter. Red means clipping.</p>
-  <p class="note" id="diag">Audio starts the first time you tap Start, Record or Measure.</p>
+  <div class="card">
+    <div class="cr"><select class="txt bare" id="micSel" aria-label="Microphone"><option value="">Start first to choose</option></select></div>
+    <div id="inGainRow"></div>
+    <div class="cr"><span>Low cut (80 Hz)</span><div id="lowCutSw"></div></div>
+    <div class="cr"><span>Auto level recordings</span><div id="autoLvlSw"></div></div>
+    <p class="cnote">Set the gain so loud hits reach the amber part of the in meter. Red means clipping.</p>
+    <p class="cnote" id="diag">Audio starts the first time you tap Start, Record or Measure.</p>
+  </div>
 
   <h3>Guide</h3>
-  <button class="btn" id="hintReset">Show the guide again</button>
+  <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button></div>
 
   <h3>Keys and pedal</h3>
-  <p class="note"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p>
-  <p class="note">Version 15 Nov 01:45</p>
+  <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
+  <p class="ver">Version 15 Nov 01:55</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -1078,6 +1138,21 @@ function dbl(node, fn) {
   let last = 0;
   node.addEventListener('pointerdown', () => { const now = performance.now(); if (now - last < 320) { last = 0; setTimeout(fn, 0); } else last = now; });
 }
+function swtch(host, get, set, def) {
+  host.textContent = '';
+  const b = el('button', 'sw'); b.setAttribute('role', 'switch'); b.append(el('i'));
+  const draw = () => { b.classList.toggle('on', !!get()); b.setAttribute('aria-checked', !!get()); };
+  b.addEventListener('click', () => { set(!get()); draw(); });
+  host.append(b); draw();
+  if (def !== undefined && !host._dbl) { host._dbl = 1; dbl(host, () => { if (get() !== def) set(def); draw(); }); }
+  return host;
+}
+const card = (...kids) => { const c = el('div', 'card'); c.append(...kids.filter(Boolean)); return c; };
+const crow = (label, ctl) => { const r = el('div', 'cr'); r.append(el('span', '', label), ctl); return r; };
+function pill(out, minus, plus, disabled) {
+  const p = el('div', 'pill'), m = el('button', 'sbtn', '−'), a = el('button', 'sbtn', '+');
+  m.disabled = a.disabled = !!disabled; hold(m, minus); hold(a, plus); p.append(m, out, a); return p;
+}
 function seg(host, opts, get, set, def) {
   host.textContent = '';
   const mark = () => { for (const c of host.children) c.classList.toggle('on', c._v === get()); };
@@ -1186,31 +1261,29 @@ function renderPane() {
 }
 function trackPane(t) {
   const p = el('div'), ap = k => v => { t[k] = v; applyTrack(t); markDirty(); };
-  const nm = el('input', 'txt'); nm.value = t.name; nm.maxLength = 28; nm.setAttribute('aria-label', 'Track name');
+  const nm = el('input', 'txt bare'); nm.value = t.name; nm.maxLength = 28; nm.setAttribute('aria-label', 'Track name');
   nm.addEventListener('input', () => { t.name = nm.value.trim() || 'Track'; t.auto = false; drawHead(t); ui(); markDirty(); });
-  const del = el('button', 'btn danger', 'Delete'); del.addEventListener('click', () => deleteTrack(t));
-  const f = el('div', 'field'); f.append(nm, del);
-  p.append(f);
+  const del = el('button', 'tbtn danger', 'Delete'); del.addEventListener('click', () => deleteTrack(t));
+  const nameRow = el('div', 'cr'); nameRow.append(nm, del);
+  let barsRow = null, barsNote = null;
   if (!isFree()) {
-    const has = t.takes.length > 0, row = el('div', 'field'), mini = el('div', 'mini'), out = el('output');
-    const show = () => { out.innerHTML = trackBars(t) + (t.bars ? '' : '<small>as lap</small>'); };
-    const mkb = d => { const b = el('button', 'sbtn', d > 0 ? '+' : '−'); b.disabled = has; hold(b, () => setTrackBars(t, trackBars(t) + d, show)); return b; };
-    mini.append(mkb(-1), out, mkb(1)); row.append(el('span', '', 'Bars'), mini); p.append(row); show();
+    const has = t.takes.length > 0, out = el('output');
+    const show = () => { out.innerHTML = trackBars(t) + (t.bars ? '' : '<small>lap</small>'); };
+    barsRow = crow('Bars', pill(out, () => setTrackBars(t, trackBars(t) - 1, show), () => setTrackBars(t, trackBars(t) + 1, show), has)); show();
     if (!has) dbl(out, () => setTrackBars(t, st.bars, show));
-    if (has) p.append(el('p', 'note', 'Fixed while the track has recordings.'));
+    else barsNote = el('p', 'cnote', 'Fixed while the track has recordings.');
   }
-  p.append(
-    sliderRow('Volume', 0, 1.5, 0.01, t.vol, 1, pct, ap('vol')),
-    sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan')),
-    el('h3', '', 'EQ'), eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }),
-    sliderRow('Filter', -1, 1, 0.01, t.filt, 0, filtTxt, v => { t.filt = v; applyTrack(t); markDirty(); const w = $('.eqw', $('#epane')); if (w) w.draw(); }),
-    el('h3', '', 'Sends'),
-    sliderRow('Delay', 0, 1, 0.01, t.echo, 0, pct, ap('echo')),
-    sliderRow('Reverb', 0, 1, 0.01, t.rev, 0, pct, ap('rev')));
+  p.append(card(nameRow, barsRow, barsNote),
+    el('h3', '', 'Mix'), card(sliderRow('Volume', 0, 1.5, 0.01, t.vol, 1, pct, ap('vol')), sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan'))),
+    el('h3', '', 'EQ'), card(eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }),
+      sliderRow('Filter', -1, 1, 0.01, t.filt, 0, filtTxt, v => { t.filt = v; applyTrack(t); markDirty(); const w = $('.eqw', $('#epane')); if (w) w.draw(); })),
+    el('h3', '', 'Sends'), card(sliderRow('Delay', 0, 1, 0.01, t.echo, 0, pct, ap('echo')), sliderRow('Reverb', 0, 1, 0.01, t.rev, 0, pct, ap('rev'))));
   const ks = t.takes.filter(k => k.started);
-  if (ks.length) { const trk = el('div', 'trk'); t.pcv = el('canvas'); trk.append(t.pcv, el('i', 'ph')); p.append(el('h3', '', 'Recording'), trk); }
-  else p.append(el('p', 'note', 'Empty. Arm it and tap Record.'));
-  ks.forEach((k, i) => p.append(takeRow(k, ks.length > 1 ? 'Take ' + (i + 1) + ' latency' : 'Latency')));
+  p.append(el('h3', '', 'Recording'));
+  if (ks.length) {
+    const trk = el('div', 'trk'); t.pcv = el('canvas'); trk.append(t.pcv, el('i', 'ph'));
+    p.append(card(trk, ...ks.map((k, i) => takeRow(k, ks.length > 1 ? 'Take ' + (i + 1) : 'Latency'))));
+  } else p.append(card(el('p', 'cnote', 'Empty. Hold the track on the play screen to record into it.')));
   return p;
 }
 function setTrackBars(t, b, show) {
@@ -1220,17 +1293,16 @@ function setTrackBars(t, b, show) {
   show(); drawLane(t); markDirty(); ui();
 }
 function takeRow(k, label) {
-  const box = el('div', 'take'), s = el('div', 'step'), out = el('output'), use = el('button', 'btn');
-  const show = () => { out.textContent = k.lat + ' ms'; use.hidden = k.lat === prof().ms; use.textContent = 'Use for new'; };
-  const mk = d => { const b = el('button', 'sbtn', (d > 0 ? '+' : '−') + Math.abs(d)); hold(b, () => { k.lat = clamp(k.lat + d, 0, MAXLAT_MS); k.final = false; show(); markDirty(); }); return b; };
-  s.append(mk(-10), mk(-1), out, mk(1), mk(10));
+  const box = el('div'), out = el('output'), use = el('button', 'tbtn');
+  const show = () => { out.innerHTML = k.lat + '<small>ms</small>'; use.hidden = k.lat === prof().ms; use.textContent = 'Use for new'; };
+  const step = d => () => { k.lat = clamp(k.lat + d, 0, MAXLAT_MS); k.final = false; show(); markDirty(); };
   dbl(out, () => { k.lat = prof().ms; k.final = false; show(); markDirty(); });     // back to the current latency setting
   use.addEventListener('click', () => { prof().ms = k.lat; prof().guess = false; save(); show(); ui(); toast('New recordings shift by ' + k.lat + ' ms.'); });
-  const rv = el('button', 'btn' + (k.reverse ? ' on' : ''), 'Reverse');
+  const rv = el('button', 'tbtn' + (k.reverse ? ' on' : ''), 'Reverse');
   rv.addEventListener('click', () => { k.reverse = !k.reverse; k.final = false; rv.classList.toggle('on', k.reverse); markDirty(); });
-  const rm = el('button', 'btn danger', 'Remove'); rm.addEventListener('click', () => removeTake(k));
-  const acts = el('div', 'acts'); acts.append(rv, use, rm);
-  box.append(el('h3', '', label), s, acts); show(); return box;
+  const rm = el('button', 'tbtn danger', 'Remove'); rm.addEventListener('click', () => removeTake(k));
+  const acts = el('div', 'cr'); acts.append(rv, use, rm);
+  box.append(crow(label, pill(out, step(-1), step(1))), acts); show(); return box;
 }
 function masterPane() {
   const p = el('div');
@@ -1239,23 +1311,20 @@ function masterPane() {
   const segHost = el('div', 'seg full');
   const drawSeg = () => seg(segHost, [[0.25, '1/16'], [0.5, '1/8'], [0.75, '1/8.'], [1, '1/4'], ['free', 'Free']], () => st.echoDiv, v => { st.echoDiv = v; save(); applyGlobalFx(); timeRow.set(Math.round(echoSec() * 1000)); markDirty(); }, 0.75);
   drawSeg();
-  const reset = el('button', 'btn', 'Reset effects');
+  const segRow = el('div', 'cr'); segRow.append(segHost);
+  const reset = el('button', 'cr act'); reset.append(el('span', '', 'Reset effects'));
   reset.addEventListener('click', () => {
     Object.assign(st, { gFilter: 0, gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1, gRev: 0, revSize: 2, revLvl: 1, compThr: -18, compAmt: 0 }, EQ_DEF);
     save(); setRevSize(); applyGlobalFx(); markDirty(); renderPane();
   });
-  const acts = el('div', 'acts'); acts.append(reset);
-  p.append(fx('master', 'Volume', 0, 1, 0.01, 0.9, pct),
-    el('h3', '', 'EQ'), eqWidget(st, 'gFilter', () => { save(); applyGlobalFx(); markDirty(); }),
-    fx('gFilter', 'Filter', -1, 1, 0.01, 0, filtTxt),
-    el('h3', '', 'Delay'), el('p', 'note', 'Send feeds the whole mix in; each track also has its own send.'), segHost, timeRow,
-    fx('echoFb', 'Repeats', 0, 0.9, 0.01, 0.42, pct), fx('echoLvl', 'Level', 0, 1.5, 0.01, 1, pct), fx('gEcho', 'Send', 0, 1, 0.01, 0, pct),
-    el('h3', '', 'Reverb'),
-    fx('revSize', 'Size', 0.4, 4, 0.1, 2, v => v.toFixed(1) + ' s'), fx('revLvl', 'Level', 0, 1.5, 0.01, 1, pct), fx('gRev', 'Send', 0, 1, 0.01, 0, pct),
-    el('h3', '', 'Compressor'),
-    fx('compThr', 'Thresh.', -40, 0, 1, -18, v => (v < 0 ? '−' : '') + Math.abs(v) + ' dB'),
-    fx('compAmt', 'Amount', 0, 1, 0.01, 0, v => v === 0 ? 'off' : (1 + v * 11).toFixed(1) + ':1'),
-    acts);
+  p.append(el('h3', '', 'Mix'), card(fx('master', 'Volume', 0, 1, 0.01, 0.9, pct)),
+    el('h3', '', 'EQ'), card(eqWidget(st, 'gFilter', () => { save(); applyGlobalFx(); markDirty(); }), fx('gFilter', 'Filter', -1, 1, 0.01, 0, filtTxt)),
+    el('h3', '', 'Delay'), card(segRow, timeRow, fx('echoFb', 'Repeats', 0, 0.9, 0.01, 0.42, pct), fx('echoLvl', 'Level', 0, 1.5, 0.01, 1, pct), fx('gEcho', 'Send', 0, 1, 0.01, 0, pct),
+      el('p', 'cnote', 'Send feeds the whole mix in; each track also has its own send.')),
+    el('h3', '', 'Reverb'), card(fx('revSize', 'Size', 0.4, 4, 0.1, 2, v => v.toFixed(1) + ' s'), fx('revLvl', 'Level', 0, 1.5, 0.01, 1, pct), fx('gRev', 'Send', 0, 1, 0.01, 0, pct)),
+    el('h3', '', 'Compressor'), card(fx('compThr', 'Thresh.', -40, 0, 1, -18, v => (v < 0 ? '−' : '') + Math.abs(v) + ' dB'),
+      fx('compAmt', 'Amount', 0, 1, 0.01, 0, v => v === 0 ? 'off' : (1 + v * 11).toFixed(1) + ':1')),
+    card(reset));
   return p;
 }
 
@@ -1655,7 +1724,7 @@ function ui() {
   $('#hintBar').hidden = !bottom;
   $('#hMeasure').hidden = !!h.measure;
   if (allTakes().length) $('#cont').hidden = true;
-  $('#perfInd').hidden = !perf; $('#perfBtn').textContent = perf ? 'Stop recording performance' : 'Record performance'; $('#perfBtn').classList.toggle('on', !!perf);
+  $('#perfInd').hidden = !perf; $('#perfBtn').firstChild.textContent = perf ? 'Stop recording performance' : 'Record performance'; $('#perfBtn').classList.toggle('on', !!perf);
   $('#projName').textContent = project ? project.name : hasContent() ? 'unsaved' : '';
   const lk = locked(); $('#tempoLock').hidden = !lk;
   for (const b of document.querySelectorAll('#bpmStep .sbtn, #beatsStep .sbtn, #barsStep .sbtn, #tapBtn, #lenSeg button')) b.disabled = lk;
@@ -1735,7 +1804,7 @@ function setClick(v) {
   drawClick();
 }
 function drawClick() {
-  seg($('#clickSeg'), [[true, 'On'], [false, 'Off']], () => st.clickOn, setClick, true);
+  swtch($('#clickSw'), () => st.clickOn, setClick, true);
   const b = $('#clickBtn'); b.classList.toggle('off', !st.clickOn);
   $('#clickLbl').textContent = st.clickOn ? 'Click' : 'Click off';
   b.setAttribute('aria-pressed', st.clickOn);
@@ -1784,9 +1853,9 @@ $('#measUse').addEventListener('click', () => { if (!measOut) return; prof().ms 
 
 $('#clickVolRow').append(sliderRow('Volume', 0, 1, 0.01, st.clickVol, 0.6, pct, v => { st.clickVol = v; save(); if (ctx && running && st.clickOn && nowF() >= epoch) clickGain.gain.setTargetAtTime(v, ctx.currentTime, 0.01); }));
 $('#inGainRow').append(sliderRow('Input gain', -12, 30, 0.5, st.inGain, 0, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + ' dB', v => { st.inGain = v; save(); if (inG) inG.gain.setTargetAtTime(dbLin(v), ctx.currentTime, 0.02); }));
-seg($('#lowCutSeg'), [[false, 'Off'], [true, 'On']], () => st.lowCut, v => { st.lowCut = v; save(); if (inHP) inHP.frequency.setTargetAtTime(v ? 80 : 10, ctx.currentTime, 0.02); }, false);
-seg($('#autoLvlSeg'), [[false, 'Off'], [true, 'On']], () => st.autoLevel, v => { st.autoLevel = v; save(); }, false);
-seg($('#perfMicSeg'), [[true, 'On'], [false, 'Off']], () => st.perfMic, v => { st.perfMic = v; save(); }, true);
+swtch($('#lowCutSw'), () => st.lowCut, v => { st.lowCut = v; save(); if (inHP) inHP.frequency.setTargetAtTime(v ? 80 : 10, ctx.currentTime, 0.02); }, false);
+swtch($('#autoLvlSw'), () => st.autoLevel, v => { st.autoLevel = v; save(); }, false);
+swtch($('#perfMicSw'), () => st.perfMic, v => { st.perfMic = v; save(); }, true);
 $('#perfBtn').addEventListener('click', togglePerf);
 seg($('#muteSeg'), [['now', 'Immediately'], ['beat', 'Next beat'], ['bar', 'Next bar']], () => st.muteQ, v => { st.muteQ = v; save(); ui(); }, 'bar');
 $('#micSel').addEventListener('change', e => { if (!ctx) return; st.micId = e.target.value; save(); openMic(chosenMic(mics), wantsBuiltin()); });
