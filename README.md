@@ -52,6 +52,7 @@ The top bar is a single row: the bar and beat counter on the left, the Varv logo
 - Recording again into a track that already holds audio adds another take on top (overdub). Each take has its own latency, reverse and remove.
 - **Mute timing:** mute and solo land on the next bar by default (in free mode: the next pass of the loop), so you can tap a little ahead. In Settings they can instead act immediately or on the next beat.
 - Per track, in Edit: name, bars, volume, pan, graphical EQ, filter (darker or thinner), delay send and reverb send, plus the waveform and each take's latency, reverse and remove.
+- **Transpose** a track in Edit, under Pitch: octaves (±2), semitones (±11) and a fine tuner in cents (±50). The tempo and the timing stay the same. Every recording on the track is shifted, and the play screen shows the setting under the track name. Double-tap a value to reset it. The shift is computed in the background from the stored recording, so changing it loses nothing; the old version keeps playing until the new one is ready.
 
 ## Graphical EQ
 
@@ -87,4 +88,4 @@ Under Master in the Edit view:
 
 Everything lives in `index.html`, with no build step and no dependencies apart from two web fonts. Recording runs in an AudioWorklet that writes the microphone into a ring buffer indexed by the audio clock, which is what makes sample-accurate alignment possible. The page must be served over https for the microphone to work. `sw.js` makes the app work offline.
 
-Alignment, measurement, the gestures, the EQ, projects and the track features are verified with automated tests in Chrome using simulated audio.
+The transposer is a phase vocoder with phase locking, processed as a loop so the seam stays smooth, followed by resampling; it runs in a Web Worker. Alignment, measurement, the gestures, the EQ, the transposer, projects and the track features are verified with automated tests in Chrome using simulated audio.
