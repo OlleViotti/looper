@@ -388,7 +388,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 15 Nov 20:10</p>
+  <p class="ver">Varv one, build 15 Nov 21:05</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -618,7 +618,27 @@ async function openMic(id, auto) {
     const bi = mics.find(m => BUILTIN.test(m.label));
     if (bi && bi.deviceId !== micDev) return openMic(bi.deviceId, false);     // listen in the headphones, record with the phone's microphone
   }
-  fillMics(); diag(); return true;
+  fillMics(); diag();
+  if (BUILTIN.test(micLabel)) reassertRoute();
+  return true;
+}
+/* On some iPhones and iPads (seen on iOS 18.7), opening the phone's own microphone moves the sound from
+   Bluetooth headphones to the speaker. Setting the audio session again a moment later brings it back to
+   the headphones while the phone microphone keeps recording. Done at most once every few seconds, so a
+   microphone that restarts because of it cannot cause a loop. */
+let raT = 0, raAt = -1e9;
+function reassertRoute() {
+  if (!navigator.audioSession || performance.now() - raAt < 4000) return;
+  raAt = performance.now(); clearTimeout(raT);
+  raT = setTimeout(() => {
+    try { navigator.audioSession.type = 'auto'; } catch (e) {}
+    setTimeout(() => {
+      try { navigator.audioSession.type = 'play-and-record'; } catch (e) {}
+      if (ctx) ctx.resume().catch(() => {});
+      const tr = micStream && micStream.getAudioTracks()[0];
+      if (!tr || tr.readyState !== 'live') keepMic(true);           // the microphone should survive this; if not, reopen it
+    }, 200);
+  }, 500);
 }
 /* Holds on to the chosen microphone when headphones connect or the system changes the audio route. */
 function keepMic(force) {

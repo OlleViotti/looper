@@ -27,7 +27,7 @@ The top bar is a single row: the bar and beat counter on the left, the Varv logo
 
 - **Per recording.** Every recording is shifted back by the latency in force when it was made. Each one keeps its own value, which you can nudge afterwards in steps of 1 or 10 ms while the loop plays, watching the hits line up with the beat lines.
 - **Automatic measurement, exact.** The app plays ten clicks and listens for them through the microphone, using a matched filter tuned to the click, so no human timing is involved. Hold the phone's microphone against an earbud and tap Measure exactly. It finds a faint click buried in noise and reports nothing rather than a wrong value when it cannot hear the clicks.
-- **Microphone choice.** The iPhone microphone is the default, even when headphones with a microphone are connected, and the app switches back to it if the system changes the input. Another microphone, such as a USB interface, can be chosen in Settings.
+- **Microphone choice.** The iPhone microphone is the default, even when headphones with a microphone are connected, and the app switches back to it if the system changes the input. On some iPhones and iPads, Safari moves the sound to the speaker when the phone's microphone starts; Varv then sets the audio session again, which brings the sound back to the headphones. `routetest.html` is a small page for checking how a device routes the sound. Another microphone, such as a USB interface, can be chosen in Settings.
 
 ## Loop length
 
