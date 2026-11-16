@@ -63,18 +63,16 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 #main{position:relative;flex:1;min-height:0;display:flex;overflow:hidden}
 .tape{flex:1;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;padding:10px 16px 16px;--ph:0;display:flex;flex-direction:column}
 .tape>*{flex:none}
-#lanes{flex:1 1 auto;display:flex;flex-direction:column;min-height:min-content}
-#lanes .track{flex:1 1 0;min-height:48px;max-height:200px}
+#lanes{display:flex;flex-direction:column}
+#lanes .track{height:52px}
 .row{display:grid;grid-template-columns:var(--nw) 1fr;column-gap:8px;margin-bottom:8px}
 .trk{position:relative;overflow:hidden}
 .trk canvas{display:block;width:100%;height:100%}
 .ph{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;left:calc(var(--ph)*100%);background:var(--amber);display:none;pointer-events:none}
 .tape.run .ph,.epane.run .ph{display:block}
 .slide{transition:transform .25s ease,opacity .2s ease}
-[data-mode=edit] .slide{transform:translateX(40%);opacity:0;pointer-events:none}
 /* in edit mode the names travel to the right edge and the edit pane comes in from the left */
 .nmcol{transition:transform .25s ease;position:relative;z-index:1}
-[data-mode=edit] .nmcol{transform:translateX(var(--shift,0px))}
 
 .ruler{margin-bottom:10px}
 .laptog{height:44px;border-radius:8px;background:var(--panel);font-size:15px;font-weight:700;color:var(--mut)}
@@ -109,20 +107,26 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 .track.silent .tname b{opacity:.45}
 [data-mode=edit] .track.sel .tname,[data-mode=edit] .masterrow.sel .tname{box-shadow:inset 0 0 0 2px var(--amber)}
 [data-mode=edit] .track.sel.armed .tname{box-shadow:inset 5px 0 0 var(--rec),inset 0 0 0 2px var(--amber)}
-.track .trk{min-height:48px;background:var(--tape);border-radius:2px;cursor:pointer;
+/* the row is the touch target; the recording shows as a thin strip of tape through its middle */
+.track .trk{height:52px;cursor:pointer}
+.track .trk canvas{position:absolute;left:0;top:50%;height:20px;margin-top:-10px;background:var(--tape);border-radius:2px;
   clip-path:polygon(0 0,100% 0,calc(100% - 3px) 22%,100% 48%,calc(100% - 2px) 76%,100% 100%,0 100%,3px 72%,0 46%,2px 20%)}
+.track .trk .ph{top:12px;bottom:12px}
+.track .tname .kbi{display:none;position:absolute;right:2px;top:2px;width:30px;height:30px;place-items:center;color:var(--amber)}
+.track .tname .kbi svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
+.track.smp .tname .kbi{display:grid}
+.track.smp .tname{padding-right:30px}
 .track.silent .trk canvas{opacity:.25}
-.track .trk em{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:700 13px/1 var(--ui);font-style:normal;color:#1b1f2e;display:none;pointer-events:none}
+.track .trk em{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:700 12px/1 var(--ui);font-style:normal;color:#1b1f2e;display:none;pointer-events:none}
 .track.muted .trk em{display:block}
-.track.armed .trk::after{content:'';position:absolute;inset:0;box-shadow:inset 0 0 0 3px var(--rec);pointer-events:none}
+.track.armed .trk::after{content:'';position:absolute;left:-3px;right:-3px;top:13px;bottom:13px;box-shadow:inset 0 0 0 3px var(--rec);border-radius:3px;pointer-events:none}
 .trk .lp{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,61,87,.35);pointer-events:none}
 .trk.pressing .lp{width:100%;transition:width .45s linear}
 .addtrk{height:48px;border:1px dashed var(--line);border-radius:8px;color:var(--mut);font-weight:600}
-.live .trk{border:1px dashed var(--line);height:48px;border-radius:4px}
+.live .trk{border:1px dashed var(--line);height:30px;border-radius:4px}
 .live .trk span{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--mut);pointer-events:none}
 body.s-rec .live .trk{border-color:var(--rec)}
 .masterrow{display:none}
-[data-mode=edit] .masterrow{display:grid}
 .masterrow .tname{background:transparent;border:1px solid var(--line)}
 .empty,.hint{color:var(--mut);padding:2px 0 14px;max-width:34em;margin:0}
 .hint{font-size:15px;padding:0 0 12px}
@@ -137,10 +141,36 @@ body.s-rec .live .trk{border-color:var(--rec)}
 .empty b{color:var(--text);font-weight:600}
 
 /* Edit pane */
-.epane{position:absolute;top:0;bottom:0;left:0;right:calc(16px + var(--nw) + 10px);overflow-y:auto;overflow-x:hidden;touch-action:pan-y;padding:10px 0 28px 16px;transform:translateX(-105%);transition:transform .25s ease;--ph:0}
+/* Edit and Settings slide over the play view and leave a strip of it, which takes you back */
+.epane{position:absolute;top:0;bottom:0;left:0;right:44px;z-index:4;background:var(--desk);box-shadow:8px 0 20px rgba(0,0,0,.45);overflow-y:auto;overflow-x:hidden;touch-action:pan-y;padding:0 12px 28px 14px;transform:translateX(-110%);transition:transform .25s ease;--ph:0}
+.back{position:absolute;z-index:3;background:rgba(17,20,30,.55);display:none;cursor:pointer}
+.back::after{content:'';position:absolute;top:50%;left:50%;width:5px;height:44px;margin:-22px 0 0 -2px;border-radius:3px;background:var(--line)}
+#backR{top:0;bottom:0;right:0;width:44px}
+[data-mode=edit] #backR{display:block}
+#backL{position:fixed;z-index:16;left:0;top:var(--hh,0px);bottom:0;width:44px}
+[data-mode=set] #backL{display:block}
+#backT{inset:0;z-index:5}
+#backT::after{display:none}
+body[data-pads] #backT{display:block}
+.etabs{position:sticky;top:0;z-index:2;background:var(--desk);display:flex;gap:6px;overflow-x:auto;padding:10px 0 8px;scrollbar-width:none;touch-action:pan-x}
+.etabs::-webkit-scrollbar{display:none}
+.etab{flex:none;height:36px;padding:0 14px;border-radius:999px;background:var(--panel);font-weight:600;font-size:15px;color:var(--text);white-space:nowrap;touch-action:pan-x}
+.etab.on{background:var(--amber);color:#1b1f2e}
+.etab.mut{color:var(--mut)}
+.etab.add{background:transparent;border:1px dashed var(--line);color:var(--mut)}
+.ename{flex:1;min-width:0;font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fh{display:flex;justify-content:space-between;align-items:center;width:100%;min-height:44px;margin:12px 0 2px;padding:0 10px;border-radius:10px;background:var(--panel);font-size:15px;font-weight:600;color:var(--mut)}
+.fh::after{content:'';width:8px;height:8px;margin-top:-4px;border-right:2px solid;border-bottom:2px solid;transform:rotate(45deg);transition:transform .15s}
+.fh.open{background:transparent;margin-bottom:0}
+.fh.open::after{transform:rotate(-135deg);margin-top:4px}
+.hrow{display:flex;justify-content:center;padding:6px 0 0;background:var(--desk)}
+.handle{display:flex;align-items:center;gap:6px;min-height:36px;padding:0 18px;border-radius:999px;border:1px solid var(--line);color:var(--mut);font-size:14px;font-weight:600}
+.handle svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.5}
+[data-mode=edit] .hrow,[data-mode=set] .hrow,body[data-pads] .hrow{display:none}
 [data-mode=edit] .epane{transform:none}
+.epane .etabs{margin:0 -12px 0 -14px;padding-left:14px;padding-right:12px}
 .epane h3{font-size:15px;font-weight:600;color:var(--mut);margin:14px 0 2px}
-.epane .trk{height:48px;background:var(--tape);border-radius:2px;margin:6px 0 2px}
+.epane .trk{height:32px;background:var(--tape);border-radius:2px;margin:6px 0 2px}
 .srow{display:grid;grid-template-columns:58px 1fr 56px;align-items:center;gap:8px;min-height:44px}
 .srow span{color:var(--mut);font-size:15px}
 .srow output{text-align:right;font-variant-numeric:tabular-nums;font-size:15px}
@@ -194,7 +224,7 @@ body.s-rec #recBtn{background:#fff;color:var(--rec)}
 @keyframes blink{50%{box-shadow:inset 0 0 0 3px transparent}}
 
 /* Settings page */
-.spage{position:fixed;inset:0;top:var(--hh,0px);z-index:15;background:var(--desk);overflow-y:auto;transform:translateX(102%);transition:transform .25s ease;visibility:hidden}
+.spage{position:fixed;inset:0;left:44px;top:var(--hh,0px);z-index:15;background:var(--desk);box-shadow:-8px 0 20px rgba(0,0,0,.45);overflow-y:auto;transform:translateX(110%);transition:transform .25s ease;visibility:hidden}
 [data-mode=set] .spage{transform:none;visibility:visible}
 .sp-in{max-width:560px;margin:0 auto;padding:0 16px calc(28px + env(safe-area-inset-bottom))}
 .sp-head{display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--desk);padding:12px 0 8px;z-index:1}
@@ -246,7 +276,7 @@ select.txt.bare{width:100%;color:var(--text)}
 .card .prow .btn.danger{color:#ff8b9a}
 .card .prow.cur b{color:var(--amber)}
 .card .prow.cur{box-shadow:none}
-.epane .card{margin-bottom:2px}
+.epane .card{margin-bottom:8px}
 .epane .card .srow{padding:2px 10px;grid-template-columns:52px 1fr 60px;gap:6px}
 .epane .card .srow output{font-size:14px;white-space:nowrap}
 .epane .cr{padding:6px 10px;min-height:48px}
@@ -284,11 +314,20 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 .undo button{flex:none;min-height:40px;padding:0 12px;border-radius:8px;font-weight:700;background:#1b1f2e;color:var(--tape)}
 .undo button.x{background:transparent;color:#1b1f2e;font-size:24px;line-height:1;padding:0 10px}
 /* Sampler: the pad screen (one big pad or a keyboard), the trim view and the tap pad for the screen latency */
-.pads{position:absolute;inset:0;z-index:6;background:var(--desk);display:flex;flex-direction:column;gap:8px;padding:10px 16px 10px;touch-action:none}
+.pads{position:absolute;top:44px;left:0;right:0;bottom:0;z-index:6;background:var(--desk);border-radius:18px 18px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:8px;padding:6px 16px 10px;touch-action:none;animation:sheetup .22s ease}
+@keyframes sheetup{from{transform:translateY(100%)}}
+.grab{flex:none;width:44px;height:5px;border-radius:3px;background:var(--line);margin:2px auto 0}
+.pads .etabs{position:static;padding:2px 0 0;margin:0 -16px;padding-left:16px;padding-right:16px}
+.reclap{height:40px;padding:0 16px;border-radius:999px;background:var(--rec);color:#fff;font-weight:700;white-space:nowrap}
+.reclap.wait{background:var(--raise);color:var(--text);box-shadow:inset 0 0 0 3px var(--rec);animation:blink .5s steps(2,jump-none) infinite}
+.reclap.on{background:#fff;color:var(--rec)}
+.reclap:disabled{opacity:.35}
+.pbig.rec{background:var(--rec);color:#fff}
+.pbig.rec small{color:#fff}
 .phead{display:flex;align-items:center;gap:8px;min-height:44px}
-.phead b{flex:1;min-width:0;font-size:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.phead .tbtn{margin-left:auto}
 .phead .seg button{min-width:56px}
-.pads .trk{flex:none;height:40px;background:var(--tape);border-radius:2px}
+.pads .trk{flex:none;height:22px;background:var(--tape);border-radius:2px}
 .pads.run .ph{display:block}
 .popt{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--mut);font-size:14px}
 .popt>div{display:flex;align-items:center;gap:6px}
@@ -314,7 +353,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 .tappad{display:block;width:100%;height:120px;border-radius:14px;background:var(--raise);font-size:20px;font-weight:700;margin:8px 0;touch-action:none}
 .tappad.hit{background:var(--amber);color:#1b1f2e}
 #tapRes{font-size:17px;margin:8px 0}
-@media (prefers-reduced-motion:reduce){.slide,.nmcol,.epane,.spage,.trk.pressing .lp{transition:none}body.s-armed #recBtn{animation:none}}
+@media (prefers-reduced-motion:reduce){.slide,.nmcol,.epane,.spage,.trk.pressing .lp{transition:none}.pads{animation:none}body.s-armed #recBtn{animation:none}}
 </style>
 </head>
 <body class="s-stop" data-mode="play">
@@ -335,18 +374,21 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
       <p class="hint" id="hTrack" hidden><b>Tap</b> a track to mute it. <b>Hold</b> it to record one lap into it, from its next lap; hold again to cancel. Tap its <b>name</b> to solo it.</p>
-      <p class="hint" id="hSwipe" hidden><b>Swipe right</b> to edit a track's sound and timing, <b>left</b> for settings. Tap the logo to come back.</p>
+      <p class="hint" id="hSwipe" hidden><b>Swipe right</b> to edit a track, <b>left</b> for settings, <b>up</b> from the bottom for the sampler pads. Tap the edge, or the logo, to come back.</p>
       <p class="hint" id="hUndo" hidden><b>Undo</b> removes the latest recording, and the bar that appears can bring it back. <b>Capture last</b> keeps the lap you just played, even without pressing Record.</p>
       <div class="row"><button class="addtrk nmcol" id="addTrk">+ Track</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
       <div class="row masterrow" id="masterRow"><button class="tname nmcol" id="masterName"><b>Master</b><small>effects</small></button><div></div></div>
     </main>
     <section class="epane" id="epane" aria-label="Edit"></section>
+    <div class="back" id="backR" aria-label="Back to play"></div>
+    <div class="back" id="backT" aria-label="Close the pads"></div>
     <section class="pads" id="pads" aria-label="Sampler" hidden></section>
   </div>
 
   <div class="hintbar" id="hintBar">
     <p class="hint" id="hScenes" hidden><b>Scenes A–E</b> remember which tracks are muted: hold one to store, tap it to bring that mix back, for a verse and a chorus say.</p>
   </div>
+  <div class="hrow" id="hrow"><button class="handle" id="padHand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15l7-7 7 7"/></svg><span id="padHandTxt">Pads</span></button></div>
   <div class="scenes" id="sceneRow"><div class="scn" id="scn" aria-label="Scenes"></div></div>
   <footer class="bar">
     <button id="playBtn"><svg viewBox="0 0 24 24" id="playIco"><path d="M7 4l13 8-13 8z"/></svg><span id="playLbl">Start</span></button>
@@ -434,9 +476,10 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 11:10</p>
+  <p class="ver">Varv one, build 16 Nov 12:00</p>
 </div></div>
 
+<div class="back" id="backL" aria-label="Back to play"></div>
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
 <div class="toast" id="toast" hidden><span id="toastTxt"></span></div>
 
@@ -491,7 +534,8 @@ let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, s
 const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'major', tSpeed: 20, tAmt: 1,
   sampler: false, padMode: null, kOct: 2, kBase: null, sGate: false }, EQ_DEF);   // sampler: pad or keys, keyboard rows and lowest octave, notes held or full length
 const TRACK_KEYS = Object.keys(TRACK_DEF);
-const isSmp = t => t.sampler || !!t.sample;          // a sampler track, with or without its sample yet
+const isSmp = t => t.sampler || !!t.sample;
+const KB_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v10M12 4v10M16 4v10M8 14v6M12 14v6M16 14v6"/></svg>';          // a sampler track, with or without its sample yet
 const allTakes = () => { const a = []; for (const t of tracks) for (const k of t.takes) a.push(k); return a; };
 const anySolo = () => tracks.some(t => t.solo);
 const audible = t => !t.mute && (!anySolo() || t.solo);
@@ -1333,7 +1377,7 @@ async function sampleRec(t) {
   if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
   ensureRing();
   srec = { tid: t.id, F: nowF() - Math.round(0.03 * sr) };
-  refreshPane(t); ui();
+  refreshPane(t); if (padT === t) drawPads(); ui();
 }
 async function stopSampleRec() {
   const r = srec; if (!r) return; srec = null; ui();
@@ -1342,6 +1386,7 @@ async function stopSampleRec() {
   const t = tracks.find(x => x.id === r.tid);
   const a = Math.max(r.F, availStart()), b = Math.min(F1, capEnd), n = b - a;
   if (!t) return;
+  if (padT === t) drawPads();
   if (n < 0.05 * sr) { toast('Too short, try again.'); refreshPane(t); return; }
   const raw = new Float32Array(n); ringRead(a, n, raw, 0);
   let pk = 0; for (let i = 0; i < n; i++) { const v = Math.abs(raw[i]); if (v > pk) pk = v; }
@@ -1382,25 +1427,60 @@ function noteOff(e, h) {
 }
 
 /* ---------- the pad screen ---------- */
+/* The pad sheet comes up from the bottom over the play view: tabs for the sampler tracks, a Rec lap button,
+   and the pad or keyboard. A strip of the play view stays above it; tapping there or swiping down closes it. */
+let padLast = null;
+const padTrack = () => tracks.find(t => t.id === padLast && isSmp(t)) || tracks.find(isSmp);
 function openPads(t) {
-  if (!t || !t.sample) return;
+  if (!t || !isSmp(t)) return;
   if (mode !== 'play') setMode('play');
-  padT = t; touched(t); initAudio(); drawPads(); ui();
+  padT = t; padLast = t.id; touched(t); initAudio(); drawPads(); ui();
 }
 function closePads() { if (!padT) return; padT.kcv = null; padT = null; drawPads(); ui(); }
+/* A new sampler: the first empty microphone track, or a new track. */
+function newSampler() {
+  let t = tracks.find(x => !x.takes.length && !isSmp(x) && !(rec && rec.tid === x.id));
+  if (!t) t = newTrack();
+  t.sampler = true; t.auto = false; markDirty(); drawHead(t); openPads(t);
+}
+/* The Rec lap button: records this track from its next lap, as holding the track does. */
+function drawPadRec() {
+  const b = $('#recLap'); if (!b || !padT) return;
+  const t = padT, mine = !!rec && rec.tid === t.id, wait = mine && (!running || (heardPos() < rec.k * rec.len && !inTail(heardPos())));
+  b.className = 'reclap' + (mine ? (wait ? ' wait' : ' on') : '');
+  b.textContent = !mine ? 'Rec lap' : wait ? 'Next lap · cancel' : rec.cont ? (rec.last ? 'Last lap' : 'Recording · end') : 'Recording';
+  b.disabled = !t.sample;
+}
 const kBaseOf = t => t.kBase != null ? t.kBase : clamp(Math.floor(Math.round(sRoot(t)) / 12) - 1 - ((t.kOct - 1) >> 1), 0, 7);
 function drawPads() {
   const host = $('#pads'), t = padT; host.textContent = '';
   host.hidden = !t;
   if (!t) { delete document.body.dataset.pads; return; }
   document.body.dataset.pads = '1';
-  const head = el('div', 'phead'), sg = el('div', 'seg'), done = el('button', 'tbtn', 'Done');
-  seg(sg, [['pad', 'Pad'], ['keys', 'Keys']], () => padModeOf(t), v => { t.padMode = v; markDirty(); drawPads(); });
+  const tabs = el('div', 'etabs');
+  for (const x of tracks.filter(isSmp)) {
+    const b = el('button', 'etab' + (x === t ? ' on' : '') + (audible(x) ? '' : ' mut'), x.name);
+    b.addEventListener('click', () => { if (x !== t) openPads(x); }); tabs.append(b);
+  }
+  const nb = el('button', 'etab add', '+ Sampler'); nb.addEventListener('click', newSampler); tabs.append(nb);
+  const head = el('div', 'phead'), rb = el('button', 'reclap'), done = el('button', 'tbtn', 'Done');
+  rb.id = 'recLap'; rb.addEventListener('click', () => recordInto(t));
   done.addEventListener('click', closePads);
-  head.append(el('b', '', t.name), sg, done);
+  head.append(rb);
+  if (t.sample) { const sg = el('div', 'seg'); seg(sg, [['pad', 'Pad'], ['keys', 'Keys']], () => padModeOf(t), v => { t.padMode = v; markDirty(); drawPads(); }); head.append(sg); }
+  head.append(done);
+  host.append(el('div', 'grab'), tabs, head);
+  requestAnimationFrame(() => { const on = $('.etab.on', tabs); if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' }); });
+  drawPadRec();
+  if (!t.sample) {                                  // an empty sampler: record its sample here
+    const on = srec && srec.tid === t.id, b = el('button', 'pbig' + (on ? ' rec' : ''));
+    b.append(el('span', '', on ? 'Stop' : 'Record a sample'), el('small', '', on ? 'Or press Record. Stops by itself after 8 seconds.' : 'Play or sing one sound into the microphone.'));
+    b.addEventListener('click', () => sampleRec(t));
+    host.append(b); return;
+  }
   const trk = el('div', 'trk'); t.kcv = el('canvas'); trk.append(t.kcv, el('i', 'ph'));
-  host.append(head, trk);
-  if (!st.hints.pads) { const h = el('p', 'pnote'); h.innerHTML = 'Play to try the sound. <b>Record</b>, or hold the track on the play screen, records a lap. While a recording is on, framed in red, the pads are silent: what you play is heard in time from the next lap on.'; host.append(h); }
+  host.append(trk);
+  if (!st.hints.pads) { const h = el('p', 'pnote'); h.innerHTML = 'Play to try the sound. <b>Rec lap</b> records the next lap. While a recording is on, framed in red, the pads are silent: what you play is heard in time from the next lap on.'; host.append(h); }
   const s = t.sample, rootTxt = s.det != null || s.adj ? midiName(sRoot(t)) : 'no pitch';
   let area;
   if (padModeOf(t) === 'pad') {
@@ -1608,7 +1688,7 @@ const recInto = t => rec && rec.tid === t.id;
 async function recordInto(t) {
   touched(t); hintDone('track');
   if (measuring) return;
-  if (isSmp(t) && !t.sample) { toast('Record a sample first: swipe right to Edit.'); return; }
+  if (isSmp(t) && !t.sample) { openPads(t); return; }
   if (t.sample) {                                   // a sampler: the pad screen opens and the lap records what is played on it
     if (isFree() && !freeL) { toast('Record the first loop with the microphone, then play the sampler.'); return; }
     openPads(t);
@@ -1645,7 +1725,9 @@ function newTrack(opts, idx) {
 }
 function mountTrack(t, idx) {
   const row = el('div', 'row track'); row.style.setProperty('--ink', t.ink);
-  const nb = el('button', 'tname nmcol'); nb.append(el('b'), el('small'), el('i', 'lv')); t.lvEl = null;
+  const nb = el('button', 'tname nmcol'), ki = el('i', 'kbi'); nb.append(el('b'), el('small'), el('i', 'lv'), ki); t.lvEl = null;
+  ki.innerHTML = KB_ICON; ki.setAttribute('aria-label', 'Play ' + t.name + ' on the screen');
+  ki.addEventListener('click', e => { e.stopPropagation(); if (mode === 'play') openPads(t); });
   nb.addEventListener('click', () => { if (mode === 'edit') selectTrack(t.id); else toggleSolo(t); });
   const trk = el('div', 'trk slide'); trk.tabIndex = 0; trk.setAttribute('role', 'button');
   t.cv = el('canvas'); trk.append(t.cv, el('i', 'ph'), el('i', 'lp'), el('em', '', 'muted'));
@@ -1684,9 +1766,10 @@ function drawHead(t) {
   $('.tname b', t.row).textContent = t.name;
   const queued = (recInto(t) && running && heardPos() < rec.k * rec.len) || (defining && defineInto === t.id);
   const into = recInto(t) && !queued;
-  $('.tname small', t.row).textContent = pend || into || (defining && defineInto === t.id) ? (rec && rec.cont && recInto(t) ? 'auto' : 'recording') : queued ? (rec && rec.cont ? 'auto' : 'next lap') : armedId === t.id ? 'armed' : t.solo ? 'solo' : isSmp(t) ? 'sampler ' + (!t.sample ? '' : pitchTxt(t) || (t.sample.det != null || t.sample.adj ? midiName(sRoot(t)) : '')) : !n ? 'empty' : pitchTxt(t) || (n > 1 ? n + ' takes' : '');
+  $('.tname small', t.row).textContent = pend || into || (defining && defineInto === t.id) ? (rec && rec.cont && recInto(t) ? 'auto' : 'recording') : queued ? (rec && rec.cont ? 'auto' : 'next lap') : armedId === t.id ? 'armed' : t.solo ? 'solo' : isSmp(t) ? (!t.sample ? 'no sample' : pitchTxt(t) || (t.sample.det != null || t.sample.adj ? midiName(sRoot(t)) : 'sample')) + (n ? ', ' + n + (n > 1 ? ' laps' : ' lap') : '') : !n ? 'empty' : pitchTxt(t) || (n > 1 ? n + ' takes' : '');
   t.row.classList.toggle('armed', armedId === t.id || queued || into);
   t.row.classList.toggle('solo', t.solo);
+  t.row.classList.toggle('smp', isSmp(t));
   t.row.classList.toggle('muted', t.mute);
   t.row.classList.toggle('silent', !audible(t));
   t.row.classList.toggle('sel', mode === 'edit' && selId === t.id);
@@ -1917,45 +2000,71 @@ function renderPane() {
   for (const t of tracks) t.pcv = null;
   if (mode !== 'edit') return;
   if (selId !== 'master' && !tracks.some(t => t.id === selId)) selId = tracks.length ? tracks[0].id : 'master';
-  if (!st.hints.edit) { const g = el('p', 'hint'); g.innerHTML = 'Tap a <b>name</b> on the right to edit that track, or <b>Master</b> for the whole mix. <b>Double-tap</b> any setting to reset it. Swipe left on the names to go back.'; pane.append(g); }
+  const tabs = el('div', 'etabs');                  // the track names as tabs
+  for (const x of tracks) {
+    const b = el('button', 'etab' + (x.id === selId ? ' on' : '') + (audible(x) ? '' : ' mut'), x.name);
+    b.addEventListener('click', () => selectTrack(x.id)); tabs.append(b);
+  }
+  const mt = el('button', 'etab' + (selId === 'master' ? ' on' : ''), 'Master'); mt.addEventListener('click', () => selectTrack('master')); tabs.append(mt);
+  pane.append(tabs);
+  if (!st.hints.edit) { const g = el('p', 'hint'); g.innerHTML = 'Tap a <b>tab</b> to edit that track, or <b>Master</b> for the whole mix. <b>Double-tap</b> any setting to reset it. Tap the strip on the right, or swipe left, to go back.'; pane.append(g); }
   pane.append(selId === 'master' ? masterPane() : trackPane(tracks.find(t => t.id === selId)));
+  requestAnimationFrame(() => { const on = $('.etab.on', tabs); if (on) tabs.scrollLeft = Math.max(0, on.offsetLeft - tabs.clientWidth / 2 + on.offsetWidth / 2); });
   paneFor = selId; pane.scrollTop = keep;
   drawHeads();
   requestAnimationFrame(() => { for (const w of pane.querySelectorAll('.eqw,.trimw')) w.draw(); const t = tracks.find(x => x.id === selId); if (t) drawLane(t); });
 }
+/* A folded section: closed by default, and it stays as you left it. The content is only built when open. */
+function fold(key, title, make) {
+  const open = !!(st.folds && st.folds[key]), h = el('button', 'fh' + (open ? ' open' : ''), title);
+  h.setAttribute('aria-expanded', open);
+  h.addEventListener('click', () => { st.folds = Object.assign({}, st.folds, { [key]: !open }); save(); renderPane(); });
+  return open ? [h, ...make()] : [h];
+}
+/* Edit, in the order it is needed live: mute and solo, the live controls, the recordings or the sample,
+   then the rest folded away. */
 function trackPane(t) {
-  const p = el('div'), ap = k => v => { t[k] = v; applyTrack(t); markDirty(); };
-  const nm = el('input', 'txt bare'); nm.value = t.name; nm.maxLength = 28; nm.setAttribute('aria-label', 'Track name');
-  nm.addEventListener('input', () => { t.name = nm.value.trim() || 'Track'; t.auto = false; drawHead(t); ui(); markDirty(); });
-  const del = el('button', 'tbtn danger', 'Delete'); del.addEventListener('click', () => deleteTrack(t));
-  const nameRow = el('div', 'cr'); nameRow.append(nm, del);
-  let barsRow = null, barsNote = null;
-  if (!isFree()) {
-    const has = t.takes.length > 0, out = el('output');
-    const show = () => { out.innerHTML = trackBars(t) + (t.bars ? '' : '<small>lap</small>'); };
-    barsRow = crow('Bars', pill(out, () => setTrackBars(t, trackBars(t) - 1, show), () => setTrackBars(t, trackBars(t) + 1, show), has)); show();
-    if (!has) dbl(out, () => setTrackBars(t, st.bars, show));
-    else barsNote = el('p', 'cnote', 'Fixed while the track has recordings.');
-  }
-  /* Microphone or sampler: fixed once the track holds recordings or laps. */
-  const has = t.takes.length > 0, kind = el('div', 'seg');
-  seg(kind, [['mic', 'Microphone'], ['smp', 'Sampler']], () => isSmp(t) ? 'smp' : 'mic', v => setKind(t, v));
-  for (const b of kind.children) b.disabled = has && !b.classList.contains('on');
-  const kindRow = el('div', 'cr'); kind.classList.add('full'); kindRow.append(kind);
-  p.append(card(nameRow, kindRow, has ? el('p', 'cnote', 'Fixed while the track has ' + (isSmp(t) ? 'laps.' : 'recordings.')) : null, barsRow, barsNote));
-  if (isSmp(t)) p.append(el('h3', '', 'Sample'), t.sample ? sampleCard(t) : emptySampleCard(t));
-  p.append(el('h3', '', 'Mix'), card(sliderRow('Volume', 0, 1.5, 0.01, t.vol, 1, pct, ap('vol')), sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan'))),
-    el('h3', '', 'EQ'), card(eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }),
-      sliderRow('Filter', -1, 1, 0.01, t.filt, 0, filtTxt, v => { t.filt = v; applyTrack(t); markDirty(); const w = $('.eqw', $('#epane')); if (w) w.draw(); })),
-    el('h3', '', 'Sends'), card(sliderRow('Delay', 0, 1, 0.01, t.echo, 0, pct, ap('echo')), sliderRow('Reverb', 0, 1, 0.01, t.rev, 0, pct, ap('rev'))),
-    el('h3', '', 'Pitch'), pitchCard(t), el('h3', '', 'Autotune'), tuneCard(t));
+  const p = el('div'), ap = k => v => { t[k] = v; applyTrack(t); markDirty(); }, has = t.takes.length > 0;
+  const mb = el('button', 'tbtn' + (t.mute ? ' on' : ''), 'Mute'), sb = el('button', 'tbtn' + (t.solo ? ' on' : ''), 'Solo');
+  mb.addEventListener('click', () => { toggleMute(t); renderPane(); }); sb.addEventListener('click', () => { toggleSolo(t); renderPane(); });
+  const head = el('div', 'cr'), btns = el('div'); btns.style.cssText = 'display:flex;gap:6px;flex:none';
+  btns.append(mb, sb); head.append(el('b', 'ename', t.name), btns);
+  /* Microphone or sampler: chosen at the top while the track is empty, then fixed. */
+  const kindRow = () => {
+    const kind = el('div', 'seg full'), r = el('div', 'cr');
+    seg(kind, [['mic', 'Microphone'], ['smp', 'Sampler']], () => isSmp(t) ? 'smp' : 'mic', v => setKind(t, v));
+    for (const b of kind.children) b.disabled = has && !b.classList.contains('on');
+    r.append(kind); return r;
+  };
+  p.append(card(head, has ? null : kindRow()));
+  const eqDraw = () => { const w = $('.eqw', $('#epane')); if (w) w.draw(); };
+  p.append(el('h3', '', 'Live'), card(sliderRow('Volume', 0, 1.5, 0.01, t.vol, 1, pct, ap('vol')),
+    sliderRow('Filter', -1, 1, 0.01, t.filt, 0, filtTxt, v => { t.filt = v; applyTrack(t); markDirty(); eqDraw(); }),
+    sliderRow('Reverb', 0, 1, 0.01, t.rev, 0, pct, ap('rev')), sliderRow('Delay', 0, 1, 0.01, t.echo, 0, pct, ap('echo'))));
+  if (isSmp(t)) p.append(el('h3', '', 'Sample'), ...(t.sample ? sampleSection(t) : [emptySampleCard(t)]));
   const ks = t.takes.filter(k => k.started);
-  p.append(el('h3', '', isSmp(t) ? 'Laps' : 'Recording'));
+  p.append(el('h3', '', isSmp(t) ? 'Laps' : 'Takes'));
   if (ks.length) {
     const trk = el('div', 'trk'); t.pcv = el('canvas'); trk.append(t.pcv, el('i', 'ph'));
     p.append(card(trk, ...ks.map((k, i) => takeRow(k, ks.length > 1 ? (k.notes ? 'Lap ' : 'Take ') + (i + 1) : 'Latency'))));
-  } else if (isSmp(t)) p.append(card(el('p', 'cnote', 'No laps yet. Hold the track on the play screen, or play on the screen and tap Record, to record what you play.')));
+  } else if (isSmp(t)) p.append(card(el('p', 'cnote', t.sample ? 'No laps yet. Swipe up for the pads and tap Rec lap, or hold the track on the play screen.' : 'Record a sample first.')));
   else p.append(card(el('p', 'cnote', 'Empty. Hold the track on the play screen to record into it.')));
+  p.append(...fold('eq', 'EQ and pan', () => [card(eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }), sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan')))]));
+  if (!isSmp(t)) p.append(...fold('pitch', 'Pitch', () => [pitchCard(t)]), ...fold('tune', 'Autotune', () => [tuneCard(t)]));
+  p.append(...fold('track', 'Track', () => {
+    const nm = el('input', 'txt bare'); nm.value = t.name; nm.maxLength = 28; nm.setAttribute('aria-label', 'Track name');
+    nm.addEventListener('input', () => { t.name = nm.value.trim() || 'Track'; t.auto = false; drawHead(t); $('.ename', $('#epane')).textContent = t.name; const tb = $('.etab.on', $('#epane')); if (tb) tb.textContent = t.name; ui(); markDirty(); });
+    nm.addEventListener('change', () => renderPane());
+    const del = el('button', 'tbtn danger', 'Delete'); del.addEventListener('click', () => deleteTrack(t));
+    const nameRow = el('div', 'cr'); nameRow.append(nm, del);
+    let barsRow = null, barsNote = null;
+    if (!isFree()) {
+      const out = el('output'), show = () => { out.innerHTML = trackBars(t) + (t.bars ? '' : '<small>lap</small>'); };
+      barsRow = crow('Bars', pill(out, () => setTrackBars(t, trackBars(t) - 1, show), () => setTrackBars(t, trackBars(t) + 1, show), has)); show();
+      if (!has) dbl(out, () => setTrackBars(t, st.bars, show));
+    }
+    return [card(nameRow, barsRow, has ? kindRow() : null, has ? el('p', 'cnote', 'Bars and the kind of track are fixed while it has ' + (isSmp(t) ? 'laps.' : 'recordings.')) : null)];
+  }));
   return p;
 }
 /* Switching to the microphone keeps the sample aside, so switching back during the session brings it back. */
@@ -1976,8 +2085,8 @@ function emptySampleCard(t) {
   sb.addEventListener('click', () => sampleRec(t));
   return card(sb);
 }
-/* The sample: trim view, root note, reverse, note length and the pad screen. */
-function sampleCard(t) {
+/* The sample: trim view and actions, root note and pitch, autotune, then reverse and note length. */
+function sampleSection(t) {
   const s = t.sample, trim = trimWidget(t), ro = el('output'), rn = el('p', 'cnote');
   const showRoot = () => {
     ro.innerHTML = s.det != null || s.adj ? midiName(sRoot(t)) + '<small>' + centsTxt(sRoot(t)).trim() + '</small>' : '–';
@@ -1996,12 +2105,15 @@ function sampleCard(t) {
   at.addEventListener('click', () => { [s.a, s.b] = autoTrim(s.raw); trim.draw(); sampleEdited(t, true, 0); });
   const pl = el('button', 'tbtn', 'Play');
   pl.addEventListener('click', async () => { await initAudio(); playVoice(t, null); });
-  const acts = el('div', 'cr wrap'); acts.append(recB, at, pl);
+  const pd = el('button', 'tbtn', 'Pads'); pd.addEventListener('click', () => openPads(t));
+  const acts = el('div', 'cr wrap'); acts.append(recB, at, pl, pd);
   const gs = el('div', 'seg');
   seg(gs, [[false, 'Full'], [true, 'Held']], () => !!t.sGate, v => { t.sGate = v; for (const k of t.takes) k.final = false; markDirty(); }, false);
-  const open = el('button', 'cr act'); open.append(el('span', '', 'Play on the screen')); open.addEventListener('click', () => openPads(t));
-  return card(trim, acts, crow('Root', rp), rn, crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false)),
-    crow('Notes', gs), el('p', 'cnote', 'Full plays the whole sample on every note; Held stops it when you let go.'), open);
+  return [card(trim, acts),
+    card(crow('Root', rp), rn, ...pitchRows(t)),
+    ...fold('tune', 'Autotune', () => [tuneCard(t)]),
+    card(crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false)),
+      crow('Notes', gs), el('p', 'cnote', 'Full plays the whole sample on every note; Held stops it when you let go.'))];
 }
 function sampleEdited(t, redetect, wait) {
   const s = t.sample; clearTimeout(s.eT);
@@ -2050,7 +2162,8 @@ function trimWidget(t) {
   return wrap;
 }
 /* Transposer: octave and semitone steppers and a fine tuner in cents. The tempo stays the same. */
-function pitchCard(t) {
+const pitchCard = t => card(...pitchRows(t));
+function pitchRows(t) {
   const o = el('output'), s = el('output'), sg = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v);
   const show = () => { o.textContent = sg(t.oct); s.textContent = sg(t.semi); };
   const set = (k, v, lim) => { v = clamp(v, -lim, lim); if (t[k] === v) return; t[k] = v; show(); pitchChanged(t); };
@@ -2058,9 +2171,9 @@ function pitchCard(t) {
   show();
   const po = pill(o, () => set('oct', t.oct - 1, 2), () => set('oct', t.oct + 1, 2)), ps = pill(s, () => set('semi', t.semi - 1, 11), () => set('semi', t.semi + 1, 11));
   po.classList.add('sm'); ps.classList.add('sm');
-  return card(crow('Octave', po), crow('Semitones', ps),
+  return [crow('Octave', po), crow('Semitones', ps),
     sliderRow('Fine', -50, 50, 1, t.cent, 0, v => sg(Math.round(v)) + ' cent', v => { v = Math.round(v); if (t.cent !== v) { t.cent = v; pitchChanged(t); } }),
-    el('p', 'cnote', isSmp(t) ? 'Changes the pitch of the sample, not its length. The keys move with it.' : 'Changes the pitch of every recording on the track, not the tempo.'));
+    el('p', 'cnote', isSmp(t) ? 'Transposes the sample, not its length. The keys move with it.' : 'Changes the pitch of every recording on the track, not the tempo.')];
 }
 /* Autotune: snaps a single voice or instrument to the nearest note of a key and scale. */
 function tuneCard(t) {
@@ -2114,14 +2227,16 @@ function masterPane() {
     Object.assign(st, { gFilter: 0, gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1, gRev: 0, revSize: 2, revLvl: 1, compThr: -18, compAmt: 0 }, EQ_DEF);
     save(); setRevSize(); applyGlobalFx(); markDirty(); renderPane();
   });
-  p.append(el('h3', '', 'Mix'), card(fx('master', 'Volume', 0, 1, 0.01, 0.9, pct)),
-    el('h3', '', 'EQ'), card(eqWidget(st, 'gFilter', () => { save(); applyGlobalFx(); markDirty(); }), fx('gFilter', 'Filter', -1, 1, 0.01, 0, filtTxt)),
-    el('h3', '', 'Delay'), card(segRow, timeRow, fx('echoFb', 'Repeats', 0, 0.9, 0.01, 0.42, pct), fx('echoLvl', 'Level', 0, 1.5, 0.01, 1, pct), fx('gEcho', 'Send', 0, 1, 0.01, 0, pct),
-      el('p', 'cnote', 'Send feeds the whole mix in; each track also has its own send.')),
-    el('h3', '', 'Reverb'), card(fx('revSize', 'Size', 0.4, 4, 0.1, 2, v => v.toFixed(1) + ' s'), fx('revLvl', 'Level', 0, 1.5, 0.01, 1, pct), fx('gRev', 'Send', 0, 1, 0.01, 0, pct)),
-    el('h3', '', 'Compressor'), card(fx('compThr', 'Thresh.', -40, 0, 1, -18, v => (v < 0 ? '−' : '') + Math.abs(v) + ' dB'),
-      fx('compAmt', 'Amount', 0, 1, 0.01, 0, v => v === 0 ? 'off' : (1 + v * 11).toFixed(1) + ':1')),
-    card(reset));
+  const head = el('div', 'cr'); head.append(el('b', 'ename', 'Master'));
+  p.append(card(head), el('h3', '', 'Live'), card(fx('master', 'Volume', 0, 1, 0.01, 0.9, pct), fx('gFilter', 'Filter', -1, 1, 0.01, 0, filtTxt),
+      fx('gRev', 'Reverb', 0, 1, 0.01, 0, pct), fx('gEcho', 'Delay', 0, 1, 0.01, 0, pct),
+      el('p', 'cnote', 'Reverb and Delay feed the whole mix into the effects; each track also has its own.')),
+    ...fold('mEq', 'EQ', () => [card(eqWidget(st, 'gFilter', () => { save(); applyGlobalFx(); markDirty(); }))]),
+    ...fold('mDelay', 'Delay', () => [card(segRow, timeRow, fx('echoFb', 'Repeats', 0, 0.9, 0.01, 0.42, pct), fx('echoLvl', 'Level', 0, 1.5, 0.01, 1, pct))]),
+    ...fold('mRev', 'Reverb', () => [card(fx('revSize', 'Size', 0.4, 4, 0.1, 2, v => v.toFixed(1) + ' s'), fx('revLvl', 'Level', 0, 1.5, 0.01, 1, pct))]),
+    ...fold('mComp', 'Compressor', () => [card(fx('compThr', 'Thresh.', -40, 0, 1, -18, v => (v < 0 ? '−' : '') + Math.abs(v) + ' dB'),
+      fx('compAmt', 'Amount', 0, 1, 0.01, 0, v => v === 0 ? 'off' : (1 + v * 11).toFixed(1) + ':1'))]),
+    el('h3', '', ''), card(reset));
   return p;
 }
 
@@ -2146,20 +2261,23 @@ let sw = null, eatClick = false;
 document.addEventListener('pointerdown', e => {
   sw = null;
   if (e.pointerType === 'mouse' && e.button !== 0) return;
-  if (e.target.closest('input,select,textarea,.eqc,.trimc,.pads,.tappad')) return;
-  sw = { x: e.clientX, y: e.clientY, id: e.pointerId, horiz: false };
+  if (e.target.closest('input,select,textarea,.eqc,.trimc,.tappad,.kb,.pbig,.etabs')) return;
+  const up = mode === 'play' && !padT && !!e.target.closest('.hrow,.scenes,.bar,.hintbar');   // swipe up from the bottom: the pads
+  const down = !!padT && !!e.target.closest('.pads');                                          // swipe down on the sheet: close it
+  sw = { x: e.clientX, y: e.clientY, id: e.pointerId, horiz: false, vert: false, up, down };
 }, true);
 document.addEventListener('pointermove', e => {
-  if (!sw || e.pointerId !== sw.id || sw.horiz) return;
+  if (!sw || e.pointerId !== sw.id || sw.horiz || sw.vert) return;
   const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
-  if (Math.abs(dx) > 14 && Math.abs(dx) > 1.4 * Math.abs(dy)) sw.horiz = true;
-  else if (Math.abs(dy) > 14) sw = null;
+  if (Math.abs(dx) > 14 && Math.abs(dx) > 1.4 * Math.abs(dy)) { if (padT) sw = null; else sw.horiz = true; }
+  else if (Math.abs(dy) > 14) { if ((sw.up && dy < 0) || (sw.down && dy > 0)) sw.vert = true; else sw = null; }
 }, true);
 document.addEventListener('pointerup', e => {
   if (!sw || e.pointerId !== sw.id) return;
-  const s = sw, dx = e.clientX - s.x; sw = null;
-  if (!s.horiz) return;
+  const s = sw, dx = e.clientX - s.x, dy = e.clientY - s.y; sw = null;
+  if (!s.horiz && !s.vert) return;
   eatClick = true; setTimeout(() => { eatClick = false; }, 350);
+  if (s.vert) { if (s.up && dy < -40) openPadSheet(); else if (s.down && dy > 60) closePads(); return; }
   if (Math.abs(dx) < 50) return;
   if (dx > 0) setMode(mode === 'set' ? 'play' : mode === 'play' ? 'edit' : mode);
   else setMode(mode === 'edit' ? 'play' : mode === 'play' ? 'set' : mode);
@@ -2548,6 +2666,8 @@ function ui() {
   $('#hintBar').hidden = !bottom;
   $('#hMeasure').hidden = !!h.measure;
   if (allTakes().length) $('#cont').hidden = true;
+  const pt = padTrack(); $('#padHandTxt').textContent = pt ? pt.name + ' · pads' : 'Sampler pads';
+  drawPadRec();
   $('#perfInd').hidden = !perf; $('#perfBtn').firstChild.textContent = perf ? 'Stop recording performance' : 'Record performance'; $('#perfBtn').classList.toggle('on', !!perf);
   $('#projName').textContent = project ? project.name : hasContent() ? 'unsaved' : '';
   const lk = locked(); $('#tempoLock').hidden = !lk;
@@ -2637,6 +2757,11 @@ function drawClick() {
 
 /* ---------- wiring ---------- */
 $('#homeBtn').addEventListener('click', () => { closePads(); setMode('play'); });
+$('#backR').addEventListener('click', () => setMode('play'));
+$('#backL').addEventListener('click', () => setMode('play'));
+$('#backT').addEventListener('click', closePads);
+const openPadSheet = () => { const t = padTrack(); if (t) openPads(t); else newSampler(); };
+$('#padHand').addEventListener('click', openPadSheet);
 const setHH = () => document.documentElement.style.setProperty('--hh', Math.round($('.status').getBoundingClientRect().bottom) + 'px');
 setHH();
 $('#masterName').addEventListener('click', () => selectTrack('master'));
