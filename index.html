@@ -478,7 +478,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 13:55</p>
+  <p class="ver">Varv one, build 16 Nov 14:10</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -1342,16 +1342,16 @@ function prepSample(t) {
   for (let i = 0; i < fi; i++) seg[i] *= i / fi;
   for (let i = 0; i < fo; i++) seg[n - 1 - i] *= i / fo;
   if (s.rev) seg.reverse();
-  const r = pitchRatio(t), tune = tuneOf(t), gen = s.gen = (s.gen || 0) + 1;
+  const st1 = sampleTune(t), r = pitchRatio(t) * Math.pow(2, st1.corr / 12), gen = s.gen = (s.gen || 0) + 1;   // autotune: one fixed shift
   const done = y => {
     if (s.gen !== gen || t.sample !== s) return;
     s.proc0 = y; applyEnv(t);
-    const d = tune ? detectRoot(y) : null; s.tuned = d == null ? null : d - 12 * Math.log2(r);
-    drawHead(t); if (s.onProc) s.onProc(); if (padT === t) drawPads();
+    s.tuned = t.tune && s.det != null ? s.det + st1.corr : null;
+    drawHead(t); if (s.onProc) s.onProc(); if (s.onTune) s.onTune(); if (padT === t) drawPads();
   };
-  if (Math.abs(r - 1) < 1e-6 && !tune) { done(seg); return; }
+  if (Math.abs(r - 1) < 1e-6) { done(seg); return; }
   const P0 = 4096, x = new Float32Array(P0 + n + 16384); x.set(seg, P0);
-  pvJob(x, r, tune).then(y => {
+  pvJob(x, r, null).then(y => {
     if (!y) { done(seg); return; }
     const z = y.slice(P0, P0 + n);
     for (let i = 0; i < fo; i++) z[n - 1 - i] *= i / fo;
@@ -1383,6 +1383,20 @@ function applyEnv(t) {
 function envChanged(t) {
   markDirty(); clearTimeout(t.envT);
   t.envT = setTimeout(() => applyEnv(t), 90);           // after a short pause in the drag: the laps are rendered again
+}
+/* Autotune on a sampler listens to the whole sample once: its pitch (the median over the sample, as detected
+   when it was recorded), after transposing, is moved to the nearest note of the key and scale, by Amount.
+   The whole sample is shifted by that one amount, so vibrato and slides stay as played. */
+function nearestNote(m, key, scale) {
+  const sc = SCALES[scale] || SCALES.major, ok = q => sc.includes((((q - key) % 12) + 12) % 12);
+  let best = Math.round(m), bd = Infinity;
+  for (let q = Math.floor(m) - 6; q <= Math.ceil(m) + 6; q++) if (ok(q) && Math.abs(q - m) < bd) { bd = Math.abs(q - m); best = q; }
+  return best;
+}
+function sampleTune(t) {
+  const s = t.sample; if (!t.tune || !s || s.det == null) return { corr: 0 };
+  const base = s.det + 12 * Math.log2(pitchRatio(t)), to = nearestNote(base, t.tKey, t.tScale);
+  return { base, to, corr: (to - base) * t.tAmt };
 }
 function setSample(t, raw) {
   const [a, b] = autoTrim(raw);
@@ -2308,15 +2322,25 @@ function pitchRows(t) {
 }
 /* Autotune: snaps a single voice or instrument to the nearest note of a key and scale. */
 function tuneCard(t) {
-  const on = crow('On', swtch(el('div'), () => t.tune, v => { t.tune = v; pitchChanged(t); renderPane(); }, false));
-  if (!t.tune) return card(on, el('p', 'cnote', 'Pulls a single voice or instrument to the nearest note in a key. Chords confuse it.'));
-  const ko = el('output'), show = () => { ko.textContent = KEYS[t.tKey]; };
+  const smp = isSmp(t), on = crow('On', swtch(el('div'), () => t.tune, v => { t.tune = v; pitchChanged(t); renderPane(); }, false));
+  if (!t.tune) return card(on, el('p', 'cnote', smp ? 'Listens to the whole sample and moves it once to the nearest note of a key.' : 'Pulls a single voice or instrument to the nearest note in a key. Chords confuse it.'));
+  const res = el('p', 'cnote'), upd = () => {                  // on a sampler: what the one shift does
+    if (!smp) return;
+    const u = sampleTune(t);
+    res.textContent = !t.sample ? '' : t.sample.det == null ? 'The sample has no clear pitch, so it is not moved.'
+      : midiName(u.base) + centsTxt(u.base) + ' moves to ' + midiName(u.base + u.corr) + centsTxt(u.base + u.corr) + (Math.abs(u.corr) < 0.005 ? ': already in tune.' : '.');
+  };
+  const ko = el('output'), show = () => { ko.textContent = KEYS[t.tKey]; upd(); };
+  if (smp && t.sample) t.sample.onTune = upd;
   const setKey = v => { t.tKey = (v + 12) % 12; show(); pitchChanged(t); };
   dbl(ko, () => setKey(0)); show();
   const kp = pill(ko, () => setKey(t.tKey - 1), () => setKey(t.tKey + 1)); kp.classList.add('sm');
   const sg = el('div', 'seg full'), sr2 = el('div', 'cr');
-  seg(sg, [['major', 'Major'], ['minor', 'Minor'], ['pent', 'Penta'], ['chrom', 'All 12']], () => t.tScale, v => { t.tScale = v; pitchChanged(t); }, 'major');
+  seg(sg, [['major', 'Major'], ['minor', 'Minor'], ['pent', 'Penta'], ['chrom', 'All 12']], () => t.tScale, v => { t.tScale = v; upd(); pitchChanged(t); }, 'major');
   sr2.append(sg);
+  if (smp) return card(on, crow('Key', kp), sr2,
+    sliderRow('Amount', 0, 1, 0.01, t.tAmt, 1, pct, v => { if (t.tAmt !== v) { t.tAmt = v; upd(); pitchChanged(t); } }), res,
+    el('p', 'cnote', 'Listens to the whole sample once and moves all of it by one amount, so vibrato and slides stay as played. The key is what you hear, after any transposing. Penta is the major pentatonic; for minor pentatonic choose its relative major (A minor: C).'));
   return card(on, crow('Key', kp), sr2,
     sliderRow('Speed', 0, 200, 1, t.tSpeed, 20, v => v < 1 ? 'hard' : Math.round(v) + ' ms', v => { v = Math.round(v); if (t.tSpeed !== v) { t.tSpeed = v; pitchChanged(t); } }),
     sliderRow('Amount', 0, 1, 0.01, t.tAmt, 1, pct, v => { if (t.tAmt !== v) { t.tAmt = v; pitchChanged(t); } }),
