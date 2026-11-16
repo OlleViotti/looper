@@ -300,6 +300,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 .pbig.hit{background:var(--amber);color:#1b1f2e}
 .pbig.hit small{color:#5c4a14}
 .kb{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;touch-action:none}
+.kb,.kb *,.pbig,.pbig *,.tappad{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .oct{flex:1;min-height:60px;position:relative;display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .ky{position:relative;border-radius:0 0 8px 8px;background:var(--tape);color:#1b1f2e;font:600 12px/1 var(--ui);display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;cursor:pointer}
 .ky.bk{position:absolute;top:0;height:58%;width:calc((100% - 18px) / 7 * .62);background:#14161f;color:var(--mut);border-radius:0 0 6px 6px;z-index:1;box-shadow:inset 0 0 0 1px var(--line)}
@@ -433,7 +434,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 10:50</p>
+  <p class="ver">Varv one, build 16 Nov 11:10</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -1406,34 +1407,41 @@ function drawPads() {
     area = el('div', 'pbig'); area.dataset.n = 'r';
     area.append(el('span', '', t.name), el('small', '', rootTxt));
   } else {
-    const base = kBaseOf(t), ro = el('output'), bo = el('output');
-    ro.textContent = t.kOct; bo.textContent = 'C' + base;
-    const setRows = v => { t.kOct = clamp(v, 1, 4); markDirty(); drawPads(); };
-    const setBase = v => { t.kBase = clamp(v, 0, 8); markDirty(); drawPads(); };
-    dbl(bo, () => { t.kBase = null; markDirty(); drawPads(); });
-    const p1 = pill(ro, () => setRows(t.kOct - 1), () => setRows(t.kOct + 1)), p2 = pill(bo, () => setBase(base - 1), () => setBase(base + 1));
+    const ro = el('output'), bo = el('output');
+    const show = () => { ro.textContent = t.kOct; bo.textContent = 'C' + kBaseOf(t); buildKeys(t, area); };   // only the keys are redrawn
+    const setRows = v => { v = clamp(v, 1, 4); if (v === t.kOct) return; t.kOct = v; markDirty(); show(); };
+    const setBase = v => { v = clamp(v, 0, 8); if (v === kBaseOf(t)) return; t.kBase = v; markDirty(); show(); };
+    dbl(bo, () => { t.kBase = null; markDirty(); show(); });
+    const p1 = pill(ro, () => setRows(t.kOct - 1), () => setRows(t.kOct + 1)), p2 = pill(bo, () => setBase(kBaseOf(t) - 1), () => setBase(kBaseOf(t) + 1));
     p1.classList.add('sm'); p2.classList.add('sm');
     const o1 = el('div'), o2 = el('div'), opt = el('div', 'popt');
     o1.append(el('span', '', 'Octaves'), p1); o2.append(el('span', '', 'From'), p2); opt.append(o1, o2);
     host.append(opt);
-    area = el('div', 'kb');
-    const rootN = Math.round(sRoot(t)), WH = [0, 2, 4, 5, 7, 9, 11], BK = [[1, 1], [3, 2], [6, 4], [8, 5], [10, 6]], NM = 'CDEFGAB';
-    for (let r = t.kOct - 1; r >= 0; r--) {
-      const o = base + r, row = el('div', 'oct'), m0 = 12 * (o + 1);
-      WH.forEach((pc, i) => { const k = el('div', 'ky' + (m0 + pc === rootN ? ' root' : ''), pc ? NM[i] : 'C' + o); k.dataset.n = m0 + pc; row.append(k); });
-      for (const [pc, j] of BK) {
-        const k = el('div', 'ky bk' + (m0 + pc === rootN ? ' root' : '')); k.dataset.n = m0 + pc;
-        k.style.left = 'calc((100% - 18px) / 7 * ' + (j - 0.31) + ' + ' + (3 * j - 1.5) + 'px)';
-        row.append(k);
-      }
-      area.append(row);
-    }
+    area = el('div', 'kb'); show();
   }
   padInput(area);
   host.append(area);
   requestAnimationFrame(() => drawLane(t));
 }
-/* Each finger plays its own note; sliding onto another key plays that one. */
+/* The keyboard: octaves stacked in rows, highest at the top, root note marked. */
+function buildKeys(t, area) {
+  if (!area) return;
+  area.textContent = '';
+  const base = kBaseOf(t), rootN = Math.round(sRoot(t)), WH = [0, 2, 4, 5, 7, 9, 11], BK = [[1, 1], [3, 2], [6, 4], [8, 5], [10, 6]], NM = 'CDEFGAB';
+  for (let r = t.kOct - 1; r >= 0; r--) {
+    const o = base + r, row = el('div', 'oct'), m0 = 12 * (o + 1);
+    WH.forEach((pc, i) => { const k = el('div', 'ky' + (m0 + pc === rootN ? ' root' : ''), pc ? NM[i] : 'C' + o); k.dataset.n = m0 + pc; row.append(k); });
+    for (const [pc, j] of BK) {
+      const k = el('div', 'ky bk' + (m0 + pc === rootN ? ' root' : '')); k.dataset.n = m0 + pc;
+      k.style.left = 'calc((100% - 18px) / 7 * ' + (j - 0.31) + ' + ' + (3 * j - 1.5) + 'px)';
+      row.append(k);
+    }
+    area.append(row);
+  }
+}
+/* Each finger plays its own note; sliding onto another key plays that one. On iPhone, Safari starts its own
+   gestures (the text magnifier on a long press, zoom on a double tap) from touch events, which pointer events
+   cannot stop, so touches on the playing surface are cancelled here; the pointer events still arrive. */
 function padInput(host) {
   const held = new Map();
   const keyAt = (x, y) => { const n = document.elementFromPoint(x, y), k = n && n.closest && n.closest('[data-n]'); return k && host.contains(k) ? k : null; };
@@ -1447,6 +1455,11 @@ function padInput(host) {
   });
   host.addEventListener('pointerup', off); host.addEventListener('pointercancel', off);
   host.addEventListener('contextmenu', e => e.preventDefault());
+  noTouchDefaults(host);
+}
+function noTouchDefaults(node) {
+  for (const ev of ['touchstart', 'touchmove', 'touchend']) node.addEventListener(ev, e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
+  node.addEventListener('gesturestart', e => e.preventDefault());
 }
 
 /* ---------- screen latency, measured by tapping ----------
@@ -1772,10 +1785,15 @@ const dB = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(Number.
 const filtTxt = v => v === 0 ? 'off' : v < 0 ? 'darker' : 'thinner';
 const panTxt = v => v === 0 ? 'centre' : (v < 0 ? 'L ' : 'R ') + Math.round(Math.abs(v) * 100);
 
+/* A stepper repeats while held. The repeat also ends on a lift anywhere and when the button leaves the page,
+   so a step that redraws the screen under the finger cannot leave it running. */
+const holdEnds = new Set();
+for (const ev of ['pointerup', 'pointercancel', 'blur']) window.addEventListener(ev, () => { for (const f of holdEnds) f(); holdEnds.clear(); });
 function hold(btn, fn) {
   let t1 = 0, t2 = 0;
-  const end = () => { clearTimeout(t1); clearInterval(t2); };
-  btn.addEventListener('pointerdown', e => { e.preventDefault(); fn(); end(); t1 = setTimeout(() => { t2 = setInterval(fn, 70); }, 380); });
+  const end = () => { clearTimeout(t1); clearInterval(t2); t1 = t2 = 0; holdEnds.delete(end); };
+  const rep = () => { if (!btn.isConnected) end(); else fn(); };
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); end(); fn(); if (!btn.isConnected) return; holdEnds.add(end); t1 = setTimeout(() => { t2 = setInterval(rep, 70); }, 380); });
   for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, end);
   btn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } });
 }
@@ -2660,6 +2678,7 @@ $('#measUse').addEventListener('click', () => { if (!measOut) return; prof().ms 
 dbl($('#scrVal'), () => { prof().scr = scrGuess(prof()); save(); ui(); });
 for (const b of document.querySelectorAll('#scrStep .sbtn')) hold(b, () => { const p = prof(); p.scr = clamp(p.scr + +b.dataset.d, 0, MAXLAT_MS); save(); ui(); });
 $('#measTap').addEventListener('click', measureTap);
+noTouchDefaults($('#tapPad'));
 $('#tapPad').addEventListener('pointerdown', e => {
   e.preventDefault(); if (!tapMeas || !ctx) return;
   tapMeas.taps.push(evFrame(e));
