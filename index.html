@@ -478,7 +478,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 14:20</p>
+  <p class="ver">Varv one, build 16 Nov 16:10</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -1236,6 +1236,7 @@ function dropSilent(k) {
 let lastState = '';
 function tick() {
   if (!ctx) return;
+  clockSample();
   const now = nowF();
   if (defining && now - defining.T0 >= FREE_MAX_S * sr) endDefine();
   if (running && rec && now >= epoch + (rec.k + 1) * rec.len - LEAD_S * sr) {
@@ -1274,16 +1275,32 @@ const SMAX_S = 8;
 let evLog = [], pruneAt = 0, srec = null, padT = null;
 const midiName = m => { const r = Math.round(m); return KEYS[((r % 12) + 12) % 12] + (Math.floor(r / 12) - 1); };
 const centsTxt = m => { const c = Math.round((m - Math.round(m)) * 100); return c ? (c > 0 ? ' +' : ' −') + Math.abs(c) + ' ct' : ''; };
-/* A touch is placed on the audio clock from the event's own time stamp. A fixed offset in that mapping
-   is part of the screen latency measured by tapping, the same way, so it cancels out. */
+/* A touch is placed on the audio clock from the event's own time stamp, through the offset between the page's
+   clock and the audio clock. A single reading of that offset is only as fresh as the last audio buffer, so it
+   jitters by up to a buffer (5 to 20 ms on a phone); the offset used is the median of the last second of
+   readings, taken every 25 ms, which is steady. A fixed offset left in this mapping is part of the screen
+   latency measured by tapping, the same way, so it cancels out. */
+let clk = [], clkSrc = null, clkOff = null;
+function clockSample() {
+  if (!ctx) return;
+  let c = null, p = null;
+  if (clkSrc !== 'ct' && ctx.getOutputTimestamp) {
+    const o = ctx.getOutputTimestamp();
+    if (o && o.performanceTime > 0 && o.contextTime > 0) { c = o.contextTime; p = o.performanceTime; clkSrc = 'ots'; }
+    else if (clkSrc === 'ots') return;                    // keep to one source: skip a reading that is not ready
+  }
+  if (c == null) { if (clkSrc == null && performance.now() - (ctx.t0 || (ctx.t0 = performance.now())) < 1000) return; clkSrc = 'ct'; c = ctx.currentTime; p = performance.now(); }
+  const off = c - p / 1000;
+  if (clkOff != null && Math.abs(off - clkOff) > 0.25) clk = [];   // the audio clock jumped (the audio was interrupted): start again
+  clk.push(off); if (clk.length > 41) clk.shift();
+  clkOff = med(clk);
+}
 function evFrame(e) {
   const pn = performance.now(); let ts = e && e.timeStamp;
   if (!(ts > 0) || Math.abs(pn - ts) > 1000) ts = pn;
-  if (ctx.getOutputTimestamp) {
-    const o = ctx.getOutputTimestamp();
-    if (o && o.performanceTime > 0 && o.contextTime > 0) return Math.round((o.contextTime + (ts - o.performanceTime) / 1000) * sr);
-  }
-  return nowF() - Math.round((pn - ts) / 1000 * sr);
+  if (clkOff == null) clockSample();
+  if (clkOff == null) return nowF() - Math.round((pn - ts) / 1000 * sr);
+  return Math.round((ts / 1000 + clkOff) * sr);
 }
 function pruneEv(now) {
   if (!evLog.length || now - pruneAt < 2 * sr) return;
@@ -1620,28 +1637,33 @@ async function measureTap() {
   if (running) stop();
   const ok = await initAudio(); if (!ok) return;
   measuring = true; ui();
-  const N = 16, iv = Math.round(0.6 * sr), n = Math.round(0.04 * sr);
-  const b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
-  for (let i = 0; i < n; i++) d[i] = Math.sin(2 * Math.PI * 1320 * i / sr) * Math.exp(-i / (0.006 * sr));
-  const t0 = nowF() + Math.round(1.2 * sr), g = gn(Math.max(st.clickVol, 0.6)); g.connect(clickComp);   // same path as the click
-  const dots = $('#tapDots'), pad = $('#tapPad');
+  /* A count-in of four higher clicks, counted down on the pad, then the sixteen clicks that are measured. */
+  const N = 16, CI = 4, iv = Math.round(0.6 * sr), n = Math.round(0.04 * sr);
+  const mk = f => { const b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.sin(2 * Math.PI * f * i / sr) * Math.exp(-i / (0.006 * sr)); return b; };
+  const bc = mk(1760), b = mk(1320);
+  const t0 = nowF() + Math.round(0.8 * sr) + CI * iv, g = gn(Math.max(st.clickVol, 0.6)); g.connect(clickComp);   // same path as the click
+  const dots = $('#tapDots'), pad = $('#tapPad'), at = f => Math.max(0, (f / sr - ctx.currentTime) * 1000);
   dots.textContent = ''; dots.hidden = false; pad.hidden = false; $('#tapRes').hidden = true; $('#tapUse').hidden = true; $('#measTap').disabled = true;
-  pad.scrollIntoView({ block: 'nearest' });
+  pad.scrollIntoView({ block: 'nearest' }); pad.textContent = 'Listen…';
   tapMeas = { t0, iv, N, taps: [] };
-  for (let k = 0; k < N; k++) {
-    const s = ctx.createBufferSource(); s.buffer = b; s.connect(g); s.start((t0 + k * iv) / sr);
-    const dot = el('i'); dots.append(dot);
-    setTimeout(() => dot.classList.add('on'), Math.max(0, ((t0 + k * iv) / sr - ctx.currentTime) * 1000));
+  const tm = [];
+  for (let k = -CI; k < N; k++) {
+    const s = ctx.createBufferSource(); s.buffer = k < 0 ? bc : b; s.connect(g); s.start((t0 + k * iv) / sr);
+    if (k < 0) tm.push(setTimeout(() => { pad.textContent = String(-k); }, at(t0 + k * iv)));
+    else {
+      const dot = el('i'); dots.append(dot);
+      tm.push(setTimeout(() => { dot.classList.add('on'); if (!k) pad.textContent = 'Tap on every click'; }, at(t0 + k * iv)));
+    }
   }
   await sleep(((t0 + N * iv) / sr - ctx.currentTime + 0.6) * 1000);
   const m = tapMeas; tapMeas = null;
   try { g.disconnect(); } catch (e) {}
-  measuring = false; pad.hidden = true; $('#measTap').disabled = false;
+  measuring = false; pad.hidden = true; pad.textContent = 'Tap on every click'; $('#measTap').disabled = false;
   tapOut = analyzeTaps(m);
   const res = $('#tapRes'); res.hidden = false;
   if (!tapOut) res.textContent = 'Too few taps on the clicks. Try again, tapping on every click.';
   else {
-    res.textContent = tapOut.ms + ' ms (±' + Math.round(tapOut.spread) + ' ms)' + (tapOut.spread > 25 ? '. Uneven, measure again.' : '');
+    res.textContent = tapOut.ms + ' ms. Your taps scattered ±' + Math.round(tapOut.spread) + ' ms; the value is good to about ±' + Math.max(1, Math.round(2 * tapOut.se)) + ' ms' + (tapOut.spread > 25 ? '. Uneven, measure again.' : '.');
     const u = $('#tapUse'); u.hidden = false; u.textContent = 'Use ' + tapOut.ms + ' ms';
   }
   ui();
@@ -1654,12 +1676,14 @@ function analyzeTaps(m) {
   if (c < -0.15 * iv) c += iv;
   const offs = [];
   for (const A of taps) {
-    const j = Math.round((A - t0 - c) / iv); if (j < 3 || j >= N) continue;
+    const j = Math.round((A - t0 - c) / iv); if (j < 1 || j >= N) continue;   // taps in the count-in and on the first click are left out
     const o = A - t0 - j * iv; if (Math.abs(o - c) < 0.3 * iv) offs.push(o / sr * 1000);
   }
   if (offs.length < 6) return null;
-  const ms = med(offs);
-  return { ms: clamp(Math.round(ms), 0, MAXLAT_MS), exact: ms, spread: med(offs.map(x => Math.abs(x - ms))), n: offs.length };
+  /* Taps far from the rest (more than three times the typical scatter) are dropped, and the rest averaged. */
+  const m0 = med(offs), sp = Math.max(2, 1.4826 * med(offs.map(x => Math.abs(x - m0)))), keep = offs.filter(x => Math.abs(x - m0) <= 3 * sp);
+  const ms = keep.reduce((a, x) => a + x, 0) / keep.length;
+  return { ms: clamp(Math.round(ms), 0, MAXLAT_MS), exact: ms, spread: med(keep.map(x => Math.abs(x - ms))), n: keep.length, se: sp / Math.sqrt(keep.length) };
 }
 
 /* ---------- tracks: audio nodes ---------- */
@@ -3039,7 +3063,7 @@ if (window.ResizeObserver) new ResizeObserver(() => { for (const t of tracks) dr
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* for debugging and tests */
-window.__varv = { st, analyzeLoop, get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
+window.__varv = { st, analyzeLoop, get ctx() { return ctx; }, get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
   ringPeak: sec => { let pk = 0; for (let f = Math.max(availStart(), capEnd - Math.round(sec * sr)); f < capEnd; f++) pk = Math.max(pk, Math.abs(ring[f % R])); return pk; },
   arm: i => toggleArm(tracks[i]),
   get scenes() { return scenes; }, get perf() { return perf; }, togglePerf, get inG() { return inG; },
