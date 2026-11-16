@@ -315,19 +315,24 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 @keyframes sheetup{from{transform:translateY(100%)}}
 .grab{flex:none;width:44px;height:5px;border-radius:3px;background:var(--line);margin:2px auto 0}
 .pads .etabs{position:static;padding:2px 0 0;margin:0 -16px;padding-left:16px;padding-right:16px}
-.reclap{height:40px;padding:0 16px;border-radius:999px;background:var(--rec);color:#fff;font-weight:700;white-space:nowrap}
+.reclap{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;height:40px;padding:0 12px;border-radius:999px;background:var(--rec);color:#fff;font-weight:700;white-space:nowrap}
 .reclap.wait{background:var(--raise);color:var(--text);box-shadow:inset 0 0 0 3px var(--rec);animation:blink .5s steps(2,jump-none) infinite}
 .reclap.on{background:#fff;color:var(--rec)}
 .reclap:disabled{opacity:.35}
 .pbig.rec{background:var(--rec);color:#fff}
 .pbig.rec small{color:#fff}
 .phead{display:flex;align-items:center;gap:8px;min-height:44px}
-.phead .tbtn{margin-left:auto}
-.phead .seg button{min-width:56px}
+.phead .seg{flex:none}
+.phead .seg button{min-width:0;padding:0 9px}
+.ptop{display:flex;align-items:center;gap:6px}
+.ptop .etabs{flex:1;min-width:0;margin-right:0;padding-right:4px}
+.ptop .tbtn{flex:none}
 .pads .trk{flex:none;height:22px;background:var(--tape);border-radius:2px}
 .pads.run .ph{display:block}
 .popt{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--mut);font-size:14px}
 .popt>div{display:flex;align-items:center;gap:6px}
+.popt .pill .sbtn{width:38px}
+.popt .pill.sm output{min-width:34px}
 .pnote{color:var(--mut);font-size:14px;margin:0}
 .pnote b{color:var(--text);font-weight:600}
 .pbig{flex:1;min-height:120px;border-radius:20px;background:var(--raise);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:24px;font-weight:700;touch-action:none;cursor:pointer}
@@ -473,7 +478,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 12:40</p>
+  <p class="ver">Varv one, build 16 Nov 12:55</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -1452,7 +1457,7 @@ function drawPadRec() {
   const b = $('#recLap'); if (!b || !padT) return;
   const t = padT, mine = !!rec && rec.tid === t.id, wait = mine && (!running || (heardPos() < rec.k * rec.len && !inTail(heardPos())));
   b.className = 'reclap' + (mine ? (wait ? ' wait' : ' on') : '');
-  b.textContent = !mine ? 'Rec lap' : wait ? 'Next lap · cancel' : rec.cont ? (rec.last ? 'Keep going' : 'Finish') : 'Recording · cancel';
+  b.textContent = !mine ? 'Rec lap' : wait ? 'Cancel' : rec.cont ? (rec.last ? 'Keep going' : 'Finish') : 'Cancel';
   b.disabled = !t.sample;
 }
 const kBaseOf = t => t.kBase != null ? t.kBase : clamp(Math.floor(Math.round(sRoot(t)) / 12) - 1 - ((t.kOct - 1) >> 1), 0, 7);
@@ -1467,13 +1472,18 @@ function drawPads() {
     b.addEventListener('click', () => { if (x !== t) openPads(x); }); tabs.append(b);
   }
   const nb = el('button', 'etab add', '+ Sampler'); nb.addEventListener('click', newSampler); tabs.append(nb);
-  const head = el('div', 'phead'), rb = el('button', 'reclap'), done = el('button', 'tbtn', 'Done');
+  const top = el('div', 'ptop'), head = el('div', 'phead'), rb = el('button', 'reclap'), done = el('button', 'tbtn', 'Done');
   rb.id = 'recLap'; rb.addEventListener('click', () => recordInto(t));
   done.addEventListener('click', closePads);
+  top.append(tabs, done);
   head.append(rb);
-  if (t.sample) { const sg = el('div', 'seg'); seg(sg, [['pad', 'Pad'], ['keys', 'Keys']], () => padModeOf(t), v => { t.padMode = v; markDirty(); drawPads(); }); head.append(sg); }
-  head.append(done);
-  host.append(el('div', 'grab'), tabs, head);
+  if (t.sample) {                                   // Pad or Keys, and whether a note plays in full or while held
+    const sg = el('div', 'seg'), gs = el('div', 'seg');
+    seg(sg, [['pad', 'Pad'], ['keys', 'Keys']], () => padModeOf(t), v => { t.padMode = v; markDirty(); drawPads(); });
+    seg(gs, [[false, 'Full'], [true, 'Held']], () => !!t.sGate, v => { t.sGate = v; for (const k of t.takes) k.final = false; markDirty(); }, false);
+    head.append(sg, gs);
+  }
+  host.append(el('div', 'grab'), top, head);
   requestAnimationFrame(() => { const on = $('.etab.on', tabs); if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' }); });
   drawPadRec();
   if (!t.sample) {                                  // an empty sampler: record its sample here
