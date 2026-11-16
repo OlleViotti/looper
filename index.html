@@ -305,6 +305,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 .ky.bk{position:absolute;top:0;height:58%;width:calc((100% - 18px) / 7 * .62);background:#14161f;color:var(--mut);border-radius:0 0 6px 6px;z-index:1;box-shadow:inset 0 0 0 1px var(--line)}
 .ky.root::before{content:'';position:absolute;left:50%;top:8px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--rec)}
 .ky.hit{background:var(--amber);color:#1b1f2e}
+body.s-rec .pads .kb,body.s-rec .pads .pbig,body.s-armed .pads .kb,body.s-armed .pads .pbig{outline:3px solid var(--rec);outline-offset:3px;border-radius:10px}
 body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 .trimw{padding:10px 14px 4px}
 .trimc{display:block;width:100%;height:96px;border-radius:8px;background:var(--desk);touch-action:none;cursor:ew-resize}
@@ -432,7 +433,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 10:35</p>
+  <p class="ver">Varv one, build 16 Nov 10:50</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -1117,7 +1118,14 @@ function serviceTake(k, now) {
     fillTake(k, now);
     const s = k.track.sample; if (!s || !s.proc) return;
     const end = k.F0 + k.len, need = k.rawStart + clamp(latN(k.lat), 0, MAXLAT) + k.len + Math.round(0.05 * sr);
-    if (!k.final && now >= need) { render(k); k.final = true; afterRender(k, now, end); }
+    if (!k.final && now >= need) {
+      render(k); k.final = true;
+      if (k.auto && !k.judged) {                      // judged only now that every note of the lap has arrived
+        k.judged = true;
+        if (!k.notes.some(e => { const q = e.A - k.rawStart - clamp(latN(k.lat), 0, MAXLAT); return q >= 0 && q < k.len; })) { detachTake(k); dropSilent(k); return; }
+      }
+      afterRender(k, now, end);
+    }
     else if (!k.started && now >= end - LEAD_S * sr) { render(k); afterRender(k, now, end); }   // heard from the next lap on, never live
     return;
   }
@@ -1146,7 +1154,7 @@ function attachTake(k) {
 function detachTake(k) { stopSrc(k); if (k.tg) { try { k.tg.disconnect(); } catch (e) {} k.tg = null; } }
 function afterRender(k, now, end) {
   const first = !k.started;
-  if (first && k.auto && k.peak < 0.006) { k.pgen++; dropSilent(k); return; }      // silent lap in continuous mode
+  if (first && k.auto && !k.notes && k.peak < 0.006) { k.pgen++; dropSilent(k); return; }      // silent lap in continuous mode (a lap of notes is judged on its final render)
   if (!k.pend) goLive(k, now, end, first);
 }
 function goLive(k, now, end, first) {
@@ -1341,12 +1349,13 @@ async function stopSampleRec() {
   const s = t.sample; toast('Sample on ' + t.name + (s.det != null ? ': ' + midiName(s.det) + centsTxt(s.det) : ', no clear pitch') + '.');
 }
 
-/* Live notes. Outside a recording lap a note sounds at once, so the sample can be tried out; inside one it is
-   silent, since it would be heard late, and it is heard in time from the next lap on. */
+/* Live notes. While a recording is on (waiting for its lap, counting in or recording) the pads are silent:
+   what is played is heard in time from the next lap on. They also stay silent for a note that still belongs to
+   a lap that has just ended, which can come up to the screen latency after the lap. Otherwise a note sounds at
+   once, so the sample can be tried out. */
 function inRecWindow(t, A) {
   if (!running) return false;
-  const q = A - latN(prof().scr) - epoch;
-  if (rec && rec.tid === t.id && q >= rec.k * rec.len - PRE && q < (rec.k + 1) * rec.len - PRE) return true;
+  if (rec) return true;
   for (const k of t.takes) if (k.notes && !k.full) { const p = A - latN(k.lat) - k.rawStart; if (p >= 0 && p < k.len) return true; }
   return false;
 }
@@ -1390,7 +1399,7 @@ function drawPads() {
   head.append(el('b', '', t.name), sg, done);
   const trk = el('div', 'trk'); t.kcv = el('canvas'); trk.append(t.kcv, el('i', 'ph'));
   host.append(head, trk);
-  if (!st.hints.pads) { const h = el('p', 'pnote'); h.innerHTML = 'Play to try the sound. <b>Record</b>, or hold the track on the play screen, records a lap: while it records you hear nothing, then it plays in time from the next lap on.'; host.append(h); }
+  if (!st.hints.pads) { const h = el('p', 'pnote'); h.innerHTML = 'Play to try the sound. <b>Record</b>, or hold the track on the play screen, records a lap. While a recording is on, framed in red, the pads are silent: what you play is heard in time from the next lap on.'; host.append(h); }
   const s = t.sample, rootTxt = s.det != null || s.adj ? midiName(sRoot(t)) : 'no pitch';
   let area;
   if (padModeOf(t) === 'pad') {
