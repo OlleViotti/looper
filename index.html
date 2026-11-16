@@ -478,7 +478,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 14:10</p>
+  <p class="ver">Varv one, build 16 Nov 14:20</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -538,7 +538,7 @@ let rec = null, recTail = null, defining = null, freeL = 0, measuring = false;
 const NSCN = 5;
 let scenes = Array(NSCN).fill(null);
 let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, selId = null, mode = 'play';
-const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'major', tSpeed: 20, tAmt: 1,
+const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'chrom', tSpeed: 20, tAmt: 1,
   sampler: false, padMode: null, kOct: null, kBase: null, sGate: false }, EQ_DEF);   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
 const TRACK_KEYS = Object.keys(TRACK_DEF);
 const isSmp = t => t.sampler || !!t.sample;
@@ -2336,7 +2336,7 @@ function tuneCard(t) {
   dbl(ko, () => setKey(0)); show();
   const kp = pill(ko, () => setKey(t.tKey - 1), () => setKey(t.tKey + 1)); kp.classList.add('sm');
   const sg = el('div', 'seg full'), sr2 = el('div', 'cr');
-  seg(sg, [['major', 'Major'], ['minor', 'Minor'], ['pent', 'Penta'], ['chrom', 'All 12']], () => t.tScale, v => { t.tScale = v; upd(); pitchChanged(t); }, 'major');
+  seg(sg, [['major', 'Major'], ['minor', 'Minor'], ['pent', 'Penta'], ['chrom', 'All 12']], () => t.tScale, v => { t.tScale = v; upd(); pitchChanged(t); }, 'chrom');
   sr2.append(sg);
   if (smp) return card(on, crow('Key', kp), sr2,
     sliderRow('Amount', 0, 1, 0.01, t.tAmt, 1, pct, v => { if (t.tAmt !== v) { t.tAmt = v; upd(); pitchChanged(t); } }), res,
