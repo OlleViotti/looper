@@ -478,7 +478,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 12:55</p>
+  <p class="ver">Varv one, build 16 Nov 13:10</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -534,7 +534,7 @@ const NSCN = 5;
 let scenes = Array(NSCN).fill(null);
 let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, selId = null, mode = 'play';
 const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'major', tSpeed: 20, tAmt: 1,
-  sampler: false, padMode: null, kOct: 2, kBase: null, sGate: false }, EQ_DEF);   // sampler: pad or keys, keyboard rows and lowest octave, notes held or full length
+  sampler: false, padMode: null, kOct: null, kBase: null, sGate: false }, EQ_DEF);   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
 const TRACK_KEYS = Object.keys(TRACK_DEF);
 const isSmp = t => t.sampler || !!t.sample;
 const KB_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v10M12 4v10M16 4v10M8 14v6M12 14v6M16 14v6"/></svg>';          // a sampler track, with or without its sample yet
@@ -1322,7 +1322,10 @@ function detectRoot(x) {
    With autotune on it is measured again after tuning, since the tuning moves it onto a note of the key. */
 const sRoot = t => { const s = t.sample; return (t.tune && s.tuned != null ? s.tuned : s.det != null ? s.det : 60) + (s.adj || 0); };
 const noteRatio = (t, n) => n == null ? 1 : Math.pow(2, (n - sRoot(t)) / 12);
-const padModeOf = t => t.padMode || (t.sample && t.sample.det != null ? 'keys' : 'pad');
+/* Octaves shown on the pads, 0 to 4; 0 is one big pad. Unset, a sample with a pitch gets two octaves and one
+   without gets the pad. padMode is from projects saved before the octave count chose this. */
+const kOctOf = t => t.kOct != null ? t.kOct : t.padMode === 'pad' ? 0 : t.padMode === 'keys' ? 2 : t.sample && t.sample.det == null ? 0 : 2;
+const padModeOf = t => kOctOf(t) ? 'keys' : 'pad';
 
 /* Trim, fade, reverse, then pitch and autotune through the same engine as the tracks. The sample is padded
    with silence so the loop processing has nothing to wrap round. The old version plays until the new is ready. */
@@ -1354,7 +1357,7 @@ function prepSample(t) {
 function setSample(t, raw) {
   const [a, b] = autoTrim(raw);
   t.sample = { key: rid(), raw, a, b, det: detectRoot(raw.subarray(a, b)), adj: 0, rev: false, proc: null, buf: null, tuned: null, savedTo: null, gen: 0 };
-  t.auto = false; t.sampler = true; t.padMode = null;
+  t.auto = false; t.sampler = true; t.padMode = null; t.kOct = null;
   prepSample(t); drawHead(t); ensureProject(); markDirty();
 }
 /* Notes are resampled from the processed sample (cubic interpolation), so a key plays the sample faster
@@ -1460,7 +1463,7 @@ function drawPadRec() {
   b.textContent = !mine ? 'Rec lap' : wait ? 'Cancel' : rec.cont ? (rec.last ? 'Keep going' : 'Finish') : 'Cancel';
   b.disabled = !t.sample;
 }
-const kBaseOf = t => t.kBase != null ? t.kBase : clamp(Math.floor(Math.round(sRoot(t)) / 12) - 1 - ((t.kOct - 1) >> 1), 0, 7);
+const kBaseOf = t => t.kBase != null ? t.kBase : clamp(Math.floor(Math.round(sRoot(t)) / 12) - 1 - ((Math.max(1, kOctOf(t)) - 1) >> 1), 0, 7);
 function drawPads() {
   const host = $('#pads'), t = padT; host.textContent = '';
   host.hidden = !t;
@@ -1477,11 +1480,10 @@ function drawPads() {
   done.addEventListener('click', closePads);
   top.append(tabs, done);
   head.append(rb);
-  if (t.sample) {                                   // Pad or Keys, and whether a note plays in full or while held
-    const sg = el('div', 'seg'), gs = el('div', 'seg');
-    seg(sg, [['pad', 'Pad'], ['keys', 'Keys']], () => padModeOf(t), v => { t.padMode = v; markDirty(); drawPads(); });
+  if (t.sample) {                                   // whether a note plays in full or while held
+    const gs = el('div', 'seg');
     seg(gs, [[false, 'Full'], [true, 'Held']], () => !!t.sGate, v => { t.sGate = v; for (const k of t.takes) k.final = false; markDirty(); }, false);
-    head.append(sg, gs);
+    head.append(gs);
   }
   host.append(el('div', 'grab'), top, head);
   requestAnimationFrame(() => { const on = $('.etab.on', tabs); if (on) on.scrollIntoView({ inline: 'nearest', block: 'nearest' }); });
@@ -1495,26 +1497,30 @@ function drawPads() {
   const trk = el('div', 'trk'); t.kcv = el('canvas'); trk.append(t.kcv, el('i', 'ph'));
   host.append(trk);
   if (!st.hints.pads) { const h = el('p', 'pnote'); h.innerHTML = 'Play to try the sound. <b>Rec lap</b> records the next lap. While a recording is on, framed in red, the pads are silent: what you play is heard in time from the next lap on.'; host.append(h); }
+  /* Octaves 0 to 4, and the lowest one. Changing them redraws only the playing area: the big pad at 0, else the keys. */
   const s = t.sample, rootTxt = s.det != null || s.adj ? midiName(sRoot(t)) : 'no pitch';
-  let area;
-  if (padModeOf(t) === 'pad') {
-    area = el('div', 'pbig'); area.dataset.n = 'r';
-    area.append(el('span', '', t.name), el('small', '', rootTxt));
-  } else {
-    const ro = el('output'), bo = el('output');
-    const show = () => { ro.textContent = t.kOct; bo.textContent = 'C' + kBaseOf(t); buildKeys(t, area); };   // only the keys are redrawn
-    const setRows = v => { v = clamp(v, 1, 4); if (v === t.kOct) return; t.kOct = v; markDirty(); show(); };
-    const setBase = v => { v = clamp(v, 0, 8); if (v === kBaseOf(t)) return; t.kBase = v; markDirty(); show(); };
-    dbl(bo, () => { t.kBase = null; markDirty(); show(); });
-    const p1 = pill(ro, () => setRows(t.kOct - 1), () => setRows(t.kOct + 1)), p2 = pill(bo, () => setBase(kBaseOf(t) - 1), () => setBase(kBaseOf(t) + 1));
-    p1.classList.add('sm'); p2.classList.add('sm');
-    const o1 = el('div'), o2 = el('div'), opt = el('div', 'popt');
-    o1.append(el('span', '', 'Octaves'), p1); o2.append(el('span', '', 'From'), p2); opt.append(o1, o2);
-    host.append(opt);
-    area = el('div', 'kb'); show();
-  }
-  padInput(area);
-  host.append(area);
+  const ro = el('output'), bo = el('output'), o1 = el('div'), o2 = el('div'), opt = el('div', 'popt');
+  let area = null;
+  const show = () => {
+    const n = kOctOf(t);
+    ro.innerHTML = n ? n : '0<small>pad</small>'; bo.textContent = 'C' + kBaseOf(t); o2.style.visibility = n ? '' : 'hidden';
+    if (!area || area.classList.contains('kb') !== !!n) {
+      let nw;
+      if (n) nw = el('div', 'kb');
+      else { nw = el('div', 'pbig'); nw.dataset.n = 'r'; nw.append(el('span', '', t.name), el('small', '', rootTxt)); }
+      padInput(nw);
+      if (area) area.replaceWith(nw); else host.append(nw);
+      area = nw;
+    }
+    if (n) buildKeys(t, area);
+  };
+  const setRows = v => { v = clamp(v, 0, 4); if (v === kOctOf(t)) return; t.kOct = v; markDirty(); show(); };
+  const setBase = v => { v = clamp(v, 0, 8); if (v === kBaseOf(t)) return; t.kBase = v; markDirty(); show(); };
+  dbl(bo, () => { t.kBase = null; markDirty(); show(); });
+  const p1 = pill(ro, () => setRows(kOctOf(t) - 1), () => setRows(kOctOf(t) + 1)), p2 = pill(bo, () => setBase(kBaseOf(t) - 1), () => setBase(kBaseOf(t) + 1));
+  p1.classList.add('sm'); p2.classList.add('sm');
+  o1.append(el('span', '', 'Octaves'), p1); o2.append(el('span', '', 'From'), p2); opt.append(o1, o2);
+  host.append(opt); show();
   requestAnimationFrame(() => drawLane(t));
 }
 /* The keyboard: octaves stacked in rows, highest at the top, root note marked. */
@@ -1522,7 +1528,7 @@ function buildKeys(t, area) {
   if (!area) return;
   area.textContent = '';
   const base = kBaseOf(t), rootN = Math.round(sRoot(t)), WH = [0, 2, 4, 5, 7, 9, 11], BK = [[1, 1], [3, 2], [6, 4], [8, 5], [10, 6]], NM = 'CDEFGAB';
-  for (let r = t.kOct - 1; r >= 0; r--) {
+  for (let r = kOctOf(t) - 1; r >= 0; r--) {
     const o = base + r, row = el('div', 'oct'), m0 = 12 * (o + 1);
     WH.forEach((pc, i) => { const k = el('div', 'ky' + (m0 + pc === rootN ? ' root' : ''), pc ? NM[i] : 'C' + o); k.dataset.n = m0 + pc; row.append(k); });
     for (const [pc, j] of BK) {
