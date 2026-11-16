@@ -478,7 +478,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 13:10</p>
+  <p class="ver">Varv one, build 16 Nov 13:55</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -504,19 +504,24 @@ const EQ_DEF = { eqL: 0, eqM: 0, eqH: 0, eqLf: 200, eqMf: 1000, eqHf: 4000 };
 const FX_KEYS = ['master', 'gFilter', 'eqL', 'eqM', 'eqH', 'eqLf', 'eqMf', 'eqHf', 'gEcho', 'echoDiv', 'echoMs', 'echoFb', 'echoLvl', 'gRev', 'revSize', 'revLvl', 'compThr', 'compAmt'];
 const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
 const st = Object.assign({
-  v: 2, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, overdub: true, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'bar',
-  profiles: [{ name: 'AirPods', ms: 180, guess: true }, { name: 'Wired or speaker', ms: 20, guess: true }],
+  v: 3, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, overdub: true, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'bar',
+  profiles: [{ name: 'AirPods', ms: 185, guess: true }, { name: 'Wired or speaker', ms: 20, guess: true }],
   active: 0, micId: 'builtin', master: 0.9, gFilter: 0,
   gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1,
   gRev: 0, revSize: 2, revLvl: 1, compThr: -18, compAmt: 0
 }, EQ_DEF, saved);
 if (!Array.isArray(st.profiles) || !st.profiles.length) st.profiles = [{ name: 'Default', ms: 0, guess: true }];
 st.active = clamp(st.active | 0, 0, st.profiles.length - 1);
-/* Screen latency (for the sampler): from a touch on the screen to where it lands on the beat you hear.
-   It includes the headphone delay, so until it is measured it is guessed from that. */
-const scrGuess = p => p.ms + 70;
-for (const p of st.profiles) if (p.scr == null) p.scr = scrGuess(p);
 if ((saved.v || 0) < 2) { st.v = 2; st.muteQ = 'bar'; if (!saved.micId) st.micId = 'builtin'; }   // new defaults: next bar, the iPhone microphone
+/* Screen latency (for the sampler): from a touch on the screen to where it lands on the beat you hear.
+   Defaults: 185 ms for the headphones and 100 ms for the screen. Settings saved before these defaults keep
+   what was measured or set by hand; the old guesses (180 ms, and the headphones plus 70 ms) move to them. */
+const LAT_DEF = 185, SCR_DEF = 100, scrGuess = () => SCR_DEF;
+if ((saved.v || 0) < 3) {
+  st.v = 3;
+  for (const p of st.profiles) { if (p.scr === p.ms + 70) delete p.scr; if (p.guess && p.ms === 180) p.ms = LAT_DEF; }
+}
+for (const p of st.profiles) if (p.scr == null) p.scr = scrGuess(p);
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
 const prof = () => st.profiles[st.active];
 
@@ -1340,9 +1345,8 @@ function prepSample(t) {
   const r = pitchRatio(t), tune = tuneOf(t), gen = s.gen = (s.gen || 0) + 1;
   const done = y => {
     if (s.gen !== gen || t.sample !== s) return;
-    s.proc = y; s.buf = ctx ? mkBuf(y) : null;
+    s.proc0 = y; applyEnv(t);
     const d = tune ? detectRoot(y) : null; s.tuned = d == null ? null : d - 12 * Math.log2(r);
-    for (const k of t.takes) k.final = false;
     drawHead(t); if (s.onProc) s.onProc(); if (padT === t) drawPads();
   };
   if (Math.abs(r - 1) < 1e-6 && !tune) { done(seg); return; }
@@ -1354,9 +1358,36 @@ function prepSample(t) {
     done(z);
   });
 }
+/* ---------- envelope ----------
+   The volume over the length of the sample: an attack rising from silence (a curve that starts slowly, for a
+   swell), a decay to the sustain level, and a punch that lifts the first moment after the attack above the
+   recorded level, by up to three times, falling back over 30 ms. Release is how long a Held note fades
+   after you let go. It is applied to the sample after pitch and autotune, so every note and lap has it. */
+const ENV_DEF = { a: 0, d: 200, s: 1, r: 25, p: 0 };
+const envOf = t => Object.assign({}, ENV_DEF, t.sample && t.sample.env);
+function envGain(e, i) {
+  const t = i / sr * 1000, A = e.a, D = e.d;
+  let g = t < A ? Math.pow(t / A, 1.6) : t < A + D ? e.s + (1 - e.s) * Math.pow(1 - (t - A) / D, 2) : e.s;
+  if (e.p > 0) g *= 1 + 2 * e.p * (t < A ? 1 : Math.exp(-(t - A) / 30));
+  return g;
+}
+const envFlat = e => e.a === 0 && e.s === 1 && e.p === 0;
+function applyEnv(t) {
+  const s = t.sample; if (!s || !s.proc0) return;
+  const e = envOf(t), y = s.proc0;
+  if (envFlat(e)) s.proc = y;
+  else { const z = new Float32Array(y.length); for (let i = 0; i < y.length; i++) z[i] = y[i] * envGain(e, i); s.proc = z; }
+  s.buf = ctx ? mkBuf(s.proc) : null;
+  for (const k of t.takes) k.final = false;
+}
+function envChanged(t) {
+  markDirty(); clearTimeout(t.envT);
+  t.envT = setTimeout(() => applyEnv(t), 90);           // after a short pause in the drag: the laps are rendered again
+}
 function setSample(t, raw) {
   const [a, b] = autoTrim(raw);
-  t.sample = { key: rid(), raw, a, b, det: detectRoot(raw.subarray(a, b)), adj: 0, rev: false, proc: null, buf: null, tuned: null, savedTo: null, gen: 0 };
+  const env = t.sample && t.sample.env ? Object.assign({}, t.sample.env) : Object.assign({}, ENV_DEF);   // a new sample keeps the envelope
+  t.sample = { key: rid(), raw, a, b, det: detectRoot(raw.subarray(a, b)), adj: 0, rev: false, env, proc: null, proc0: null, buf: null, tuned: null, savedTo: null, gen: 0 };
   t.auto = false; t.sampler = true; t.padMode = null; t.kOct = null;
   prepSample(t); drawHead(t); ensureProject(); markDirty();
 }
@@ -1364,7 +1395,7 @@ function setSample(t, raw) {
    or slower, like a classic sampler. A tail that runs past the end of the loop comes round at its start. */
 function renderNotes(k) {
   const t = k.track, s = t.sample, N = k.len, out = new Float32Array(N), d = clamp(latN(k.lat), 0, MAXLAT);
-  const y = s && s.proc, fade = Math.round(0.025 * sr);
+  const y = s && s.proc, fade = Math.max(16, Math.round(envOf(t).r / 1000 * sr));
   if (!y) return out;
   for (const e of k.notes) {
     const q = e.A - k.rawStart - d; if (q < 0 || q >= N) continue;
@@ -1424,7 +1455,10 @@ function playVoice(t, n) {
   src.onended = () => { try { g.disconnect(); } catch (e) {} };
   return { src, g };
 }
-function stopVoice(v) { const t0 = ctx.currentTime; v.g.gain.setTargetAtTime(0, t0, 0.008); try { v.src.stop(t0 + 0.08); } catch (e) {} }
+function stopVoice(v, t) {                           // the release: about the same fade as in a rendered lap
+  const t0 = ctx.currentTime, r = Math.max(5, envOf(t).r) / 1000;
+  v.g.gain.setTargetAtTime(0, t0, r / 3); try { v.src.stop(t0 + r * 1.6 + 0.02); } catch (e) {}
+}
 function noteOn(e, n) {
   const t = padT; if (!t || !t.sample) return null;
   if (!ctx) { initAudio(); return null; }
@@ -1435,7 +1469,7 @@ function noteOn(e, n) {
 function noteOff(e, h) {
   if (!h) return;
   h.ev.O = evFrame(e);
-  if (h.v && h.t.sGate) stopVoice(h.v);
+  if (h.v && h.t.sGate) stopVoice(h.v, h.t);
 }
 
 /* ---------- the pad screen ---------- */
@@ -2113,7 +2147,7 @@ function sampleSection(t) {
     rn.textContent = (s.det == null ? 'No clear pitch found, so the keys count from C4.' : 'Detected ' + midiName(s.det) + centsTxt(s.det) + '.')
       + (s.adj ? ' Moved by hand; double-tap to undo.' : ' The keys play in tune from it.');
   };
-  s.onProc = () => { showRoot(); trim.draw(); };
+  s.onProc = () => { showRoot(); trim.draw(); const w = $('.envw', $('#epane')); if (w) w.draw(); };
   const setAdj = v => { s.adj = clamp(v, -24, 24); showRoot(); drawHead(t); for (const k of t.takes) k.final = false; if (padT === t) drawPads(); markDirty(); };
   const rp = pill(ro, () => setAdj(s.adj - 1), () => setAdj(s.adj + 1)); rp.classList.add('sm');
   dbl(ro, () => setAdj(0));
@@ -2130,7 +2164,9 @@ function sampleSection(t) {
   const gs = el('div', 'seg');
   seg(gs, [[false, 'Full'], [true, 'Held']], () => !!t.sGate, v => { t.sGate = v; for (const k of t.takes) k.final = false; markDirty(); }, false);
   return [card(trim, acts),
-    card(crow('Root', rp), rn, ...pitchRows(t)),
+    el('h3', '', 'Envelope'), card(envWidget(t),
+      sliderRow('Punch', 0, 1, 0.01, envOf(t).p, 0, v => v ? '+' + (20 * Math.log10(1 + 2 * v)).toFixed(1) + ' dB' : 'off', v => { s.env = Object.assign(envOf(t), { p: v }); envChanged(t); const w = $('.envw', $('#epane')); if (w) w.draw(); })),
+    el('h3', '', 'Pitch'), card(crow('Root', rp), rn, ...pitchRows(t)),
     ...fold('tune', 'Autotune', () => [tuneCard(t)]),
     card(crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false)),
       crow('Notes', gs), el('p', 'cnote', 'Full plays the whole sample on every note; Held stops it when you let go.'))];
@@ -2138,6 +2174,81 @@ function sampleSection(t) {
 function sampleEdited(t, redetect, wait) {
   const s = t.sample; clearTimeout(s.eT);
   s.eT = setTimeout(() => { if (t.sample !== s) return; if (redetect) s.det = detectRoot(s.raw.subarray(s.a, s.b)); prepSample(t); markDirty(); }, wait == null ? 150 : wait);
+}
+/* The envelope over the sample, drawn like the graphical EQ: A sets the attack, D the decay (sideways) and the
+   sustain level (up and down), R in the box on the right the release of a Held note. Double-tap a handle to
+   reset it. The faint waveform is the sample as it is, the bright one with the envelope. */
+function envWidget(t) {
+  const s = t.sample, wrap = el('div', 'eqw envw'), cv = el('canvas', 'eqc envc'), out = el('output');
+  cv.setAttribute('aria-label', 'Envelope: drag the handles');
+  wrap.append(cv, out);
+  let W = 0, H = 0, act = null, lastTap = 0, lastH = null;
+  const PAD = 12, RMAX = 2000, TOP = 1.33;
+  const dur = () => s.proc0 ? s.proc0.length / sr * 1000 : 1000;
+  const xr0 = () => W * 0.76, xs = ms => PAD + ms / dur() * (xr0() - 2 * PAD), msx = x => (x - PAD) / (xr0() - 2 * PAD) * dur();
+  const xrel = ms => xr0() + PAD + ms / RMAX * (W - xr0() - 2 * PAD), relx = x => (x - xr0() - PAD) / (W - xr0() - 2 * PAD) * RMAX;
+  const ly = L => H - PAD - Math.min(L, TOP) / TOP * (H - 2 * PAD), yl = y => (H - PAD - y) / (H - 2 * PAD) * TOP;
+  const handles = e => ({ A: [xs(e.a), ly(1)], D: [xs(e.a + e.d), ly(e.s)], R: [xrel(e.r), ly(0)] });
+  const fmt = v => v >= 1000 ? (v / 1000).toFixed(2) + ' s' : Math.round(v) + ' ms';
+  const label = () => { const e = envOf(t); out.textContent = 'Attack ' + fmt(e.a) + ', decay ' + fmt(e.d) + ', sustain ' + Math.round(e.s * 100) + ' %, release ' + fmt(e.r); };
+  function draw() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3); W = cv.clientWidth; H = cv.clientHeight; if (!W) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const e = envOf(t), y = s.proc0, x0 = PAD, x1 = xr0() - PAD, base = ly(0);
+    g.strokeStyle = 'rgba(160,168,192,.25)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(0, Math.round(ly(1)) + 0.5); g.lineTo(xr0(), Math.round(ly(1)) + 0.5); g.stroke();
+    g.setLineDash([4, 4]); g.beginPath(); g.moveTo(Math.round(xr0()) + 0.5, 4); g.lineTo(Math.round(xr0()) + 0.5, H - 4); g.stroke(); g.setLineDash([]);
+    g.fillStyle = 'rgba(160,168,192,.6)'; g.font = '11px ' + getComputedStyle(document.body).fontFamily; g.fillText('release', xr0() + 6, 14);
+    if (y) {                                          // the waveform as a level, from the bottom up: faint as recorded, bright with the envelope
+      let top = 1e-4; const n = Math.max(1, Math.floor(x1 - x0)), pk = new Float32Array(n);
+      for (let x = 0; x < n; x++) { const a = Math.floor(x / n * y.length), b = Math.max(a + 1, Math.floor((x + 1) / n * y.length)); let m = 0; for (let i = a; i < b; i++) { const v = Math.abs(y[i]); if (v > m) m = v; } pk[x] = m; if (m > top) top = m; }
+      for (let x = 0; x < n; x++) {
+        const v = pk[x] / top, i = Math.floor((x + 0.5) / n * y.length), h1 = v * (base - ly(1)), h2 = Math.min(base - PAD + 6, v * envGain(e, i) * (base - ly(1)));
+        g.fillStyle = 'rgba(236,229,208,.14)'; g.fillRect(x0 + x, base - h1, 1, h1);
+        g.fillStyle = 'rgba(236,229,208,.55)'; g.fillRect(x0 + x, base - h2, 1, h2);
+      }
+    }
+    g.beginPath();                                    // the envelope line
+    const steps = 160, T = dur();
+    for (let k = 0; k <= steps; k++) { const ms = k / steps * T, xx = xs(ms), yy = ly(envGain(e, Math.round(ms / 1000 * sr))); k ? g.lineTo(xx, yy) : g.moveTo(xx, yy); }
+    g.strokeStyle = '#ffb224'; g.lineWidth = 2; g.stroke();
+    g.beginPath(); g.moveTo(xr0() + PAD, ly(e.s));      // release: from the sustain level down to silence
+    for (let k = 1; k <= 40; k++) { const ms = k / 40 * e.r; g.lineTo(xrel(ms), ly(e.s * (1 - k / 40))); }
+    g.stroke();
+    const hs = handles(e);
+    for (const k of ['A', 'D', 'R']) {
+      const [hx, hy] = hs[k];
+      g.beginPath(); g.arc(hx, hy, 11, 0, Math.PI * 2); g.fillStyle = k === act ? '#ffb224' : '#ece5d0'; g.fill();
+      g.fillStyle = '#1b1f2e'; g.font = '700 11px ' + getComputedStyle(document.body).fontFamily; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(k, hx, hy + 0.5); g.textAlign = 'start'; g.textBaseline = 'alphabetic';
+    }
+    label();
+  }
+  const pos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const set = o => { s.env = Object.assign(envOf(t), o); envChanged(t); draw(); };
+  cv.addEventListener('pointerdown', e => {
+    const [x, y] = pos(e), hs = handles(envOf(t)); let best = null, bd = 34;
+    for (const k in hs) { const d = Math.hypot(hs[k][0] - x, hs[k][1] - y); if (d < bd) { bd = d; best = k; } }
+    if (!best) best = x > xr0() ? 'R' : Math.abs(x - hs.A[0]) < Math.abs(x - hs.D[0]) ? 'A' : 'D';
+    const now = performance.now();
+    if (best === lastH && now - lastTap < 320) {         // double-tap: this handle back to its default
+      lastTap = 0; set(best === 'A' ? { a: ENV_DEF.a } : best === 'D' ? { d: ENV_DEF.d, s: ENV_DEF.s } : { r: ENV_DEF.r }); return;
+    }
+    lastTap = now; lastH = best; act = best; try { cv.setPointerCapture(e.pointerId); } catch (er) {} draw();
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!act) return;
+    const [x, y] = pos(e), en = envOf(t), T = dur();
+    if (act === 'A') { const a = Math.round(clamp(msx(x), 0, Math.min(RMAX, T))); set({ a, d: Math.min(en.d, Math.max(0, T - a)) }); }
+    else if (act === 'D') set({ d: Math.round(clamp(msx(x) - en.a, 0, Math.max(0, T - en.a))), s: Math.round(clamp(yl(y), 0, 1) * 100) / 100 });
+    else set({ r: Math.round(clamp(relx(x), 5, RMAX)) });
+  });
+  const up = () => { if (!act) return; act = null; draw(); };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  out.textContent = 'Drag A for the attack, D for the decay and sustain, R for the release. Double-tap a handle to reset it.';
+  wrap.draw = draw;
+  return wrap;
 }
 /* The whole recording with the kept part lit; drag either edge, double-tap for auto trim. */
 function trimWidget(t) {
@@ -2168,7 +2279,7 @@ function trimWidget(t) {
     if (now - lastTap < 320) { lastTap = 0; [s.a, s.b] = autoTrim(s.raw); draw(); sampleEdited(t, true, 0); return; }
     lastTap = now;
     act = Math.abs(x - fx(s.a)) <= Math.abs(x - fx(s.b)) ? 'a' : 'b';
-    cv.setPointerCapture(e.pointerId);
+    try { cv.setPointerCapture(e.pointerId); } catch (er) {}
   });
   cv.addEventListener('pointermove', e => {
     if (!act) return;
@@ -2281,7 +2392,7 @@ let sw = null, eatClick = false;
 document.addEventListener('pointerdown', e => {
   sw = null;
   if (e.pointerType === 'mouse' && e.button !== 0) return;
-  if (e.target.closest('input,select,textarea,.eqc,.trimc,.tappad,.kb,.pbig,.etabs')) return;
+  if (e.target.closest('input,select,textarea,.eqc,.envc,.trimc,.tappad,.kb,.pbig,.etabs')) return;
   const up = mode === 'play' && !padT && !!e.target.closest('.hrow,.scenes,.bar,.hintbar');   // swipe up from the bottom: the pads
   const down = !!padT && !!e.target.closest('.pads');                                          // swipe down on the sheet: close it
   sw = { x: e.clientX, y: e.clientY, id: e.pointerId, horiz: false, vert: false, up, down };
@@ -2522,7 +2633,7 @@ async function saveProject() {
       sample: (s => {                                     // the sample's raw recording is stored like a take's
         if (!s) return null;
         keep.add(s.key); if (s.savedTo !== pid) { puts.push([pid + '/' + s.key, s.raw]); s.savedTo = pid; }
-        return { key: s.key, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev };
+        return { key: s.key, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: s.env };
       })(t.sample),
       takes: t.takes.filter(k => k.full && k.started).map(k => {
         if (k.notes) return { key: k.key, lat: k.lat, bars: isFree() ? null : Math.round(k.len / barsLen(1)), notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
@@ -2600,7 +2711,7 @@ async function openProject(id) {
       if (raw) {
         if (!same) raw = resample(raw, ratio);
         const sm = tm.sample, b = Math.min(raw.length, Math.round(sm.b * ratio)), a = clamp(Math.round(sm.a * ratio), 0, Math.max(0, b - 16));
-        t.sample = { key: sm.key, raw, a, b, det: sm.det == null ? null : sm.det, adj: sm.adj || 0, rev: !!sm.rev, proc: null, buf: null, tuned: null, savedTo: same ? id : null, gen: 0 };
+        t.sample = { key: sm.key, raw, a, b, det: sm.det == null ? null : sm.det, adj: sm.adj || 0, rev: !!sm.rev, env: Object.assign({}, ENV_DEF, sm.env), proc: null, proc0: null, buf: null, tuned: null, savedTo: same ? id : null, gen: 0 };
         prepSample(t);
       } else missing++;
     }
@@ -2816,7 +2927,7 @@ drawLenSeg();
 dbl($('#bpmVal'), () => setTempo(() => { st.bpm = 100; }));
 dbl($('#beatsVal'), () => setTempo(() => { st.beats = 4; }));
 dbl($('#barsVal'), () => setTempo(() => { st.bars = 2; }));
-dbl($('#latVal'), () => { prof().ms = 180; save(); ui(); });
+dbl($('#latVal'), () => { prof().ms = LAT_DEF; save(); ui(); });
 for (const b of document.querySelectorAll('#latStep .sbtn')) hold(b, () => { const p = prof(); p.ms = clamp(p.ms + +b.dataset.d, 0, MAXLAT_MS); p.guess = false; save(); ui(); });
 $('#measLoop').addEventListener('click', measure);
 $('#measUse').addEventListener('click', () => { if (!measOut) return; prof().ms = measOut.ms; prof().guess = false; save(); $('#measUse').hidden = true; ui(); toast('New recordings shift by ' + measOut.ms + ' ms.'); });
