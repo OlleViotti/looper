@@ -58,7 +58,7 @@ The top bar is a single row: the bar and beat counter on the left, the Varv logo
 
 ## Sampler
 
-Any empty track can become a sampler. In Edit, tap **Record a sample**, play or sing one sound into the microphone and tap again (or press Record) to stop; it stops by itself after 8 seconds.
+At the top of Edit, each track is set to record from the **Microphone** or to be a **Sampler**; the choice is fixed once the track holds recordings or laps. Switching back to Microphone keeps the sample aside for the session, so switching to Sampler again brings it back. On a sampler, tap **Record a sample**, play or sing one sound into the microphone and tap again (or press Record) to stop; it stops by itself after 8 seconds.
 
 - **Auto trim** cuts the silence before and after the sound as soon as it is recorded: it starts 1.5 ms before the attack and ends where the sound has died away. The trim view shows the whole recording with the kept part lit; drag either edge to trim by hand, double-tap it or tap Auto trim to trim automatically again.
 - **Pitch.** The pitch of the sample is detected when it is recorded, as a note with cents (YIN, as for autotune), so the keys play in tune from it. Sounds without a clear pitch, like most drums, count as C4. The root note can be moved by hand in semitones; double-tap it to go back to the detected one.

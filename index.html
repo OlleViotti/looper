@@ -175,6 +175,7 @@ select.txt{appearance:auto}
 .seg{display:flex;background:var(--desk);border-radius:10px;padding:3px;gap:2px}
 .seg button{flex:1;min-width:38px;height:34px;padding:0 10px;border-radius:8px;font-weight:600;font-size:15px;white-space:nowrap;color:var(--mut)}
 .seg button.on{background:var(--tape);color:#1b1f2e}
+.seg button:disabled{opacity:.35}
 .seg.full{width:100%;margin:4px 0}
 
 /* Graphical EQ */
@@ -431,7 +432,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 10:30</p>
+  <p class="ver">Varv one, build 16 Nov 10:35</p>
 </div></div>
 
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
@@ -486,8 +487,9 @@ const NSCN = 5;
 let scenes = Array(NSCN).fill(null);
 let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, selId = null, mode = 'play';
 const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'major', tSpeed: 20, tAmt: 1,
-  padMode: null, kOct: 2, kBase: null, sGate: false }, EQ_DEF);   // sampler: pad or keys, keyboard rows and lowest octave, notes held or full length
+  sampler: false, padMode: null, kOct: 2, kBase: null, sGate: false }, EQ_DEF);   // sampler: pad or keys, keyboard rows and lowest octave, notes held or full length
 const TRACK_KEYS = Object.keys(TRACK_DEF);
+const isSmp = t => t.sampler || !!t.sample;          // a sampler track, with or without its sample yet
 const allTakes = () => { const a = []; for (const t of tracks) for (const k of t.takes) a.push(k); return a; };
 const anySolo = () => tracks.some(t => t.solo);
 const audible = t => !t.mute && (!anySolo() || t.solo);
@@ -763,7 +765,7 @@ const heardPos = () => nowF() - latN(prof().ms) - epoch;
 const armedTrack = () => tracks.find(t => t.id === armedId);
 /* With the pad screen open, Record and Capture last go to the sampler on it. Otherwise the auto-fill skips
    sampler tracks: they take what is played on the screen, not the microphone. */
-const targetTrack = () => armedTrack() || (padT && padT.sample && tracks.includes(padT) ? padT : null) || tracks.find(t => !t.takes.length && !t.sample);
+const targetTrack = () => armedTrack() || (padT && padT.sample && tracks.includes(padT) ? padT : null) || tracks.find(t => !t.takes.length && !isSmp(t));
 const targetName = () => { const t = targetTrack(); return t ? t.name : 'a new track'; };
 
 /* A planned recording: target track (null = a new one), its loop length, and which pass of that length to record.
@@ -1290,7 +1292,7 @@ function prepSample(t) {
 function setSample(t, raw) {
   const [a, b] = autoTrim(raw);
   t.sample = { key: rid(), raw, a, b, det: detectRoot(raw.subarray(a, b)), adj: 0, rev: false, proc: null, buf: null, tuned: null, savedTo: null, gen: 0 };
-  t.auto = false; t.padMode = null;
+  t.auto = false; t.sampler = true; t.padMode = null;
   prepSample(t); drawHead(t); ensureProject(); markDirty();
 }
 /* Notes are resampled from the processed sample (cubic interpolation), so a key plays the sample faster
@@ -1584,6 +1586,7 @@ const recInto = t => rec && rec.tid === t.id;
 async function recordInto(t) {
   touched(t); hintDone('track');
   if (measuring) return;
+  if (isSmp(t) && !t.sample) { toast('Record a sample first: swipe right to Edit.'); return; }
   if (t.sample) {                                   // a sampler: the pad screen opens and the lap records what is played on it
     if (isFree() && !freeL) { toast('Record the first loop with the microphone, then play the sampler.'); return; }
     openPads(t);
@@ -1659,7 +1662,7 @@ function drawHead(t) {
   $('.tname b', t.row).textContent = t.name;
   const queued = (recInto(t) && running && heardPos() < rec.k * rec.len) || (defining && defineInto === t.id);
   const into = recInto(t) && !queued;
-  $('.tname small', t.row).textContent = pend || into || (defining && defineInto === t.id) ? (rec && rec.cont && recInto(t) ? 'auto' : 'recording') : queued ? (rec && rec.cont ? 'auto' : 'next lap') : armedId === t.id ? 'armed' : t.solo ? 'solo' : t.sample ? 'sampler ' + (pitchTxt(t) || (t.sample.det != null || t.sample.adj ? midiName(sRoot(t)) : '')) : !n ? 'empty' : pitchTxt(t) || (n > 1 ? n + ' takes' : '');
+  $('.tname small', t.row).textContent = pend || into || (defining && defineInto === t.id) ? (rec && rec.cont && recInto(t) ? 'auto' : 'recording') : queued ? (rec && rec.cont ? 'auto' : 'next lap') : armedId === t.id ? 'armed' : t.solo ? 'solo' : isSmp(t) ? 'sampler ' + (!t.sample ? '' : pitchTxt(t) || (t.sample.det != null || t.sample.adj ? midiName(sRoot(t)) : '')) : !n ? 'empty' : pitchTxt(t) || (n > 1 ? n + ' takes' : '');
   t.row.classList.toggle('armed', armedId === t.id || queued || into);
   t.row.classList.toggle('solo', t.solo);
   t.row.classList.toggle('muted', t.mute);
@@ -1907,27 +1910,44 @@ function trackPane(t) {
     if (!has) dbl(out, () => setTrackBars(t, st.bars, show));
     else barsNote = el('p', 'cnote', 'Fixed while the track has recordings.');
   }
-  p.append(card(nameRow, barsRow, barsNote),
-    el('h3', '', 'Mix'), card(sliderRow('Volume', 0, 1.5, 0.01, t.vol, 1, pct, ap('vol')), sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan'))),
+  /* Microphone or sampler: fixed once the track holds recordings or laps. */
+  const has = t.takes.length > 0, kind = el('div', 'seg');
+  seg(kind, [['mic', 'Microphone'], ['smp', 'Sampler']], () => isSmp(t) ? 'smp' : 'mic', v => setKind(t, v));
+  for (const b of kind.children) b.disabled = has && !b.classList.contains('on');
+  const kindRow = el('div', 'cr'); kind.classList.add('full'); kindRow.append(kind);
+  p.append(card(nameRow, kindRow, has ? el('p', 'cnote', 'Fixed while the track has ' + (isSmp(t) ? 'laps.' : 'recordings.')) : null, barsRow, barsNote));
+  if (isSmp(t)) p.append(el('h3', '', 'Sample'), t.sample ? sampleCard(t) : emptySampleCard(t));
+  p.append(el('h3', '', 'Mix'), card(sliderRow('Volume', 0, 1.5, 0.01, t.vol, 1, pct, ap('vol')), sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan'))),
     el('h3', '', 'EQ'), card(eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }),
       sliderRow('Filter', -1, 1, 0.01, t.filt, 0, filtTxt, v => { t.filt = v; applyTrack(t); markDirty(); const w = $('.eqw', $('#epane')); if (w) w.draw(); })),
     el('h3', '', 'Sends'), card(sliderRow('Delay', 0, 1, 0.01, t.echo, 0, pct, ap('echo')), sliderRow('Reverb', 0, 1, 0.01, t.rev, 0, pct, ap('rev'))),
     el('h3', '', 'Pitch'), pitchCard(t), el('h3', '', 'Autotune'), tuneCard(t));
   const ks = t.takes.filter(k => k.started);
-  if (t.sample) p.append(el('h3', '', 'Sample'), sampleCard(t));
-  p.append(el('h3', '', t.sample ? 'Laps' : 'Recording'));
+  p.append(el('h3', '', isSmp(t) ? 'Laps' : 'Recording'));
   if (ks.length) {
     const trk = el('div', 'trk'); t.pcv = el('canvas'); trk.append(t.pcv, el('i', 'ph'));
     p.append(card(trk, ...ks.map((k, i) => takeRow(k, ks.length > 1 ? (k.notes ? 'Lap ' : 'Take ') + (i + 1) : 'Latency'))));
-  } else if (t.sample) p.append(card(el('p', 'cnote', 'No laps yet. Hold the track on the play screen, or play on the screen and tap Record, to record what you play.')));
-  else {
-    const sb = el('button', 'cr act' + (srec && srec.tid === t.id ? ' on' : ''));
-    sb.append(el('span', '', srec && srec.tid === t.id ? 'Stop the sample' : 'Record a sample'));
-    sb.firstChild.append(el('small', '', 'Makes the track a sampler you play on the screen, from a pad or a keyboard.'));
-    sb.addEventListener('click', () => sampleRec(t));
-    p.append(card(el('p', 'cnote', 'Empty. Hold the track on the play screen to record into it.'), sb));
-  }
+  } else if (isSmp(t)) p.append(card(el('p', 'cnote', 'No laps yet. Hold the track on the play screen, or play on the screen and tap Record, to record what you play.')));
+  else p.append(card(el('p', 'cnote', 'Empty. Hold the track on the play screen to record into it.')));
   return p;
+}
+/* Switching to the microphone keeps the sample aside, so switching back during the session brings it back. */
+function setKind(t, v) {
+  if (t.takes.length || (v === 'smp') === isSmp(t)) return;
+  if (v === 'smp') { t.sampler = true; if (!t.sample && t.spare) { t.sample = t.spare; t.spare = null; } }
+  else {
+    if (srec && srec.tid === t.id) { srec = null; ui(); }
+    if (t.sample) { t.sample.onProc = null; t.spare = t.sample; t.sample = null; }
+    t.sampler = false; if (padT === t) closePads();
+  }
+  markDirty(); drawHead(t); renderPane();
+}
+function emptySampleCard(t) {
+  const on = srec && srec.tid === t.id, sb = el('button', 'cr act' + (on ? ' on' : ''));
+  sb.append(el('span', '', on ? 'Stop the sample' : 'Record a sample'));
+  sb.firstChild.append(el('small', '', on ? 'Or press Record. Stops by itself after 8 seconds.' : 'Play or sing one sound into the microphone. You then play it on the screen, from a pad or a keyboard.'));
+  sb.addEventListener('click', () => sampleRec(t));
+  return card(sb);
 }
 /* The sample: trim view, root note, reverse, note length and the pad screen. */
 function sampleCard(t) {
@@ -1953,13 +1973,8 @@ function sampleCard(t) {
   const gs = el('div', 'seg');
   seg(gs, [[false, 'Full'], [true, 'Held']], () => !!t.sGate, v => { t.sGate = v; for (const k of t.takes) k.final = false; markDirty(); }, false);
   const open = el('button', 'cr act'); open.append(el('span', '', 'Play on the screen')); open.addEventListener('click', () => openPads(t));
-  let rm = null;
-  if (!t.takes.length) {
-    rm = el('div', 'cr'); const b = el('button', 'tbtn danger'); rm.append(el('span', '', 'Back to a microphone track'), b);
-    twoTap(b, 'Remove', 'Sure?', () => true, () => { s.onProc = null; t.sample = null; markDirty(); drawHead(t); renderPane(); });
-  }
   return card(trim, acts, crow('Root', rp), rn, crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false)),
-    crow('Notes', gs), el('p', 'cnote', 'Full plays the whole sample on every note; Held stops it when you let go.'), open, rm);
+    crow('Notes', gs), el('p', 'cnote', 'Full plays the whole sample on every note; Held stops it when you let go.'), open);
 }
 function sampleEdited(t, redetect, wait) {
   const s = t.sample; clearTimeout(s.eT);
@@ -2018,7 +2033,7 @@ function pitchCard(t) {
   po.classList.add('sm'); ps.classList.add('sm');
   return card(crow('Octave', po), crow('Semitones', ps),
     sliderRow('Fine', -50, 50, 1, t.cent, 0, v => sg(Math.round(v)) + ' cent', v => { v = Math.round(v); if (t.cent !== v) { t.cent = v; pitchChanged(t); } }),
-    el('p', 'cnote', t.sample ? 'Changes the pitch of the sample, not its length. The keys move with it.' : 'Changes the pitch of every recording on the track, not the tempo.'));
+    el('p', 'cnote', isSmp(t) ? 'Changes the pitch of the sample, not its length. The keys move with it.' : 'Changes the pitch of every recording on the track, not the tempo.'));
 }
 /* Autotune: snaps a single voice or instrument to the nearest note of a key and scale. */
 function tuneCard(t) {
