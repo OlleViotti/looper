@@ -478,7 +478,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 16:30</p>
+  <p class="ver">Varv one, build 16 Nov 16:50</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -538,7 +538,8 @@ const NSCN = 5;
 let scenes = Array(NSCN).fill(null);
 let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, selId = null, mode = 'play';
 const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'chrom', tSpeed: 20, tAmt: 1,
-  sampler: false, padMode: null, kOct: null, kBase: null, sGate: false }, EQ_DEF);   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
+  sampler: false, padMode: null, kOct: null, kBase: null, sGate: false,
+  dist: false, dTyp: 'soft', dDrv: 0.5, dTon: 0.7, dMix: 1, dLvl: 1 }, EQ_DEF);   // distortion: on, type, drive, tone, mix, level   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
 const TRACK_KEYS = Object.keys(TRACK_DEF);
 const isSmp = t => t.sampler || !!t.sample;
 const KB_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v10M12 4v10M16 4v10M8 14v6M12 14v6M16 14v6"/></svg>';          // a sampler track, with or without its sample yet
@@ -1207,7 +1208,7 @@ function applyTakes(t, at) {
 }
 function attachTake(k) {
   if (k.tg || !k.buf || !k.track.lp) return;
-  k.tg = gn(k.norm); k.tg.connect(k.track.lp);
+  k.tg = gn(k.norm); k.tg.connect(k.track.inp);
 }
 function detachTake(k) { stopSrc(k); if (k.tg) { try { k.tg.disconnect(); } catch (e) {} k.tg = null; } }
 function afterRender(k, now, end) {
@@ -1476,7 +1477,7 @@ function inRecWindow(t, A) {
 function playVoice(t, n) {
   const s = t.sample; if (!s || !s.buf || !t.lp) return null;
   const src = ctx.createBufferSource(), g = gn(1);
-  src.buffer = s.buf; src.playbackRate.value = noteRatio(t, n); src.connect(g); g.connect(t.lp); src.start();
+  src.buffer = s.buf; src.playbackRate.value = noteRatio(t, n); src.connect(g); g.connect(t.inp); src.start();
   src.onended = () => { try { g.disconnect(); } catch (e) {} };
   return { src, g };
 }
@@ -1681,9 +1682,41 @@ function analyzeTaps(m) {
 }
 
 /* ---------- tracks: audio nodes ---------- */
+/* ---------- distortion ----------
+   A waveshaper (4x oversampled, so the harmonics it makes do not fold back) at the start of the track, before
+   its filter and EQ. Soft rounds the peaks like an overdriven tube, Hard clips them, Fuzz is uneven: the two
+   halves of the wave are bent differently, which adds even harmonics. Drive goes up to +40 dB into the curve;
+   the output is brought back down by how much the curve lifts a quiet signal, so more drive gives more grit
+   rather than more volume. Tone is a lowpass after it, Mix blends in the clean sound, Level sets the output. */
+const DIST_F = {
+  soft: (x, k) => Math.tanh(k * x),
+  hard: (x, k) => clamp(k * x, -1, 1),
+  fuzz: (x, k) => x >= 0 ? Math.tanh(k * x) : 0.7 * Math.tanh(1.6 * k * x)
+};
+const distK = d => Math.pow(10, d * 40 / 20);
+function distCurve(type, d) {
+  const f = DIST_F[type] || DIST_F.soft, k = distK(d), n = 2048, c = new Float32Array(n);
+  for (let i = 0; i < n; i++) c[i] = f(i / (n - 1) * 2 - 1, k);
+  return c;
+}
+const distComp = (type, d) => 0.2 / Math.max(1e-3, Math.abs((DIST_F[type] || DIST_F.soft)(0.2, distK(d))));
+const distHz = v => Math.min(OPEN_LP, 800 * Math.pow(15, v));
+function applyDist(t) {
+  if (!t.inp) return;
+  const on = !!t.dist, tm = ctx.currentTime;
+  if (on && !t.dOn) { t.inp.connect(t.dSh); t.dOn = true; }              // the shaper only runs while it is on
+  else if (!on && t.dOn) { try { t.inp.disconnect(t.dSh); } catch (e) {} t.dOn = false; }
+  const key = t.dTyp + ':' + t.dDrv.toFixed(3);
+  if (on && t.dKey !== key) { t.dSh.curve = distCurve(t.dTyp, t.dDrv); t.dKey = key; }
+  t.dDryG.gain.setTargetAtTime(on ? 1 - t.dMix : 1, tm, 0.01);
+  t.dWetG.gain.setTargetAtTime(on ? t.dMix * t.dLvl * distComp(t.dTyp, t.dDrv) : 0, tm, 0.01);
+  t.dLp.frequency.setTargetAtTime(distHz(t.dTon), tm, 0.02);
+}
 function buildTrackNodes(t) {
   if (!ctx || t.lp) return;
   t.lp = bq('lowpass', OPEN_LP); t.hp = bq('highpass', 10); t.eq = mkEq(); t.g = gn(0);
+  t.inp = gn(1); t.dDryG = gn(1); t.dWetG = gn(0); t.dSh = ctx.createWaveShaper(); t.dSh.oversample = '4x'; t.dLp = bq('lowpass', 8000); t.dLp.Q.value = 0.5; t.dOn = false; t.dKey = '';
+  t.inp.connect(t.dDryG); t.dDryG.connect(t.lp); t.dSh.connect(t.dLp); t.dLp.connect(t.dWetG); t.dWetG.connect(t.lp);   // in → clean + distorted → filter
   t.pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null; t.es = gn(0); t.rs = gn(0);
   t.lp.connect(t.hp); t.hp.connect(t.eq[0]); t.eq[2].connect(t.g);
   const out = t.pn || t.g; if (t.pn) t.g.connect(t.pn);
@@ -1695,8 +1728,8 @@ function buildTrackNodes(t) {
 function dropTrackNodes(t) {
   for (const k of t.takes) detachTake(k);
   if (!t.lp) return;
-  for (const n of [t.lp, t.hp, t.eq[0], t.eq[1], t.eq[2], t.g, t.pn, t.es, t.rs]) { if (n) try { n.disconnect(); } catch (e) {} }
-  t.lp = t.g = t.pn = t.an = null;
+  for (const n of [t.inp, t.dDryG, t.dWetG, t.dSh, t.dLp, t.lp, t.hp, t.eq[0], t.eq[1], t.eq[2], t.g, t.pn, t.es, t.rs]) { if (n) try { n.disconnect(); } catch (e) {} }
+  t.lp = t.g = t.pn = t.an = t.inp = null; t.dOn = false; t.dKey = '';
 }
 /* `at` is an audio-clock time for the gain change, so mute and solo can land on the beat or bar. */
 function applyTrack(t, at) {
@@ -1707,6 +1740,7 @@ function applyTrack(t, at) {
   setFilter(t.lp, t.hp, t.filt); setEq(t.eq, t);
   t.es.gain.setTargetAtTime(t.echo * 0.8, tm, 0.01);
   t.rs.gain.setTargetAtTime(t.rev, tm, 0.01);
+  applyDist(t);
 }
 function switchAt() {
   if (!ctx || !running || st.muteQ === 'now') return 0;
@@ -2135,6 +2169,17 @@ function trackPane(t) {
     p.append(card(trk, ...ks.map((k, i) => takeRow(k, ks.length > 1 ? (k.notes ? 'Lap ' : 'Take ') + (i + 1) : 'Latency'))));
   } else if (isSmp(t)) p.append(card(el('p', 'cnote', t.sample ? 'No laps yet. Swipe up for the pads and tap Rec lap, or hold the track on the play screen.' : 'Record a sample first.')));
   else p.append(card(el('p', 'cnote', 'Empty. Hold the track on the play screen to record into it.')));
+  p.append(...fold('dist', 'Distortion' + (t.dist ? ' · on' : ''), () => {
+    const ad = k => v => { t[k] = v; applyDist(t); markDirty(); };
+    const ty = el('div', 'seg full'), tr = el('div', 'cr');
+    seg(ty, [['soft', 'Soft'], ['hard', 'Hard'], ['fuzz', 'Fuzz']], () => t.dTyp, ad('dTyp'), 'soft'); tr.append(ty);
+    return [card(crow('On', swtch(el('div'), () => t.dist, v => { t.dist = v; applyDist(t); markDirty(); renderPane(); }, false)), tr,
+      sliderRow('Drive', 0, 1, 0.01, t.dDrv, 0.5, v => '+' + Math.round(v * 40) + ' dB', ad('dDrv')),
+      sliderRow('Tone', 0, 1, 0.01, t.dTon, 0.7, v => hz(distHz(v)), ad('dTon')),
+      sliderRow('Mix', 0, 1, 0.01, t.dMix, 1, pct, ad('dMix')),
+      sliderRow('Level', 0, 1.5, 0.01, t.dLvl, 1, pct, ad('dLvl')),
+      el('p', 'cnote', 'Soft rounds the peaks like an overdriven tube, Hard clips them, Fuzz is rougher and uneven. Drive sets how hard it is pushed; the level is evened out, so more drive gives more grit rather than more volume. Tone darkens the result, Mix blends in the clean sound. It comes before the EQ, so the EQ can shape it.'))];
+  }));
   p.append(...fold('eq', 'EQ and pan', () => [card(eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }), sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan')))]));
   if (!isSmp(t)) p.append(...fold('pitch', 'Pitch', () => [pitchCard(t)]), ...fold('tune', 'Autotune', () => [tuneCard(t)]));
   p.append(...fold('track', 'Track', () => {
@@ -3057,7 +3102,7 @@ if (window.ResizeObserver) new ResizeObserver(() => { for (const t of tracks) dr
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* for debugging and tests */
-window.__varv = { st, analyzeLoop, get ctx() { return ctx; }, get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
+window.__varv = { st, analyzeLoop, get ctx() { return ctx; }, applyTrackFor: t => applyTrack(t), get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
   ringPeak: sec => { let pk = 0; for (let f = Math.max(availStart(), capEnd - Math.round(sec * sr)); f < capEnd; f++) pk = Math.max(pk, Math.abs(ring[f % R])); return pk; },
   arm: i => toggleArm(tracks[i]),
   get scenes() { return scenes; }, get perf() { return perf; }, togglePerf, get inG() { return inG; },
