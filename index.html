@@ -63,8 +63,8 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 #main{position:relative;flex:1;min-height:0;display:flex;overflow:hidden}
 .tape{flex:1;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;padding:10px 16px 16px;--ph:0;display:flex;flex-direction:column}
 .tape>*{flex:none}
-#lanes{display:flex;flex-direction:column}
-#lanes .track{height:52px}
+#lanes{flex:1 1 auto;display:flex;flex-direction:column;min-height:min-content}
+#lanes .track{flex:1 1 0;min-height:52px;max-height:200px}
 .row{display:grid;grid-template-columns:var(--nw) 1fr;column-gap:8px;margin-bottom:8px}
 .trk{position:relative;overflow:hidden}
 .trk canvas{display:block;width:100%;height:100%}
@@ -107,19 +107,16 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 .track.silent .tname b{opacity:.45}
 [data-mode=edit] .track.sel .tname,[data-mode=edit] .masterrow.sel .tname{box-shadow:inset 0 0 0 2px var(--amber)}
 [data-mode=edit] .track.sel.armed .tname{box-shadow:inset 5px 0 0 var(--rec),inset 0 0 0 2px var(--amber)}
-/* the row is the touch target; the recording shows as a thin strip of tape through its middle */
-.track .trk{height:52px;cursor:pointer}
-.track .trk canvas{position:absolute;left:0;top:50%;height:20px;margin-top:-10px;background:var(--tape);border-radius:2px;
+.track .trk{min-height:52px;background:var(--tape);border-radius:2px;cursor:pointer;
   clip-path:polygon(0 0,100% 0,calc(100% - 3px) 22%,100% 48%,calc(100% - 2px) 76%,100% 100%,0 100%,3px 72%,0 46%,2px 20%)}
-.track .trk .ph{top:12px;bottom:12px}
 .track .tname .kbi{display:none;position:absolute;right:2px;top:2px;width:30px;height:30px;place-items:center;color:var(--amber)}
 .track .tname .kbi svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
 .track.smp .tname .kbi{display:grid}
 .track.smp .tname{padding-right:30px}
 .track.silent .trk canvas{opacity:.25}
-.track .trk em{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:700 12px/1 var(--ui);font-style:normal;color:#1b1f2e;display:none;pointer-events:none}
+.track .trk em{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:700 13px/1 var(--ui);font-style:normal;color:#1b1f2e;display:none;pointer-events:none}
 .track.muted .trk em{display:block}
-.track.armed .trk::after{content:'';position:absolute;left:-3px;right:-3px;top:13px;bottom:13px;box-shadow:inset 0 0 0 3px var(--rec);border-radius:3px;pointer-events:none}
+.track.armed .trk::after{content:'';position:absolute;inset:0;box-shadow:inset 0 0 0 3px var(--rec);pointer-events:none}
 .trk .lp{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,61,87,.35);pointer-events:none}
 .trk.pressing .lp{width:100%;transition:width .45s linear}
 .addtrk{height:48px;border:1px dashed var(--line);border-radius:8px;color:var(--mut);font-weight:600}
@@ -476,7 +473,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 12:00</p>
+  <p class="ver">Varv one, build 16 Nov 12:40</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -823,6 +820,13 @@ function plan(from) {
 const inTail = p => recTail && p >= recTail.start && p < recTail.end;
 const taken = r => { const t = tracks.find(x => x.id === r.tid); return t && t.takes.some(x => x.run === runId && x.k === r.k && x.len === r.len); };
 
+/* Continuous recording: Finish makes the lap in progress the last one, and Keep going takes that back.
+   Just after a lap has been taken the next one is already planned; Finish then means the lap just taken
+   was the last, so nothing more is recorded. */
+function finishRec(p) {
+  if (p < rec.k * rec.len && inTail(p)) { rec = null; toast('Recording finished.'); return; }
+  rec.last = !rec.last;
+}
 async function toggleRec() {
   if (srec) { stopSampleRec(); return; }
   if (measuring) return;
@@ -837,7 +841,7 @@ async function toggleRec() {
   const p = heardPos();
   if (rec) {
     if (p < rec.k * rec.len && !inTail(p)) rec = null;                     // was waiting: cancel
-    else if (rec.cont) rec.last = !rec.last;                              // continuous: last lap, or carry on
+    else if (rec.cont) finishRec(p);                                      // continuous: Finish, or Keep going
     else { rec = null; toast('Recording cancelled.'); }                   // a one-lap recording from a hold: cancel
     ui(); return;
   }
@@ -1448,7 +1452,7 @@ function drawPadRec() {
   const b = $('#recLap'); if (!b || !padT) return;
   const t = padT, mine = !!rec && rec.tid === t.id, wait = mine && (!running || (heardPos() < rec.k * rec.len && !inTail(heardPos())));
   b.className = 'reclap' + (mine ? (wait ? ' wait' : ' on') : '');
-  b.textContent = !mine ? 'Rec lap' : wait ? 'Next lap · cancel' : rec.cont ? (rec.last ? 'Last lap' : 'Recording · end') : 'Recording';
+  b.textContent = !mine ? 'Rec lap' : wait ? 'Next lap · cancel' : rec.cont ? (rec.last ? 'Keep going' : 'Finish') : 'Recording · cancel';
   b.disabled = !t.sample;
 }
 const kBaseOf = t => t.kBase != null ? t.kBase : clamp(Math.floor(Math.round(sRoot(t)) / 12) - 1 - ((t.kOct - 1) >> 1), 0, 7);
@@ -1702,7 +1706,7 @@ async function recordInto(t) {
   const p = heardPos();
   if (recInto(t)) {
     if (!rec.cont || (p < rec.k * rec.len && !inTail(p))) { rec = null; toast('Recording into ' + t.name + ' cancelled.'); }
-    else rec.last = !rec.last;
+    else finishRec(p);
     ui(); return;
   }
   if (rec && !(p < rec.k * rec.len && !inTail(p))) { toast('Wait for the recording into ' + (tracks.find(x => x.id === rec.tid) || {}).name + ' to finish.'); return; }
@@ -2645,7 +2649,7 @@ function exportWav() {
 function stateText(s) {
   const cur = rec && rec.tid != null && rec.stay ? tracks.find(t => t.id === rec.tid) : null, to = cur ? cur.name : targetName();
   return { stop: 'Stopped', count: 'Counting in', countrec: 'Count-in, then into ' + to, armed: 'Next lap into ' + to,
-    rec: 'Recording into ' + to, reclast: 'Last lap into ' + to, play: 'Playing', meas: 'Measuring latency', define: 'Recording the loop', sample: 'Recording a sample' }[s];
+    rec: 'Recording into ' + to, reclast: 'Finishing: last lap into ' + to, play: 'Playing', meas: 'Measuring latency', define: 'Recording the loop', sample: 'Recording a sample' }[s];
 }
 const locked = () => allTakes().length > 0 || trash.some(it => it.take || it.track.takes.length);
 function ui() {
@@ -2655,7 +2659,7 @@ function ui() {
   $('#tape').classList.toggle('run', running); $('#epane').classList.toggle('run', running); $('#pads').classList.toggle('run', running);
   $('#playLbl').textContent = running ? 'Stop' : 'Start';
   $('#playIco').innerHTML = running ? '<path d="M6 6h12v12H6z"/>' : '<path d="M7 4l13 8-13 8z"/>';
-  $('#recLbl').textContent = s === 'sample' ? 'Stop' : s === 'define' ? 'End loop' : s === 'armed' || s === 'countrec' ? 'Cancel' : s === 'rec' && rec && rec.cont ? 'Last lap' : s === 'reclast' ? 'Continue' : s === 'rec' && rec ? 'Cancel' : 'Record';
+  $('#recLbl').textContent = s === 'sample' ? 'Stop' : s === 'define' ? 'End loop' : s === 'armed' || s === 'countrec' ? 'Cancel' : s === 'rec' && rec && rec.cont ? 'Finish' : s === 'reclast' ? 'Keep going' : s === 'rec' && rec ? 'Cancel' : 'Record';
   drawHeads();
   const h = st.hints, played = allTakes().some(k => k.started), filled = tracks.filter(t => t.takes.some(k => k.started)).length;
   $('#empty').hidden = played || !!h.start;                 // guide lines, each gone for good once used
