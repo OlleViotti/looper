@@ -478,7 +478,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 16:10</p>
+  <p class="ver">Varv one, build 16 Nov 16:30</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -504,7 +504,7 @@ const EQ_DEF = { eqL: 0, eqM: 0, eqH: 0, eqLf: 200, eqMf: 1000, eqHf: 4000 };
 const FX_KEYS = ['master', 'gFilter', 'eqL', 'eqM', 'eqH', 'eqLf', 'eqMf', 'eqHf', 'gEcho', 'echoDiv', 'echoMs', 'echoFb', 'echoLvl', 'gRev', 'revSize', 'revLvl', 'compThr', 'compAmt'];
 const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
 const st = Object.assign({
-  v: 3, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, overdub: true, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'bar',
+  v: 4, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, overdub: true, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'bar',
   profiles: [{ name: 'AirPods', ms: 185, guess: true }, { name: 'Wired or speaker', ms: 20, guess: true }],
   active: 0, micId: 'builtin', master: 0.9, gFilter: 0,
   gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1,
@@ -514,13 +514,12 @@ if (!Array.isArray(st.profiles) || !st.profiles.length) st.profiles = [{ name: '
 st.active = clamp(st.active | 0, 0, st.profiles.length - 1);
 if ((saved.v || 0) < 2) { st.v = 2; st.muteQ = 'bar'; if (!saved.micId) st.micId = 'builtin'; }   // new defaults: next bar, the iPhone microphone
 /* Screen latency (for the sampler): from a touch on the screen to where it lands on the beat you hear.
-   Defaults: 185 ms for the headphones and 100 ms for the screen. Settings saved before these defaults keep
-   what was measured or set by hand; the old guesses (180 ms, and the headphones plus 70 ms) move to them. */
-const LAT_DEF = 185, SCR_DEF = 100, scrGuess = () => SCR_DEF;
-if ((saved.v || 0) < 3) {
-  st.v = 3;
-  for (const p of st.profiles) { if (p.scr === p.ms + 70) delete p.scr; if (p.guess && p.ms === 180) p.ms = LAT_DEF; }
-}
+   Measured on the audio clock it includes the headphone delay, so until it is measured it is guessed as the
+   headphone latency plus 60 ms for the touch. The headphones default to 185 ms. Screen latencies saved before
+   the touch timing moved to this clock (settings version below 4) were measured another way and are reset. */
+const LAT_DEF = 185, TOUCH_MS = 60, scrGuess = p => p.ms + TOUCH_MS;
+if ((saved.v || 0) < 3) for (const p of st.profiles) if (p.guess && p.ms === 180) p.ms = LAT_DEF;
+if ((saved.v || 0) < 4) { st.v = 4; for (const p of st.profiles) delete p.scr; }
 for (const p of st.profiles) if (p.scr == null) p.scr = scrGuess(p);
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
 const prof = () => st.profiles[st.active];
@@ -1276,24 +1275,19 @@ let evLog = [], pruneAt = 0, srec = null, padT = null;
 const midiName = m => { const r = Math.round(m); return KEYS[((r % 12) + 12) % 12] + (Math.floor(r / 12) - 1); };
 const centsTxt = m => { const c = Math.round((m - Math.round(m)) * 100); return c ? (c > 0 ? ' +' : ' −') + Math.abs(c) + ' ct' : ''; };
 /* A touch is placed on the audio clock from the event's own time stamp, through the offset between the page's
-   clock and the audio clock. A single reading of that offset is only as fresh as the last audio buffer, so it
-   jitters by up to a buffer (5 to 20 ms on a phone); the offset used is the median of the last second of
-   readings, taken every 25 ms, which is steady. A fixed offset left in this mapping is part of the screen
-   latency measured by tapping, the same way, so it cancels out. */
-let clk = [], clkSrc = null, clkOff = null;
+   clock (performance.now) and the audio clock (currentTime). currentTime only moves once per audio buffer, so a
+   reading is never ahead of the true offset, only behind it by up to a buffer: the largest reading of the last
+   second is the freshest and is the one used. Only these two clocks are used, the same way everywhere, so the
+   offset does not depend on what a browser reports about its output latency (getOutputTimestamp is not used:
+   on a phone with Bluetooth its offset is not known to stay put). A fixed offset left in this mapping is part
+   of the screen latency measured by tapping, the same way, so it cancels out. */
+let clk = [], clkOff = null;
 function clockSample() {
-  if (!ctx) return;
-  let c = null, p = null;
-  if (clkSrc !== 'ct' && ctx.getOutputTimestamp) {
-    const o = ctx.getOutputTimestamp();
-    if (o && o.performanceTime > 0 && o.contextTime > 0) { c = o.contextTime; p = o.performanceTime; clkSrc = 'ots'; }
-    else if (clkSrc === 'ots') return;                    // keep to one source: skip a reading that is not ready
-  }
-  if (c == null) { if (clkSrc == null && performance.now() - (ctx.t0 || (ctx.t0 = performance.now())) < 1000) return; clkSrc = 'ct'; c = ctx.currentTime; p = performance.now(); }
-  const off = c - p / 1000;
+  if (!ctx || ctx.state !== 'running') return;
+  const off = ctx.currentTime - performance.now() / 1000;
   if (clkOff != null && Math.abs(off - clkOff) > 0.25) clk = [];   // the audio clock jumped (the audio was interrupted): start again
   clk.push(off); if (clk.length > 41) clk.shift();
-  clkOff = med(clk);
+  clkOff = Math.max(...clk);
 }
 function evFrame(e) {
   const pn = performance.now(); let ts = e && e.timeStamp;
@@ -1638,7 +1632,7 @@ async function measureTap() {
   const ok = await initAudio(); if (!ok) return;
   measuring = true; ui();
   /* A count-in of four higher clicks, counted down on the pad, then the sixteen clicks that are measured. */
-  const N = 16, CI = 4, iv = Math.round(0.6 * sr), n = Math.round(0.04 * sr);
+  const N = 16, CI = 4, iv = Math.round(0.75 * sr), n = Math.round(0.04 * sr);
   const mk = f => { const b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.sin(2 * Math.PI * f * i / sr) * Math.exp(-i / (0.006 * sr)); return b; };
   const bc = mk(1760), b = mk(1320);
   const t0 = nowF() + Math.round(0.8 * sr) + CI * iv, g = gn(Math.max(st.clickVol, 0.6)); g.connect(clickComp);   // same path as the click
@@ -1663,7 +1657,7 @@ async function measureTap() {
   const res = $('#tapRes'); res.hidden = false;
   if (!tapOut) res.textContent = 'Too few taps on the clicks. Try again, tapping on every click.';
   else {
-    res.textContent = tapOut.ms + ' ms. Your taps scattered ±' + Math.round(tapOut.spread) + ' ms; the value is good to about ±' + Math.max(1, Math.round(2 * tapOut.se)) + ' ms' + (tapOut.spread > 25 ? '. Uneven, measure again.' : '.');
+    res.textContent = tapOut.ms + ' ms. Your taps scattered ±' + Math.round(tapOut.spread) + ' ms (from ' + Math.round(tapOut.lo) + ' to ' + Math.round(tapOut.hi) + '), so the value is good to about ±' + Math.max(1, Math.round(2 * tapOut.se)) + ' ms' + (tapOut.spread > 25 ? '. Uneven, measure again.' : '.');
     const u = $('#tapUse'); u.hidden = false; u.textContent = 'Use ' + tapOut.ms + ' ms';
   }
   ui();
@@ -1683,7 +1677,7 @@ function analyzeTaps(m) {
   /* Taps far from the rest (more than three times the typical scatter) are dropped, and the rest averaged. */
   const m0 = med(offs), sp = Math.max(2, 1.4826 * med(offs.map(x => Math.abs(x - m0)))), keep = offs.filter(x => Math.abs(x - m0) <= 3 * sp);
   const ms = keep.reduce((a, x) => a + x, 0) / keep.length;
-  return { ms: clamp(Math.round(ms), 0, MAXLAT_MS), exact: ms, spread: med(keep.map(x => Math.abs(x - ms))), n: keep.length, se: sp / Math.sqrt(keep.length) };
+  return { ms: clamp(Math.round(ms), 0, MAXLAT_MS), exact: ms, spread: med(keep.map(x => Math.abs(x - ms))), n: keep.length, se: sp / Math.sqrt(keep.length), lo: Math.min(...keep), hi: Math.max(...keep) };
 }
 
 /* ---------- tracks: audio nodes ---------- */
