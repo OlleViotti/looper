@@ -220,6 +220,7 @@ body[data-pads] #backT{display:block}
 .epane .etabs{margin:0 -12px 0 -14px;padding-left:14px;padding-right:12px}
 .epane h3{font-size:15px;font-weight:600;color:var(--mut);margin:14px 0 2px}
 .epane .trk{height:32px;background:var(--wave);border-radius:8px;margin:6px 0 2px}
+.epane .card.wl .srow{grid-template-columns:92px 1fr 52px}
 .srow{display:grid;grid-template-columns:58px 1fr 56px;align-items:center;gap:8px;min-height:44px}
 .srow span{color:var(--mut);font-size:15px}
 .srow output{text-align:right;font-variant-numeric:tabular-nums;font-size:15px}
@@ -549,7 +550,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 00:20</p>
+  <p class="ver">Varv one, build 18 Nov 01:10</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -640,7 +641,8 @@ const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute
   sampler: false, padMode: null, kOct: null, kBase: null, sGate: false,
   dist: false, dTyp: 'soft', dDrv: 0.5, dTon: 0.7, dMix: 1, dLvl: 1,
   speed: 1, tstop: false, trem: 0, tDep: 1, tShape: 'smooth', lofi: 0, ring: 0, rFreq: 0.5, gran: 0, gSize: 0.4, gScat: 0.3,
-  xyMap: XY_DEF, xyHold: false }, EQ_DEF);   // sound tricks: speed (0.5, 1, 2), tape stop, tremolo (notes per beat, depth, gate), lo-fi   // distortion: on, type, drive, tone, mix, level   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
+  xyMap: XY_DEF, xyHold: false,
+  ebrk: 0, rbrk: 0, frz: 0, phone: 0, radio: 0, isoL: 0, isoM: 0, isoH: 0, slice: 0, sPos: 0, sLen: 0.5, rdly: 0, ping: 0, pDiv: 0.5 }, EQ_DEF);   // live tricks   // sound tricks: speed (0.5, 1, 2), tape stop, tremolo (notes per beat, depth, gate), lo-fi   // distortion: on, type, drive, tone, mix, level   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
 const TRACK_KEYS = Object.keys(TRACK_DEF);
 const isSmp = t => !!t.sample;                       // a sampler when it holds a sample, a microphone track when it holds recordings
 const OD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="14" r="6.5"/><path d="M19 2.5v8M15 6.5h8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
@@ -929,10 +931,11 @@ async function start(countIn) {
   }
   running = true; runId++; rec = null; recTail = null; livePass = null;
   for (const k of allTakes()) if (k.buf && k.tg) startSource(k, epoch);
+  for (const t of tracks) if (liveAmt(t, 'slice') > 0) applyTrack(t);   // a slice that is on starts with the loop
   wake(true); ui(); return true;
 }
 
-function stopSrc(k) { if (k.src) { try { k.src.stop(); } catch (e) {} k.src = null; } }
+function stopSrc(k) { for (const n of ['src', 'ssrc', 'rsrc']) if (k[n]) { try { k[n].stop(); } catch (e) {} k[n] = null; } }
 function stop() {
   if (defining) { defining = null; defineInto = null; wake(false); toast('Loop cancelled.'); ui(); return; }
   if (!running) return;
@@ -950,6 +953,7 @@ function startSource(k, at) {
   s.start(at / sr, (((at - epoch) % n + n) % n) / sr);
   if (k.src) { try { k.src.stop(at / sr); } catch (e) {} }
   k.src = s;
+  if (k.rg && liveAmt(k.track, 'rdly') > 0) rdStart(k, at);                // the reverse delay runs alongside, in step
 }
 
 /* heard position: the audio clock minus the current latency, i.e. where what you hear and play lands */
@@ -1406,16 +1410,20 @@ function applyTakes(t, at) {
   if (!ctx) return;
   for (const k of t.takes) {
     if (!k.tg) continue;
-    const v = takeOn(k) ? k.norm : 0, g = k.tg.gain;
-    if (at) g.setValueAtTime(v, at);
-    else { g.cancelScheduledValues(0); g.setTargetAtTime(v, ctx.currentTime, 0.008); }
+    const v = takeOn(k) ? k.norm : 0;
+    for (const n of [k.tg, k.xg, k.rg]) {
+      if (!n) continue; const g = n.gain;
+      if (at) g.setValueAtTime(v, at);
+      else { g.cancelScheduledValues(0); g.setTargetAtTime(v, ctx.currentTime, 0.008); }
+    }
   }
 }
 function attachTake(k) {
   if (k.tg || !k.buf || !k.track.lp) return;
-  k.tg = gn(k.norm); k.tg.connect(k.track.inp);
+  const t = k.track;
+  k.tg = gn(k.norm); k.tg.connect(t.tk); k.xg = gn(k.norm); k.xg.connect(t.sl); k.rg = gn(k.norm); k.rg.connect(t.rd);   // the take, its slice and its reverse delay
 }
-function detachTake(k) { stopSrc(k); if (k.tg) { try { k.tg.disconnect(); } catch (e) {} k.tg = null; } }
+function detachTake(k) { stopSrc(k); for (const n of ['tg', 'xg', 'rg']) if (k[n]) { try { k[n].disconnect(); } catch (e) {} k[n] = null; } }
 function afterRender(k, now, end) {
   const first = !k.started;
   if (first && k.auto && !k.notes && k.peak < 0.006) { k.pgen++; dropSilent(k); return; }      // silent lap in continuous mode (a lap of notes is judged on its final render)
@@ -1982,11 +1990,55 @@ function applyLive(t, A) {
   t.crDry.gain.setTargetAtTime(1 - cr, tm, 0.01); t.crWet.gain.setTargetAtTime(cr, tm, 0.01);
   t.trOsc.frequency.setTargetAtTime(1 * Math.pow(16, A.tremF != null ? A.tremF : 0.4), tm, 0.02);    // 1 to 16 Hz
   t.trG.gain.setTargetAtTime(1 - tr / 2, tm, 0.01); t.trDep.gain.setTargetAtTime(tr / 2, tm, 0.01);
+  const ph = liveAmt(t, 'phone'), ra = liveAmt(t, 'radio');
+  t.phDry.gain.setTargetAtTime(1 - Math.max(ph, ra), tm, 0.01); t.phWet.gain.setTargetAtTime(ph * 0.9, tm, 0.01); t.raWet.gain.setTargetAtTime(ra * 0.9, tm, 0.01);
+  const gL = 1 - liveAmt(t, 'isoL'), gM = 1 - liveAmt(t, 'isoM'), gH = 1 - liveAmt(t, 'isoH');
+  t.isoX.gain.setTargetAtTime(gM, tm, 0.01); t.isoLg.gain.setTargetAtTime(gL - gM, tm, 0.01); t.isoHg.gain.setTargetAtTime(gH - gM, tm, 0.01);
+  const fz = liveAmt(t, 'frz');
+  t.fzIn.gain.setTargetAtTime(fz > 0 ? 0 : 1, tm, 0.02); for (const fb of t.fzFb) fb.gain.setTargetAtTime(fz > 0 ? 0.998 : 0.82, tm, 0.02);
+  t.fzWet.gain.setTargetAtTime(fz * 0.5, tm, 0.02);
+  const pp = liveAmt(t, 'ping'), pt = Math.min(1.9, beatN() / sr * (t.pDiv || 0.5));
+  t.ppIn.gain.setTargetAtTime(pp, tm, 0.01); t.ppL.delayTime.setTargetAtTime(pt, tm, 0.05); t.ppR.delayTime.setTargetAtTime(pt, tm, 0.05);
+  const rd = liveAmt(t, 'rdly');
+  t.rd.gain.setTargetAtTime(rd * 0.7, tm, 0.01);
+  if (rd > 0 && running) for (const k of t.takes) if (k.rg && k.buf && (k.rdFor !== k.buf || !k.rsrc)) rdStart(k, nowF() + Math.round(SAFE_S * sr));
+  /* slice: loop a short piece of the loop, chosen by position and length, in place of the track */
+  const slc = Math.max(liveAmt(t, 'slice'), A.slicePos != null || A.sliceLen != null ? 1 : 0);
+  t.tk.gain.setTargetAtTime(1 - slc, tm, 0.005); t.sl.gain.setTargetAtTime(slc, tm, 0.005);
+  if (slc > 0 && running) {
+    const lenB = sliceBeats(A.sliceLen != null ? A.sliceLen : t.sLen), pos = A.slicePos != null ? A.slicePos : t.sPos, lenS = beatN() * lenB / sr;
+    for (const k of t.takes) {
+      if (!k.xg || !k.buf) continue;
+      const n = Math.max(1, Math.floor(k.buf.duration / lenS + 1e-6)), i = Math.min(n - 1, Math.floor(pos * n)), key = k.buf.length + ':' + lenB + ':' + i;
+      if (k.slKey === key && k.ssrc) continue;
+      if (k.ssrc) try { k.ssrc.stop(); } catch (e) {}
+      const s = ctx.createBufferSource(); s.buffer = k.buf; s.loop = true; s.loopStart = i * lenS; s.loopEnd = Math.min(k.buf.duration, (i + 1) * lenS);
+      s.connect(k.xg); s.start(tm, i * lenS); k.ssrc = s; k.slKey = key;
+    }
+  } else if (slc === 0) for (const k of t.takes) if (k.ssrc) { try { k.ssrc.stop(tm + 0.05); } catch (e) {} k.ssrc = null; k.slKey = null; }
+}
+const beatN = () => isFree() ? (freeL || L) / 4 : barsLen(1) / st.beats;
+const liveAmt = (t, key) => Math.max(t[key] || 0, (t.xyA || {})[key] || 0);       // a live trick: its setting, or more from the XY pad
+const sliceBeats = v => [1, 0.5, 0.25, 0.125, 0.0625][Math.min(4, Math.floor(v * 5))];
+/* Reverse delay: each beat of the take played backwards, one beat later, with two softer repeats. */
+function rdStart(k, at) {
+  if (k.rdFor !== k.buf) {
+    const x = k.buf.getChannelData(0), N = x.length, D = Math.max(64, Math.round(beatN())), c = new Float32Array(N), y = new Float32Array(N);
+    for (let b = 0; b < N; b += D) { const e = Math.min(N, b + D); for (let i = b; i < e; i++) c[i] = x[e - 1 - (i - b)]; }
+    for (let i = 0; i < N; i++) y[i] = c[(i - D + 4 * N) % N] + 0.5 * c[(i - 2 * D + 4 * N) % N] + 0.25 * c[(i - 3 * D + 4 * N) % N];
+    k.rdBuf = mkBuf(y); k.rdFor = k.buf;
+  }
+  at = Math.max(at, epoch);
+  const s = ctx.createBufferSource(), n = k.rdBuf.length; s.buffer = k.rdBuf; s.loop = true; s.connect(k.rg);
+  s.start(at / sr, (((at - epoch) % n + n) % n) / sr);
+  if (k.rsrc) try { k.rsrc.stop(at / sr); } catch (e) {}
+  k.rsrc = s;
 }
 function buildTrackNodes(t) {
   if (!ctx || t.lp) return;
   t.lp = bq('lowpass', OPEN_LP); t.hp = bq('highpass', 10); t.eq = mkEq(); t.g = gn(0);
-  t.inp = gn(1); t.dDryG = gn(1); t.dWetG = gn(0); t.dSh = ctx.createWaveShaper(); t.dSh.oversample = '4x'; t.dLp = bq('lowpass', 8000); t.dLp.Q.value = 0.5; t.dOn = false; t.dKey = '';
+  t.inp = gn(1); t.tk = gn(1); t.sl = gn(0); t.rd = gn(0); t.tk.connect(t.inp); t.sl.connect(t.inp); t.rd.connect(t.inp); t.slKey = null;   // takes, slice and reverse delay
+  t.dDryG = gn(1); t.dWetG = gn(0); t.dSh = ctx.createWaveShaper(); t.dSh.oversample = '4x'; t.dLp = bq('lowpass', 8000); t.dLp.Q.value = 0.5; t.dOn = false; t.dKey = '';
   t.inp.connect(t.dDryG); t.dDryG.connect(t.lp); t.dSh.connect(t.dLp); t.dLp.connect(t.dWetG); t.dWetG.connect(t.lp);   // in → clean + distorted → filter
   t.pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null; t.es = gn(0); t.rs = gn(0);
   t.lp.connect(t.hp); t.hp.connect(t.eq[0]);
@@ -1996,9 +2048,33 @@ function buildTrackNodes(t) {
   t.trG = gn(1); t.trDep = gn(0); t.trOsc = ctx.createOscillator(); t.trOsc.frequency.value = 4; t.trOsc.connect(t.trDep); t.trDep.connect(t.trG.gain); t.trOsc.start();
   t.eq[2].connect(t.rmDry); t.eq[2].connect(t.rmMul); t.rmMul.connect(t.rmWet); t.rmDry.connect(t.crIn); t.rmWet.connect(t.crIn);
   t.crIn.connect(t.crDry); t.crIn.connect(t.crSh); t.crSh.connect(t.crWet); t.crDry.connect(t.trG); t.crWet.connect(t.trG);
-  t.trG.connect(t.g);
+  /* telephone and radio bands, then the isolator (low, mid and high, cut by amount; at rest it adds up to the input) */
+  t.phIn = gn(1); t.phDry = gn(1); t.phWet = gn(0); t.raWet = gn(0);
+  const chain = (src, ...ns) => { let a = src; for (const n of ns) { a.connect(n); a = n; } return a; };
+  const pk = (f, g) => { const b = bq('peaking', f); b.gain.value = g; b.Q.value = 0.8; return b; };
+  chain(t.phIn, bq('highpass', 380), bq('highpass', 380), bq('lowpass', 3000), bq('lowpass', 3000), pk(1200, 3), t.phWet);
+  chain(t.phIn, bq('highpass', 650), bq('lowpass', 5200), pk(1800, 4), t.raWet);
+  t.trG.connect(t.phIn); t.phIn.connect(t.phDry);
+  t.isoIn = gn(1); t.isoX = gn(1); t.isoLg = gn(0); t.isoHg = gn(0); t.isoOut = gn(1);
+  t.phDry.connect(t.isoIn); t.phWet.connect(t.isoIn); t.raWet.connect(t.isoIn);
+  t.isoIn.connect(t.isoX); t.isoX.connect(t.isoOut);
+  chain(t.isoIn, bq('lowpass', 220), bq('lowpass', 220), t.isoLg, t.isoOut);
+  chain(t.isoIn, bq('highpass', 2800), bq('highpass', 2800), t.isoHg, t.isoOut);
+  t.isoOut.connect(t.g);
   const out = t.pn || t.g; if (t.pn) t.g.connect(t.pn);
-  out.connect(mix); out.connect(t.es); t.es.connect(echoIn); out.connect(t.rs); t.rs.connect(revIn);
+  t.dry = gn(1); out.connect(t.dry); t.dry.connect(mix);                 // the breaks mute this while the sends go on
+  out.connect(t.es); t.es.connect(echoIn); out.connect(t.rs); t.rs.connect(revIn);
+  /* freeze: four combs that sound like a small reverb; frozen, their input closes and they ring on */
+  t.fzIn = gn(1); t.fzWet = gn(0); t.fzFb = [];
+  for (const ms of [31, 37, 41, 47]) {
+    const d = ctx.createDelay(0.1), lp = bq('lowpass', 6000), fb = gn(0.82); d.delayTime.value = ms / 1000;
+    t.fzIn.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); d.connect(t.fzWet); t.fzFb.push(fb);
+  }
+  out.connect(t.fzIn); t.fzWet.connect(mix);
+  /* ping-pong delay, in time with the beat */
+  t.ppIn = gn(0); t.ppL = ctx.createDelay(2); t.ppR = ctx.createDelay(2); t.ppFb = gn(0.55); t.ppM = ctx.createChannelMerger(2);
+  out.connect(t.ppIn); t.ppIn.connect(t.ppL); t.ppL.connect(t.ppR); t.ppR.connect(t.ppFb); t.ppFb.connect(t.ppL);
+  t.ppL.connect(t.ppM, 0, 0); t.ppR.connect(t.ppM, 0, 1); t.ppM.connect(mix);
   t.an = ctx.createAnalyser(); t.an.fftSize = 2048; out.connect(t.an); t.lvS = 0;
   applyTrack(t);
   for (const k of t.takes) { attachTake(k); if (running) startSource(k, nowF() + Math.round(SAFE_S * sr)); }
@@ -2007,7 +2083,7 @@ function dropTrackNodes(t) {
   for (const k of t.takes) detachTake(k);
   if (!t.lp) return;
   for (const o of [t.rmOsc, t.trOsc]) if (o) try { o.stop(); } catch (e) {}
-  for (const n of [t.inp, t.dDryG, t.dWetG, t.dSh, t.dLp, t.lp, t.hp, t.eq[0], t.eq[1], t.eq[2], t.g, t.pn, t.es, t.rs, t.rmOsc, t.rmDry, t.rmMul, t.rmWet, t.crIn, t.crDry, t.crSh, t.crWet, t.trOsc, t.trDep, t.trG]) { if (n) try { n.disconnect(); } catch (e) {} }
+  for (const n of [t.inp, t.dDryG, t.dWetG, t.dSh, t.dLp, t.lp, t.hp, t.eq[0], t.eq[1], t.eq[2], t.g, t.pn, t.es, t.rs, t.rmOsc, t.rmDry, t.rmMul, t.rmWet, t.crIn, t.crDry, t.crSh, t.crWet, t.trOsc, t.trDep, t.trG, t.tk, t.sl, t.rd, t.phIn, t.isoOut, t.dry, t.fzIn, t.fzWet, t.ppIn, t.ppM]) { if (n) try { n.disconnect(); } catch (e) {} }
   t.lp = t.g = t.pn = t.an = t.inp = null; t.dOn = false; t.dKey = '';
 }
 /* `at` is an audio-clock time for the gain change, so mute and solo can land on the beat or bar. */
@@ -2019,8 +2095,10 @@ function applyTrack(t, at) {
   t.g.gain.setTargetAtTime(audible(t) ? t.vol * (1 - (A.duck || 0)) : 0, Math.max(tm, at || 0), 0.004);
   if (t.pn) t.pn.pan.setTargetAtTime(A.pan != null ? A.pan * 2 - 1 : t.pan, tm, 0.01);
   setFilter(t.lp, t.hp, filt); setEq(t.eq, t);
-  t.es.gain.setTargetAtTime(Math.max(t.echo, A.echo || 0) * 0.8, tm, 0.01);
-  t.rs.gain.setTargetAtTime(Math.max(t.rev, A.rev || 0), tm, 0.01);
+  const eb = liveAmt(t, 'ebrk'), rb = liveAmt(t, 'rbrk');
+  t.dry.gain.setTargetAtTime(1 - Math.max(eb, rb), tm, 0.01);           // a break mutes the track and leaves its echo or reverb
+  t.es.gain.setTargetAtTime(Math.max(t.echo, A.echo || 0, eb) * 0.8, tm, 0.01);
+  t.rs.gain.setTargetAtTime(Math.max(t.rev, A.rev || 0, rb), tm, 0.01);
   applyDist(t); applyLive(t, A);
 }
 function switchAt() {
@@ -2487,7 +2565,7 @@ const changedIn = {
   pitch: t => !!(t.oct || t.semi || t.cent),
   tune: t => !!t.tune,
   xy: t => JSON.stringify(t.xyMap) !== JSON.stringify(XY_DEF) || t.xyHold,
-  tricks: t => t.takes.some(k => k.reverse) || t.speed !== 1 || t.tstop || !!t.trem || t.lofi > 0 || t.ring > 0 || t.gran > 0,
+  tricks: t => ['ebrk', 'rbrk', 'frz', 'phone', 'radio', 'isoL', 'isoM', 'isoH', 'slice', 'rdly', 'ping'].some(k => t[k] > 0) || t.takes.some(k => k.reverse) || t.speed !== 1 || t.tstop || !!t.trem || t.lofi > 0 || t.ring > 0 || t.gran > 0,
   takes: t => t.takes.some(k => k.off || k.solo || k.lat !== (k.notes ? prof().scr : prof().ms)),
   eq: t => eqChanged(t, 'filt') || !near(t.pan, 0),
   dist: t => !!t.dist,
@@ -2557,7 +2635,7 @@ function trackPane(t) {
       el('p', 'cnote', 'Soft rounds the peaks like an overdriven tube, Hard clips them, Fuzz is rougher and uneven. Drive sets how hard it is pushed; the level is evened out, so more drive gives more grit rather than more volume. Tone darkens the result, Mix blends in the clean sound. It comes before the EQ, so the EQ can shape it.'))];
   }, changedIn.dist(t), t));
   if (!isSmp(t)) p.append(...fold('pitch', 'Pitch', () => [pitchCard(t)], changedIn.pitch(t), t), ...fold('tune', 'Autotune' + (t.tune ? ' · on' : ''), () => [tuneCard(t)], changedIn.tune(t), t));
-  if (!isSmp(t)) p.append(...fold('tricks', 'Sound tricks', () => {            // the less usual edits of a microphone track's takes
+  p.append(...fold('tricks', 'Sound tricks', () => {                          // the less usual edits: on a microphone track's takes, and live on any track
     const mic = t.takes.filter(k => !k.notes), redo = () => { for (const k of mic) k.final = false; markDirty(); };
     const tr = k => v => { t[k] = v; redo(); };
     const sp = el('div', 'seg full'), spr = el('div', 'cr'); seg(sp, [[0.5, 'Half speed'], [1, 'Normal'], [2, 'Double']], () => t.speed, v => { t.speed = v; redo(); }, 1); spr.append(sp);
@@ -2576,7 +2654,26 @@ function trackPane(t) {
     if (t.gran > 0) rows.push(sliderRow('Grain', 0, 1, 0.01, t.gSize, 0.4, v => Math.round(granMs(v)) + ' ms', tr('gSize')),
       sliderRow('Scatter', 0, 1, 0.01, t.gScat, 0.3, pct, tr('gScat')),
       el('p', 'cnote', 'Breaks the sound into small grains and lays them out again, each taken from near its place, or with more scatter from anywhere in the loop: a moving, flowing texture.'));
-    return [card(...rows)];
+    const lv = k => v => { t[k] = v; applyTrack(t); markDirty(); };
+    const pdv = el('div', 'seg full'), pdr = el('div', 'cr'); seg(pdv, [[0.25, '1/16'], [0.5, '1/8'], [0.75, '3/16'], [1, '1/4']], () => t.pDiv, v => { t.pDiv = v; applyTrack(t); markDirty(); }, 0.5); pdr.append(pdv);
+    const off = f => v => v === 0 ? 'off' : f(v);
+    const live = [el('p', 'csub', 'Breaks'),
+      sliderRow('Echo break', 0, 1, 0.01, t.ebrk, 0, off(pct), lv('ebrk')), sliderRow('Reverb break', 0, 1, 0.01, t.rbrk, 0, off(pct), lv('rbrk')),
+      el('p', 'cnote', 'Mute the track and leave its echo or its reverb.'),
+      sliderRow('Freeze', 0, 1, 0.01, t.frz, 0, off(pct), lv('frz')), el('p', 'cnote', 'Holds the track’s reverb tail and lets it ring on.'),
+      el('p', 'csub', 'Filters'),
+      sliderRow('Telephone', 0, 1, 0.01, t.phone, 0, off(pct), lv('phone')), sliderRow('Radio', 0, 1, 0.01, t.radio, 0, off(pct), lv('radio')),
+      sliderRow('Cut lows', 0, 1, 0.01, t.isoL, 0, off(pct), lv('isoL')), sliderRow('Cut mids', 0, 1, 0.01, t.isoM, 0, off(pct), lv('isoM')), sliderRow('Cut highs', 0, 1, 0.01, t.isoH, 0, off(pct), lv('isoH')),
+      el('p', 'csub', 'Slice'),
+      sliderRow('Slice', 0, 1, 0.01, t.slice, 0, off(pct), lv('slice')),
+      sliderRow('Position', 0, 0.999, 0.001, t.sPos, 0, pct, lv('sPos')),
+      sliderRow('Length', 0, 0.999, 0.001, t.sLen, 0.5, v => { const b = sliceBeats(v); return b === 1 ? '1 beat' : '1/' + Math.round(1 / b) + ' beat'; }, lv('sLen')),
+      el('p', 'cnote', 'Loops a short piece of the track, chosen by position and length, in place of the track. Nicest on the XY pad.'),
+      el('p', 'csub', 'Delays'),
+      sliderRow('Reverse delay', 0, 1, 0.01, t.rdly, 0, off(pct), lv('rdly')), el('p', 'cnote', 'Each beat played backwards, a beat later.'),
+      sliderRow('Ping-pong', 0, 1, 0.01, t.ping, 0, off(pct), lv('ping')), pdr];
+    const lc = card(...live); lc.classList.add('wl');                         // room for the longer names
+    return isSmp(t) ? [lc] : [el('h3', '', 'On the recordings'), card(...rows), el('h3', '', 'Live'), lc];
   }, changedIn.tricks(t), t));
   p.append(...fold('xy', 'XY pad', () => xyPane(t), changedIn.xy(t), t));
   if (!isFree()) p.append(...fold('track', 'Bars', () => {
@@ -2880,7 +2977,9 @@ function takeCommon(t, ks) {
    control an effect: an axis sweeps it from one side to the other, an edge or corner brings it in as the finger
    nears it. Lifting the finger sets everything back, unless Hold is on. */
 const XY_T = [['', '—'], ['filter', 'Filter, low to high'], ['lp', 'Low-pass'], ['hp', 'High-pass'], ['rev', 'Reverb'], ['echo', 'Delay'], ['duck', 'Volume down'],
-  ['pan', 'Pan'], ['dist', 'Distortion'], ['crush', 'Bit crush'], ['ring', 'Ring mod'], ['ringF', 'Ring mod pitch'], ['trem', 'Tremolo'], ['tremF', 'Tremolo speed']];
+  ['pan', 'Pan'], ['dist', 'Distortion'], ['crush', 'Bit crush'], ['ring', 'Ring mod'], ['ringF', 'Ring mod pitch'], ['trem', 'Tremolo'], ['tremF', 'Tremolo speed'],
+  ['ebrk', 'Echo break'], ['rbrk', 'Reverb break'], ['frz', 'Freeze'], ['phone', 'Telephone'], ['radio', 'Radio'], ['isoL', 'Cut lows'], ['isoM', 'Cut mids'], ['isoH', 'Cut highs'],
+  ['slice', 'Slice'], ['slicePos', 'Slice position'], ['sliceLen', 'Slice length'], ['rdly', 'Reverse delay'], ['ping', 'Ping-pong delay']];
 const XY_SLOTS = [['x', 'X axis'], ['y', 'Y axis'], ['l', 'Left edge'], ['r', 'Right edge'], ['t', 'Top edge'], ['b', 'Bottom edge'],
   ['tl', 'Top left'], ['tr', 'Top right'], ['bl', 'Bottom left'], ['br', 'Bottom right']];
 const XY_CORNER = { tl: [0, 1], tr: [1, 1], bl: [0, 0], br: [1, 0] };
