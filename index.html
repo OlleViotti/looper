@@ -550,7 +550,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 01:10</p>
+  <p class="ver">Varv one, build 18 Nov 01:25</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -700,6 +700,8 @@ async function restartAudio() {
   ring = null; R = 0; capEnd = 0; capFirst = -1; clk = []; clkOff = null;
   try { navigator.audioSession && (navigator.audioSession.type = 'auto'); } catch (e) {}
   try { await old.close(); } catch (e) {}
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  await new Promise(r => setTimeout(r, 900));       // give the phone time to leave its call mode before starting again
   for (const k of allTakes()) { k.buf = null; k.src = null; k.tg = null; k.final = false; }   // rendered again for the new engine on the next tick
   for (const t of tracks) if (t.sample) { t.sample.buf = null; }
   const ok = await initAudio();
@@ -713,7 +715,9 @@ function initAudio() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) { toast('This browser lacks the audio engine.'); return Promise.resolve(false); }
   try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) {}
-  try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e) { ctx = new AC(); }
+  /* Asked for 48 kHz: if the phone is still in its call mode (24 or 16 kHz, after a Bluetooth microphone was open), the
+     engine runs at 48 kHz anyway and the phone converts, instead of the engine being stuck at the low rate. */
+  try { ctx = new AC({ latencyHint: 'interactive', sampleRate: 48000 }); } catch (e) { try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e2) { ctx = new AC(); } }
   sr = ctx.sampleRate; ctx.resume().catch(() => {}); audioT0 = performance.now();
   PRE = latN(PRE_MS); XF = latN(XF_MS); MAXLAT = latN(MAXLAT_MS); OPEN_LP = Math.min(20000, sr * 0.45);
   buildGraph();
@@ -842,7 +846,7 @@ const BUILTIN = /iphone|ipad|built-?in|inbyggd|intern/i;
 const wantsBuiltin = () => !st.micId || st.micId === 'builtin';
 const builtinId = list => (list.find(m => BUILTIN.test(m.label)) || {}).deviceId || '';
 const chosenMic = list => wantsBuiltin() ? builtinId(list) : list.some(m => m.deviceId === st.micId) ? st.micId : builtinId(list);
-let micDev = '', micOpenAt = 0, micList = '', keepT = 0, audioT0 = 0;
+let autoRestartAt = -1e9, micDev = '', micOpenAt = 0, micList = '', keepT = 0, audioT0 = 0;
 async function openMic(id, auto) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { micOK = false; toast('The microphone needs the page to be opened over https.'); return false; }
   const base = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 };
@@ -865,6 +869,9 @@ async function openMic(id, auto) {
   }
   fillMics(); diag();
   if (BUILTIN.test(micLabel)) reassertRoute();
+  if (ctx.sampleRate < 32000 && BUILTIN.test(micLabel) && !running && !measuring && performance.now() - autoRestartAt > 30000) {
+    autoRestartAt = performance.now(); setTimeout(() => restartAudio(), 400);   // started in the phone's call mode: start again once
+  }
   return true;
 }
 /* On some iPhones and iPads (seen on iOS 18.7), opening the phone's own microphone moves the sound from
@@ -3630,7 +3637,7 @@ function diag() {
   if (!ctx) return;
   let t = Math.round(sr / 100) / 10 + ' kHz' + (capMode === 'worklet' ? '' : ', fallback capture with poorer timing') + '. ';
   t += micOK ? 'In use: ' + (micLabel || 'unknown') + '. ' : 'The microphone is not running. ';
-  if (sr < 32000) t += "The low sample rate suggests the headphones' microphone is in use. Choose the phone's microphone above.";
+  if (sr < 32000) t += "The low sample rate means the phone was in its call mode when the audio started. Choose the phone's microphone above and tap Restart audio.";
   const n = $('#diag'); n.textContent = t; n.classList.toggle('warn', sr < 32000 || !micOK);
 }
 
