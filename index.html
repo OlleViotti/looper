@@ -499,7 +499,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 17 Nov 21:50</p>
+  <p class="ver">Varv one, build 17 Nov 21:55</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -1979,11 +1979,11 @@ function mountTrack(t, idx) {
   nb.addEventListener('click', () => { if (mode === 'edit') selectTrack(t.id); else touched(t); });
   const trk = el('div', 'trk slide');
   t.cv = el('canvas'); trk.append(t.cv, el('i', 'ph'), el('em', '', 'muted'));
-  /* The buttons: sample (or keys on a sampler), solo, mute, record. */
+  /* The buttons: sample (or keys on a sampler), mute, solo, record. */
   const bs = el('div', 'tbs'), mk = (cls, label, html, fn) => { const b = el('button', 'tb ' + cls); b.setAttribute('aria-label', label); b.innerHTML = html; b.addEventListener('click', () => { if (mode === 'play') fn(); }); bs.append(b); return b; };
   t.bX = mk('sx', 'Record a sample', MIC_ICON, () => sampleButton(t));
-  t.bS = mk('so', 'Solo', 'S', () => toggleSolo(t));
   t.bM = mk('mu', 'Mute', 'M', () => toggleMute(t));
+  t.bS = mk('so', 'Solo', 'S', () => toggleSolo(t));
   t.bR = mk('rc', 'Record a lap', '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>', () => recordInto(t));
   row.addEventListener('pointerdown', () => touched(t), true);       // a swipe right that starts on this track edits it
   row.append(nb, trk, bs); t.row = row;
