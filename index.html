@@ -173,6 +173,8 @@ body[data-pads] #backT{display:block}
 .tbtn.eplay{width:44px;height:40px;min-height:40px;border-radius:999px;background:var(--amber);color:#1b1f2e;display:grid;place-items:center;padding:0}
 .tbtn.eplay svg{width:18px;height:18px;fill:currentColor}
 .ename{flex:1;min-width:0;font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fh.sub{margin:10px 0 0;min-height:40px;font-size:14px}
+.csub2{margin:14px 6px 6px;font-size:13px;font-weight:600;color:var(--mut)}
 .csub{margin:0;padding:14px 14px 0;font-size:13px;font-weight:600;color:var(--mut);border-top:1px solid rgba(255,255,255,.06)}
 .sfb[hidden]{display:none}
 .sfb>.card+.card{margin-top:8px}
@@ -404,7 +406,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
     <main class="tape" id="tape">
       <div class="empty" id="empty">
         <p><b>Varv is a looper:</b> what you record repeats in time with the click, layer by layer. <b>Tap Record</b>: one bar of count-in, then it records lap after lap, each into the next empty track, until you tap Record again. <b>Hold Record</b> to start or stop without recording.</p>
-        <p><b>Bluetooth headphones lag,</b> so Varv moves each recording back to land on the beat. Measure the delay once: swipe left, Latency, Measure exactly.</p>
+        <p><b>Bluetooth headphones lag,</b> so Varv moves each recording back to land on the beat. Measure the delay once: tap the in and out meters at the top, then Measure exactly.</p>
       </div>
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
@@ -435,19 +437,9 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
 <div class="spage" id="spage" role="dialog" aria-labelledby="hSet"><div class="sp-in">
   <div class="sp-head"><h2 id="hSet">Settings</h2></div>
-  <p class="hint" id="hMeasure" hidden><b>Start here:</b> with your headphones on, measure the latency once under Latency, Measure exactly. Do it again if you change headphones.</p>
 
-  <button class="fh sfh" data-fold="sLat" data-def="1">Latency</button>
-  <div class="sfb">
-  <div class="card">
-    <div class="cr"><span>Headphones</span><div class="pill" id="latStep"><button class="sbtn" data-d="-1" aria-label="Shorter">−</button><output id="latVal"></output><button class="sbtn" data-d="1" aria-label="Longer">+</button></div></div>
-    <button class="cr act" id="measLoop"><span>Measure exactly<small>Hold the phone's microphone against an earbud, volume up.</small></span></button>
-    <div class="cpad"><div class="dots" id="measDots" hidden></div><p id="measRes" hidden></p><button class="btn on wide" id="measUse" hidden></button></div>
-    <div class="cr"><span>Screen</span><div class="pill" id="scrStep"><button class="sbtn" data-d="-1" aria-label="Shorter">−</button><output id="scrVal"></output><button class="sbtn" data-d="1" aria-label="Longer">+</button></div></div>
-    <button class="cr act" id="measTap"><span>Measure by tapping<small>For the sampler. Headphones on, tap along with the clicks as you hear them.</small></span></button>
-    <div class="cpad"><button class="tappad" id="tapPad" hidden>Tap on the clicks</button><div class="dots" id="tapDots" hidden></div><p id="tapRes" hidden></p><button class="btn on wide" id="tapUse" hidden></button></div>
-  </div>
-  </div>
+
+  <div class="card"><button class="cr act" id="toAudio"><span>Audio settings<small>Microphone, output and latency. Also opens from the in and out meters at the top.</small></span></button></div>
 
   <button class="fh sfh" data-fold="sLoop" data-def="1">Loop and click</button>
   <div class="sfb">
@@ -468,7 +460,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   </div>
   </div>
 
-  <button class="fh sfh" data-fold="sProj" data-def="1">Project</button>
+  <button class="fh sfh" data-fold="sFiles" data-def="1">Projects and files</button>
   <div class="sfb">
   <div class="card">
     <div class="cr"><input class="txt bare" id="projInput" aria-label="Project name" maxlength="40" placeholder="Project name"><button class="tbtn" id="saveBtn">Save</button></div>
@@ -476,10 +468,16 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
     <button class="cr act" id="newBtn"><span>New project</span></button>
     <button class="cr act" id="exportBtn"><span>Export lap as WAV</span></button>
   </div>
-  </div>
-
-  <button class="fh sfh" data-fold="sList" id="plistH">Saved projects</button>
+  <button class="fh sfh sub" data-fold="sList" id="plistH">Saved projects</button>
   <div class="sfb"><div class="card" id="plist"></div></div>
+  <p class="csub2">Performance recordings</p>
+  <div class="card">
+    <button class="cr act" id="perfBtn"><span>Record performance</span></button>
+    <div class="cr"><span>Include microphone</span><div id="perfMicSw"></div></div>
+    <p class="cnote">Records everything you hear, without the click, as an audio file. With the microphone included, what you play live is in it too, lined up with the loops.</p>
+    <div id="perfList"></div>
+  </div>
+  </div>
 
   <button class="fh sfh" data-fold="sCtl">Recording, mute and scenes</button>
   <div class="sfb">
@@ -495,39 +493,38 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   </div>
   </div>
 
-  <button class="fh sfh" data-fold="sMic">Audio and microphone</button>
-  <div class="sfb">
-  <div class="card">
-    <button class="cr act" id="restartBtn"><span>Restart audio<small>Starts the sound and the microphone again, as when the app opens.</small></span></button>
-    <button class="cr act" id="toAudio"><span>Audio setup<small>Microphone and output, with live meters. Also opens from the in and out meters at the top.</small></span></button>
-    <div id="micRows"><p class="cnote" style="padding-top:12px">Start the audio first to choose the microphone.</p></div>
-    <div id="inGainRow"></div>
-    <div class="cr"><span>Low cut (80 Hz)</span><div id="lowCutSw"></div></div>
-    <div class="cr"><span>Auto level recordings</span><div id="autoLvlSw"></div></div>
-    <p class="cnote">Set the gain so loud hits reach the amber part of the in meter. Red means clipping.</p>
-    <p class="cnote" id="diag">Audio starts the first time you tap Start, Record or Measure.</p>
-  </div>
-  </div>
-
-  <button class="fh sfh" data-fold="sPerf">Performance recording</button>
-  <div class="sfb">
-  <div class="card">
-    <button class="cr act" id="perfBtn"><span>Record performance</span></button>
-    <div class="cr"><span>Include microphone</span><div id="perfMicSw"></div></div>
-    <p class="cnote">Records everything you hear, without the click, as an audio file. With the microphone included, what you play live is in it too, lined up with the loops.</p>
-    <div id="perfList"></div>
-  </div>
-  </div>
-
   <button class="fh sfh" data-fold="sHelp">Help</button>
   <div class="sfb">
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 17 Nov 22:40</p>
+  <p class="ver">Varv one, build 17 Nov 23:00</p>
 </div></div>
 
-<div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in" id="apIn"></div></div>
+<div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
+  <div class="sp-head"><h2>Audio</h2><button class="tbtn" id="apDone">Done</button></div>
+  <p class="hint" id="hMeasure" hidden><b>Start here:</b> with your headphones on, measure the latency once under Latency, Measure exactly. Do it again if you change headphones.</p>
+  <div id="apIn"></div>
+  <button class="fh sfh" data-fold="aLat" data-def="1">Latency</button>
+  <div class="sfb">
+  <div class="card">
+    <div class="cr"><span>Headphones</span><div class="pill" id="latStep"><button class="sbtn" data-d="-1" aria-label="Shorter">−</button><output id="latVal"></output><button class="sbtn" data-d="1" aria-label="Longer">+</button></div></div>
+    <button class="cr act" id="measLoop"><span>Measure exactly<small>Hold the phone's microphone against an earbud, volume up.</small></span></button>
+    <div class="cpad"><div class="dots" id="measDots" hidden></div><p id="measRes" hidden></p><button class="btn on wide" id="measUse" hidden></button></div>
+    <div class="cr"><span>Screen</span><div class="pill" id="scrStep"><button class="sbtn" data-d="-1" aria-label="Shorter">−</button><output id="scrVal"></output><button class="sbtn" data-d="1" aria-label="Longer">+</button></div></div>
+    <button class="cr act" id="measTap"><span>Measure by tapping<small>For the sampler. Headphones on, tap along with the clicks as you hear them.</small></span></button>
+    <div class="cpad"><button class="tappad" id="tapPad" hidden>Tap on the clicks</button><div class="dots" id="tapDots" hidden></div><p id="tapRes" hidden></p><button class="btn on wide" id="tapUse" hidden></button></div>
+  </div>
+  </div>
+  <button class="fh sfh" data-fold="aMore">Restart and more</button>
+  <div class="sfb">
+  <div class="card">
+    <button class="cr act" id="restartBtn"><span>Restart audio<small>Closes the sound and the microphone and starts them again, as when the app opens. Try it if the delay grows or the sound goes to the wrong place.</small></span></button>
+    <div class="cr"><span>Auto level recordings</span><div id="autoLvlSw"></div></div>
+    <p class="cnote" id="diag">Audio starts the first time you tap Start, Record or Measure.</p>
+  </div>
+  </div>
+</div></div>
 <div class="back" id="backL" aria-label="Back to play"></div>
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
 <div class="toast" id="toast" hidden><span id="toastTxt"></span></div>
@@ -2704,7 +2701,7 @@ function setMode(m) {
   }
   if (m !== 'play' && !(st.hints.start && st.hints.swipe)) { st.hints.start = st.hints.swipe = 1; save(); ui(); }   // the first swipe dismisses the instructions
   else renderPane();
-  if (m === 'set') { drawProjects(); drawPerf(); $('#spage').scrollTop = 0; inGainRow.set(st.inGain); swtch($('#lowCutSw'), () => st.lowCut, v => { st.lowCut = v; save(); if (inHP) inHP.frequency.setTargetAtTime(v ? 80 : 10, ctx.currentTime, 0.02); }, false); }
+  if (m === 'set') { drawProjects(); drawPerf(); $('#spage').scrollTop = 0; }
   if (m === 'audio') { $('#apage').scrollTop = 0; drawAudio(); }
   drawHeads();
 }
@@ -3209,8 +3206,6 @@ function testTone() {
 }
 async function drawAudio() {
   const host = $('#apIn'); host.textContent = '';
-  const head = el('div', 'sp-head'), done = el('button', 'tbtn', 'Done');
-  done.addEventListener('click', () => setMode('play')); head.append(el('h2', '', 'Audio'), done); host.append(head);
   if (!ctx) {
     const go = el('button', 'cr act'); go.append(el('span', '', 'Start audio'));
     go.addEventListener('click', async () => { await initAudio(); drawAudio(); });
@@ -3239,15 +3234,6 @@ async function drawAudio() {
   } else oc.push(el('p', 'cnote', 'This browser lets the system choose where the sound goes. On iPhone: open Control Center, press and hold the music controls and tap the AirPlay icon to choose the headphones or the phone’s speaker. (iOS 26 lets Varv choose it here.)'));
   const tt = el('button', 'cr act'); tt.append(el('span', '', 'Play a test sound')); tt.addEventListener('click', testTone);
   host.append(el('h3', '', 'Output'), card(...oc, mrow('Out', 'aOut'), tt));
-  // latency, which depends on the output
-  const lat = el('button', 'cr act'); lat.append(el('span', '', 'Measure in Settings'));
-  lat.addEventListener('click', () => { setMode('set'); requestAnimationFrame(() => { const h = $('#spage .sfh[data-fold=sLat]'); if (h) { if (!h.classList.contains('open')) h.click(); h.scrollIntoView(); } }); });
-  const rs = el('button', 'cr act'); rs.append(el('span', '', 'Restart audio'));
-  rs.firstChild.append(el('small', '', 'Closes the sound and the microphone and starts them again, as when the app opens. Try it if the delay grows or the sound goes to the wrong place.'));
-  rs.addEventListener('click', () => restartAudio());
-  host.append(card(rs));
-  host.append(el('h3', '', 'Latency'), card(crow('Headphones', el('b', '', prof().ms + ' ms')), crow('Screen', el('b', '', prof().scr + ' ms')),
-    el('p', 'cnote', 'Both depend on the output in use. Measure again after changing it.'), lat));
 }
 /* The microphones as tappable rows, the one in use ticked, like the outputs: the phone's own first. */
 function fillMicRows(host) {
@@ -3267,7 +3253,6 @@ function fillMicRows(host) {
 }
 function fillMics() {
   if (mode === 'audio') { const ms = $('#apage .microws'); if (ms) fillMicRows(ms); }
-  fillMicRows($('#micRows'));
 }
 function diag() {
   if (!ctx) return;
@@ -3319,8 +3304,9 @@ $('#backR').addEventListener('click', () => setMode('play'));
 $('#backL').addEventListener('click', () => setMode('play'));
 $('#metersBtn').addEventListener('click', () => setMode(mode === 'audio' ? 'play' : 'audio'));
 $('#toAudio').addEventListener('click', () => setMode('audio'));
+$('#apDone').addEventListener('click', () => setMode('play'));
 /* Settings sections fold open and shut and stay as you leave them, like those in Edit. */
-for (const h of document.querySelectorAll('#spage .sfh')) {
+for (const h of document.querySelectorAll('.spage .sfh')) {
   const key = h.dataset.fold, body = h.nextElementSibling;
   const show = () => { const open = st.folds && key in st.folds ? !!st.folds[key] : !!h.dataset.def; body.hidden = !open; h.classList.toggle('open', open); h.setAttribute('aria-expanded', open); };
   h.addEventListener('click', () => { const open = st.folds && key in st.folds ? !!st.folds[key] : !!h.dataset.def; st.folds = Object.assign({}, st.folds, { [key]: !open }); save(); show(); });
@@ -3379,9 +3365,6 @@ $('#tapPad').addEventListener('pointerdown', e => {
 $('#tapUse').addEventListener('click', () => { if (!tapOut) return; prof().scr = tapOut.ms; save(); $('#tapUse').hidden = true; ui(); toast('New laps on the sampler shift by ' + tapOut.ms + ' ms.'); });
 
 $('#clickVolRow').append(sliderRow('Volume', 0, 1, 0.01, st.clickVol, 0.6, pct, v => { st.clickVol = v; save(); if (ctx && running && st.clickOn && nowF() >= epoch) clickGain.gain.setTargetAtTime(v, ctx.currentTime, 0.01); }));
-const inGainRow = sliderRow('Input gain', -12, 30, 0.5, st.inGain, 0, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + ' dB', v => { st.inGain = v; save(); if (inG) inG.gain.setTargetAtTime(dbLin(v), ctx.currentTime, 0.02); });
-$('#inGainRow').append(inGainRow);
-swtch($('#lowCutSw'), () => st.lowCut, v => { st.lowCut = v; save(); if (inHP) inHP.frequency.setTargetAtTime(v ? 80 : 10, ctx.currentTime, 0.02); }, false);
 const drawOverdubNote = () => { $('#overdubNote').textContent = st.overdub
   ? 'A new lap recorded onto a track that already has one plays together with it.'
   : 'A new lap recorded onto a track replaces what was there. The earlier laps are kept silent, and Undo brings them back.'; };
