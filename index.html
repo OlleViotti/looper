@@ -322,7 +322,6 @@ select.txt.bare{width:100%;color:var(--text)}
 .pill .sbtn:disabled{opacity:.3}
 .pill.sm output{min-width:40px}
 .takeoff > .cr:first-child > span{opacity:.45}
-.takeoff > .cr:first-child > span::after{content:' (silent)'}
 /* switch */
 .sw{position:relative;width:52px;height:32px;border-radius:16px;background:var(--raise);transition:background .15s}
 .sw i{position:absolute;left:3px;top:3px;width:26px;height:26px;border-radius:50%;background:var(--tape);transition:transform .15s}
@@ -525,7 +524,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 17 Nov 22:35</p>
+  <p class="ver">Varv one, build 17 Nov 22:45</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -1307,9 +1306,10 @@ function serviceTake(k, now) {
   else if (!k.started && !k.pend && now >= end - LEAD_S * sr) { render(k); afterRender(k, now, end); }
 }
 /* A lap recorded with the track's overdub button (k.od) plays on top of what is there; one recorded with its record
-   button replaces it: the earlier takes are kept, silent, so Undo brings them back. A take switched off is silent. */
+   button replaces it: the earlier takes are kept, silent, so Undo brings them back. A take switched off is silent; one switched back on (k.pin) plays until the next replacing lap. */
 const takeOn = k => {
   if (k.off) return false;
+  if (k.pin) return true;
   for (const j of k.track.takes) if (j.id > k.id && j.started && !j.off && !j.od) return false;
   return true;
 };
@@ -1333,6 +1333,7 @@ function afterRender(k, now, end) {
   if (!k.pend) goLive(k, now, end, first);
 }
 function goLive(k, now, end, first) {
+  if (first && !k.od) for (const j of k.track.takes) if (j.id < k.id) j.pin = false;   // a replacing lap silences what was switched back on
   attachTake(k);
   k.started = true;
   let at = 0;
@@ -2708,7 +2709,7 @@ function setTrackBars(t, b, show) {
 function takeRow(k, label) {
   const box = el('div', 'take' + (takeOn(k) ? '' : ' takeoff')), out = el('output'), use = el('button', 'tbtn');
   const head = el('div', 'cr tkh'), rm = el('button', 'tbtn danger', 'Remove');
-  head.append(swtch(el('div'), () => !k.off, v => { k.off = !v; applyTakes(k.track); drawLane(k.track); markDirty(); renderPane(); }), el('span', 'tkl', label), rm);
+  head.append(swtch(el('div'), () => takeOn(k), v => { k.off = !v; k.pin = v; applyTakes(k.track); drawLane(k.track); markDirty(); renderPane(); }), el('span', 'tkl', label), rm);
   rm.addEventListener('click', () => removeTake(k));
   const cv = el('canvas', 'tkw'); cv.draw = () => drawTakeWave(k, cv);
   const cur = () => k.notes ? prof().scr : prof().ms;
@@ -3030,10 +3031,10 @@ async function saveProject() {
         return { key: s.key, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: s.env, comp: s.comp };
       })(t.sample),
       takes: t.takes.filter(k => k.full && k.started).map(k => {
-        if (k.notes) return { key: k.key, lat: k.lat, off: !!k.off, bars: isFree() ? null : Math.round(k.len / barsLen(1)), notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
+        if (k.notes) return { key: k.key, lat: k.lat, off: !!k.off, pin: !!k.pin, bars: isFree() ? null : Math.round(k.len / barsLen(1)), notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
         keep.add(k.key);
         if (k.savedTo !== pid) { puts.push([pid + '/' + k.key, k.raw.slice(0, k.filled)]); k.savedTo = pid; }
-        return { key: k.key, lat: k.lat, off: !!k.off, od: !!k.od, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
+        return { key: k.key, lat: k.lat, off: !!k.off, pin: !!k.pin, od: !!k.od, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
       }) })) };
   const prev = saving;
   const job = (async () => {
@@ -3113,7 +3114,7 @@ async function openProject(id) {
       if (km.notes) {                                     // a lap of notes: rendered from the sample once it is ready
         if (!t.sample || (isFree() && !freeL)) { missing++; continue; }
         const len = isFree() ? freeL : barsLen(km.bars || tm.bars || meta.bars);
-        t.takes.push({ id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw: null, span: len + MAXLAT + 8, sig: '', off: !!km.off,
+        t.takes.push({ id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw: null, span: len + MAXLAT + 8, sig: '', off: !!km.off, pin: !!km.pin,
           notes: km.notes.map(([p, n, o]) => ({ A: Math.round(p * ratio), n, O: o == null ? null : Math.round(o * ratio), tid: t.id })),
           filled: 0, lat: km.lat, reverse: false, norm: 1, peak: 0, peaks: null, buf: null, src: null, tg: null,
           final: false, started: true, full: true, auto: false, track: t, savedTo: same ? id : null });
@@ -3123,7 +3124,7 @@ async function openProject(id) {
       if (!raw || (isFree() && !freeL)) { missing++; continue; }
       if (!same) raw = resample(raw, ratio);
       const len = isFree() ? freeL : barsLen(km.bars || tm.bars || meta.bars);
-      const k = { id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, off: !!km.off, od: !!km.od, reverse: !!km.reverse,
+      const k = { id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, off: !!km.off, pin: !!km.pin, od: !!km.od, reverse: !!km.reverse,
         norm: km.norm == null ? null : km.norm, peak: 0, peaks: null, buf: null, src: null, tg: null,
         final: true, started: true, full: true, auto: false, track: t, savedTo: same ? id : null };
       render(k); t.takes.push(k); attachTake(k);
