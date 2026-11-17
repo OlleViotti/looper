@@ -435,6 +435,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 .kb,.kb *,.pbig,.pbig *,.tappad{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .oct{flex:1;min-height:60px;position:relative;display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .ky{position:relative;border-radius:0 0 8px 8px;background:var(--tape);color:#1b1f2e;font:600 12px/1 var(--ui);display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;cursor:pointer}
+.kdead{position:absolute;top:0;height:58%;width:calc((100% - 18px) / 7 * .38 + 3px);z-index:1}
 .ky.bk{position:absolute;top:0;height:58%;width:calc((100% - 18px) / 7 * .62);background:#14161f;color:var(--mut);border-radius:0 0 6px 6px;z-index:1;box-shadow:inset 0 0 0 1px var(--line)}
 .ky.root::before{content:'';position:absolute;left:50%;top:8px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--rec)}
 .ky.hit{background:var(--amber);color:#1b1f2e}
@@ -557,7 +558,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 02:50</p>
+  <p class="ver">Varv one, build 18 Nov 03:00</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -1909,7 +1910,7 @@ function buildKeys(t, area) {
   area.textContent = '';
   const w0 = kStart(t), rootN = Math.round(sRoot(t));
   for (let r = kOctOf(t) - 1; r >= 0; r--) {                // each row seven white keys, from any white key
-    const s0 = w0 + 7 * r, row = el('div', 'oct');
+    const s0 = w0 + 7 * r, row = el('div', 'oct'), bj = [];
     for (let i = 0; i < 7; i++) {
       const w = s0 + i, m = wMidi(w), first = i === 0 || w % 7 === 0;
       const k = el('div', 'ky' + (m === rootN ? ' root' : ''), first ? wName(w) : 'CDEFGAB'[w % 7]); k.dataset.n = m; row.append(k);
@@ -1918,7 +1919,10 @@ function buildKeys(t, area) {
       const w = s0 + i; if (![0, 1, 3, 4, 5].includes(w % 7)) continue;
       const m = wMidi(w) + 1, j = i + 1, k = el('div', 'ky bk' + (m === rootN ? ' root' : '')); k.dataset.n = m;
       k.style.left = 'calc((100% - 18px) / 7 * ' + (j - 0.31) + ' + ' + (3 * j - 1.5) + 'px)';
-      row.append(k);
+      row.append(k); bj.push(j);
+    }
+    for (const j of bj) if (bj.includes(j + 1)) {           // the strip of white key between two black keys does not play
+      const d = el('div', 'kdead'); d.style.left = 'calc((100% - 18px) / 7 * ' + (j + 0.31) + ' + ' + (3 * j - 1.5) + 'px)'; row.append(d);
     }
     area.append(row);
   }
