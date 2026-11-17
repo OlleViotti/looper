@@ -108,6 +108,7 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 .scb{position:relative;overflow:hidden;height:44px;display:block;padding:0;border-radius:8px;background:var(--raise);font-weight:700;cursor:pointer}
 .scb.empty{background:transparent;border:1px dashed var(--line);color:var(--mut)}
 .scb.on{background:var(--amber);color:#1b1f2e}
+.scb.wait{background:var(--raise);color:var(--text);box-shadow:inset 0 0 0 3px var(--amber);animation:blink .5s steps(2,jump-none) infinite}
 .scb span{position:relative;display:block;width:100%;line-height:42px;text-align:center}
 .scb .lp{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,178,36,.35);pointer-events:none}
 .scb.pressing .lp{width:100%;transition:width .45s linear}
@@ -476,6 +477,12 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
     <p class="cnote" id="muteNote"></p>
   </div>
 
+  <h3>Scenes</h3>
+  <div class="card">
+    <div class="cr"><div class="seg full" id="sceneSeg"></div></div>
+    <p class="cnote" id="sceneNote"></p>
+  </div>
+
   <h3>Performance recording</h3>
   <div class="card">
     <button class="cr act" id="perfBtn"><span>Record performance</span></button>
@@ -500,7 +507,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 17 Nov 10:30</p>
+  <p class="ver">Varv one, build 17 Nov 10:50</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in" id="apIn"></div></div>
@@ -527,7 +534,7 @@ const EQ_DEF = { eqL: 0, eqM: 0, eqH: 0, eqLf: 200, eqMf: 1000, eqHf: 4000 };
 const FX_KEYS = ['master', 'gFilter', 'eqL', 'eqM', 'eqH', 'eqLf', 'eqMf', 'eqHf', 'gEcho', 'echoDiv', 'echoMs', 'echoFb', 'echoLvl', 'gRev', 'revSize', 'revLvl', 'compThr', 'compAmt'];
 const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
 const st = Object.assign({
-  v: 4, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, overdub: true, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'bar',
+  v: 5, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, overdub: false, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now', sceneQ: 'lap',
   profiles: [{ name: 'AirPods', ms: 185, guess: true }, { name: 'Wired or speaker', ms: 20, guess: true }],
   active: 0, micId: 'builtin', master: 0.9, gFilter: 0,
   gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1,
@@ -543,6 +550,7 @@ if ((saved.v || 0) < 2) { st.v = 2; st.muteQ = 'bar'; if (!saved.micId) st.micId
 const LAT_DEF = 185, TOUCH_MS = 60, scrGuess = p => p.ms + TOUCH_MS;
 if ((saved.v || 0) < 3) for (const p of st.profiles) if (p.guess && p.ms === 180) p.ms = LAT_DEF;
 if ((saved.v || 0) < 4) { st.v = 4; for (const p of st.profiles) delete p.scr; }
+if ((saved.v || 0) < 5) { st.v = 5; st.muteQ = 'now'; st.overdub = false; st.sceneQ = 'lap'; }   // new defaults: mute and solo at once, scenes at the end of the lap, overdub off
 for (const p of st.profiles) if (p.scr == null) p.scr = scrGuess(p);
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
 const prof = () => st.profiles[st.active];
@@ -1278,6 +1286,7 @@ function tick() {
     ui();                                                                    // the target may have moved on
   }
   if (srec && now - srec.F >= SMAX_S * sr) stopSampleRec();
+  if (scenePend && (!running || ctx.currentTime >= scenePend.at)) { scenePend = null; drawScenes(); }
   for (const k of allTakes()) serviceTake(k, now);
   for (const it of trash) for (const k of (it.take ? [it.take] : it.track.takes)) fillTake(k, now);   // keeps removed takes complete for a restore
   pruneEv(now);
@@ -1954,10 +1963,20 @@ function sceneRecall(i) {
   const sc = scenes[i];
   if (!sc) { toast('Hold to store the current mutes as scene ' + SCN[i] + '.'); return; }
   hintDone('scenes');
-  const at = switchAt();
+  const at = sceneAt();
   for (const t of tracks) if (t.key in sc.mute) { t.mute = sc.mute[t.key]; t.solo = !!sc.solo[t.key]; }
   for (const t of tracks) applyTrack(t, at);
+  scenePend = at && ctx && at > ctx.currentTime ? { i, at } : null;
   drawHeads(); refreshPane(tracks.find(t => t.id === selId)); markDirty();
+}
+/* When a scene lands: at once, on the next bar, or (the default) at the end of the lap you are hearing.
+   Counted from what you hear, so tapping just before the end of a lap still lands on that lap's end. */
+let scenePend = null;
+function sceneAt() {
+  if (!ctx || !running || st.sceneQ === 'now') return 0;
+  const unit = st.sceneQ === 'bar' && !isFree() ? barsLen(1) : L, p = heardPos();
+  if (p < 0) return epoch / sr;                                     // in the count-in: from the first beat
+  return (epoch + Math.ceil((p + 0.01 * sr) / unit) * unit) / sr;
 }
 const sceneOn = sc => !!sc && tracks.length > 0 && tracks.every(t => !(t.key in sc.mute) || (sc.mute[t.key] === t.mute && !!sc.solo[t.key] === t.solo));
 function drawScenes() {
@@ -1967,7 +1986,7 @@ function drawScenes() {
     b.setAttribute('aria-label', 'Scene ' + c + ': tap to recall, hold to store');
     pressable(b, () => sceneRecall(i), () => sceneStore(i)); host.append(b);
   });
-  [...host.children].forEach((b, i) => { b.classList.toggle('empty', !scenes[i]); b.classList.toggle('on', sceneOn(scenes[i])); });
+  [...host.children].forEach((b, i) => { b.classList.toggle('empty', !scenes[i]); b.classList.toggle('on', sceneOn(scenes[i]) && !(scenePend && scenePend.i !== i)); b.classList.toggle('wait', !!scenePend && scenePend.i === i); });
 }
 
 /* Removed recordings and tracks stay restorable until the bar is dismissed. */
@@ -2204,7 +2223,12 @@ function trackPane(t) {
     for (const b of kind.children) b.disabled = has && !b.classList.contains('on');
     r.append(kind); return r;
   };
-  p.append(card(head, has ? null : kindRow()));
+  let cp = null;
+  if (t.sample) {                                   // a sampler: a new track with the same sample and every setting, without the laps
+    cp = el('button', 'cr act'); cp.append(el('span', '', 'New track with this sample'));
+    cp.firstChild.append(el('small', '', 'Same sample and all track settings, without the laps.')); cp.addEventListener('click', () => copySampler(t));
+  }
+  p.append(card(head, has ? null : kindRow(), cp));
   const eqDraw = () => { const w = $('.eqw', $('#epane')); if (w) w.draw(); };
   p.append(el('h3', '', 'Live'), card(sliderRow('Volume', 0, 1.5, 0.01, t.vol, 1, pct, ap('vol')),
     sliderRow('Filter', -1, 1, 0.01, t.filt, 0, filtTxt, v => { t.filt = v; applyTrack(t); markDirty(); eqDraw(); }),
@@ -2294,7 +2318,7 @@ function sampleSection(t) {
     ...fold('tune', 'Autotune', () => [tuneCard(t)]),
     card(crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false)),
       crow('Notes', gs), el('p', 'cnote', 'Full plays the whole sample on every note; Held stops it when you let go.')),
-    card((() => { const b = el('button', 'cr act'); b.append(el('span', '', 'New track with this sample')); b.firstChild.append(el('small', '', 'The same sample and settings, without the laps.')); b.addEventListener('click', () => copySampler(t)); return b; })())];
+    ];
 }
 /* A new track with the same sample and all its settings, but none of the laps. */
 function copySampler(t) {
@@ -2968,6 +2992,8 @@ function ui() {
   $('#bpmVal').innerHTML = st.bpm + '<small>bpm</small>';
   $('#latVal').innerHTML = prof().ms + '<small>ms</small>';
   $('#scrVal').innerHTML = prof().scr + '<small>ms</small>';
+  $('#sceneNote').textContent = st.sceneQ === 'now' ? 'A scene takes effect the moment you tap it.' : st.sceneQ === 'bar' ? 'A scene takes effect on the next bar; its button blinks until then.'
+    : 'A scene takes effect when the lap you are hearing ends, so you can choose the next part ahead; its button blinks until then.';
   $('#muteNote').textContent = st.muteQ === 'now' ? 'Mute and solo act the moment you lift your finger.'
     : isFree() ? 'In free mode the change lands at the start of the next pass of the loop.' : 'Tap ahead: the change lands on the next ' + (st.muteQ === 'bar' ? 'bar' : 'beat') + '.';
   if (document.activeElement !== $('#projInput')) $('#projInput').value = project ? project.name : '';
@@ -3191,12 +3217,13 @@ swtch($('#lowCutSw'), () => st.lowCut, v => { st.lowCut = v; save(); if (inHP) i
 const drawOverdubNote = () => { $('#overdubNote').textContent = st.overdub
   ? 'A new lap recorded onto a track that already has one plays together with it.'
   : 'A new lap recorded onto a track replaces what was there. The earlier laps are kept silent, and Undo brings them back.'; };
-swtch($('#overdubSw'), () => st.overdub, v => { st.overdub = v; save(); drawOverdubNote(); for (const t of tracks) { applyTakes(t); drawLane(t); } renderPane(); }, true);
+swtch($('#overdubSw'), () => st.overdub, v => { st.overdub = v; save(); drawOverdubNote(); for (const t of tracks) { applyTakes(t); drawLane(t); } renderPane(); }, false);
 drawOverdubNote();
 swtch($('#autoLvlSw'), () => st.autoLevel, v => { st.autoLevel = v; save(); }, false);
 swtch($('#perfMicSw'), () => st.perfMic, v => { st.perfMic = v; save(); }, true);
 $('#perfBtn').addEventListener('click', togglePerf);
-seg($('#muteSeg'), [['now', 'Immediately'], ['beat', 'Next beat'], ['bar', 'Next bar']], () => st.muteQ, v => { st.muteQ = v; save(); ui(); }, 'bar');
+seg($('#muteSeg'), [['now', 'Immediately'], ['beat', 'Next beat'], ['bar', 'Next bar']], () => st.muteQ, v => { st.muteQ = v; save(); ui(); }, 'now');
+seg($('#sceneSeg'), [['now', 'Immediately'], ['bar', 'Next bar'], ['lap', 'End of lap']], () => st.sceneQ, v => { st.sceneQ = v; save(); ui(); }, 'lap');
 $('#micSel').addEventListener('change', e => { if (!ctx) return; st.micId = e.target.value; save(); openMic(chosenMic(mics), wantsBuiltin()); });
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (performance.now() - micOpenAt > 1500) keepMic(false); });
 $('#exportBtn').addEventListener('click', exportWav);
