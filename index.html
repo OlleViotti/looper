@@ -439,6 +439,9 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 body.s-rec .pads .kb,body.s-rec .pads .pbig,body.s-armed .pads .kb,body.s-armed .pads .pbig{outline:3px solid var(--rec);outline-offset:3px;border-radius:10px}
 body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 .trimw{padding:10px 14px 4px}
+.finew{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 10px 2px}
+.finev output{display:block;font-size:13px;color:var(--mut);text-align:center;padding-top:4px;font-variant-numeric:tabular-nums}
+.finec{display:block;width:100%;height:64px;border-radius:8px;background:var(--desk);touch-action:none;cursor:ew-resize}
 .trimc{display:block;width:100%;height:96px;border-radius:8px;background:var(--desk);touch-action:none;cursor:ew-resize}
 .trimw output{display:block;font-size:14px;color:var(--mut);min-height:20px;margin-top:4px;font-variant-numeric:tabular-nums}
 .tappad{display:block;width:100%;height:120px;border-radius:14px;background:var(--raise);font-size:20px;font-weight:700;margin:8px 0;touch-action:none}
@@ -550,7 +553,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 01:25</p>
+  <p class="ver">Varv one, build 18 Nov 01:45</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -2720,27 +2723,50 @@ function sampleMain(t) {
   at.addEventListener('click', () => { [s.a, s.b] = autoTrim(s.raw); trim.draw(); syncFine(); sampleEdited(t, true, 0); });
   const pd = el('button', 'tbtn', 'Pads'); pd.addEventListener('click', () => openPads(t));
   const acts = el('div', 'cr wrap'); acts.append(recB, at, pd);
-  /* fine trim: each edge within 150 ms either side of where it was when the section opened (or last moved by
-     dragging the trim view or Auto trim), in steps of a sample; double-tap for where auto trim puts it */
-  const W = Math.round(0.15 * sr), auto = autoTrim(s.raw), fmt = v => (v / sr).toFixed(3) + ' s';
-  const fineRow = (key, label) => {
-    const r = sliderRow(label, 0, 1, 1, s[key], key === 'a' ? auto[0] : auto[1], fmt, v => {
-      v = Math.round(v);
-      if (key === 'a') s.a = clamp(v, 0, s.b - gap); else s.b = clamp(v, s.a + gap, s.raw.length);
-      trim.draw(); sampleEdited(t, true);
-    });
-    const av = key === 'a' ? auto[0] : auto[1];       // the window always reaches the auto trim point, so a double-tap can go there
-    r.center = () => { const inp = $('input', r), c = s[key]; inp.min = Math.max(0, Math.min(c - W, av)); inp.max = Math.min(s.raw.length, Math.max(c + W, av)); r.set(c); };
-    r.center(); return r;
-  };
-  const fa = fineRow('a', 'Start'), fb = fineRow('b', 'End');
-  const syncFine = () => { fa.center(); fb.center(); };
+  /* fine trim: a close-up of each edge, 150 ms either side of it, to drag it finely; double-tap for where auto trim puts it */
+  const fa = fineView(t, 'a', () => trim.draw()), fb = fineView(t, 'b', () => trim.draw());
+  const syncFine = () => { fa.draw(); fb.draw(); };
+  const fine = el('div', 'finew'); fine.append(fa, fb);
   trim.onEnd = syncFine;                              // dragging the trim view moves the fine sliders' window with it
-  s.hk.main = () => { trim.draw(); const w = $('.envw', $('#epane')); if (w) w.draw(); };
+  s.hk.main = () => { trim.draw(); syncFine(); const w = $('.envw', $('#epane')); if (w) w.draw(); };
   return [card(trim, acts, crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false))),
-    el('h3', '', 'Envelope'), card(envWidget(t), fa, fb,
+    el('h3', '', 'Envelope'), card(envWidget(t), fine,
       sliderRow('Punch', 0, 1, 0.01, envOf(t).p, 0, v => v ? '+' + (20 * Math.log10(1 + 2 * v)).toFixed(1) + ' dB' : 'off', v => { s.env = Object.assign(envOf(t), { p: v }); envChanged(t); const w = $('.envw', $('#epane')); if (w) w.draw(); }),
-      el('p', 'cnote', 'Start and End trim the sample finely, within 150 ms of where they were; double-tap either for where Auto trim puts it.'))];
+      el('p', 'cnote', 'Start and End show each edge close up: drag to move it finely, double-tap for where Auto trim puts it.'))];
+}
+function fineView(t, key, moved) {
+  const s = t.sample, box = el('div', 'finev'), cv = el('canvas', 'finec'), out = el('output'), W = Math.round(0.15 * sr), gap = Math.round(0.02 * sr);
+  box.append(cv, out);
+  let c0 = s[key], act = false, lastTap = 0;                 // the close-up stays put while dragging, then centres on the edge again
+  function draw() {
+    if (!act) c0 = s[key];
+    const { g, w, h } = sizeCanvas(cv); if (!w) return;
+    const a0 = c0 - W, mid = h / 2, per = 2 * W / w; let top = 1e-4;
+    for (let i = Math.max(0, a0); i < Math.min(s.raw.length, a0 + 2 * W); i++) top = Math.max(top, Math.abs(s.raw[i]));
+    const sc = (mid - 4) / top;
+    for (let x = 0; x < w; x++) {
+      const i0 = Math.floor(a0 + x * per), i1 = Math.floor(a0 + (x + 1) * per); let lo = 0, hi = 0;
+      for (let i = Math.max(0, i0); i < Math.min(s.raw.length, Math.max(i0 + 1, i1)); i++) { const v = s.raw[i]; if (v < lo) lo = v; if (v > hi) hi = v; }
+      const inside = i0 >= s.a && i0 < s.b;
+      g.fillStyle = inside ? '#ece5d0' : 'rgba(160,168,192,.35)'; g.fillRect(x, mid - hi * sc, 1, Math.max(1, (hi - lo) * sc));
+    }
+    const ex = Math.round((s[key] - a0) / per);
+    g.fillStyle = '#ffb224'; g.fillRect(ex - 1, 0, 3, h); g.fillRect(ex - 6, key === 'a' ? 0 : h - 8, 13, 8);
+    out.textContent = (key === 'a' ? 'Start ' : 'End ') + (s[key] / sr).toFixed(3) + ' s';
+  }
+  let x0 = 0, v0 = 0;                                      // dragging moves the edge by half the finger's travel, for precision
+  const at = e => { const r = cv.getBoundingClientRect(); return Math.round(v0 + (e.clientX - x0) / r.width * W); };
+  const set = v => { if (key === 'a') s.a = clamp(v, 0, s.b - gap); else s.b = clamp(v, s.a + gap, s.raw.length); };
+  cv.addEventListener('pointerdown', e => {
+    const now = performance.now();
+    if (now - lastTap < 320) { lastTap = 0; set(autoTrim(s.raw)[key === 'a' ? 0 : 1]); act = false; draw(); moved(); sampleEdited(t, true, 0); return; }
+    lastTap = now; act = true; x0 = e.clientX; v0 = s[key]; try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+  });
+  cv.addEventListener('pointermove', e => { if (!act) return; set(at(e)); draw(); moved(); });
+  const up = () => { if (!act) return; act = false; draw(); sampleEdited(t, true); };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  box.draw = draw; requestAnimationFrame(draw);
+  return box;
 }
 /* Pitch: the root note and the transposition of the sample. */
 function samplePitch(t) {
@@ -3087,7 +3113,7 @@ let sw = null, eatClick = false;
 document.addEventListener('pointerdown', e => {
   sw = null;
   if (e.pointerType === 'mouse' && e.button !== 0) return;
-  if (e.target.closest('input,select,textarea,.eqc,.envc,.trimc,.tappad,.kb,.pbig,.etabs,.xyp')) return;
+  if (e.target.closest('input,select,textarea,.eqc,.envc,.trimc,.finec,.tappad,.kb,.pbig,.etabs,.xyp')) return;
   const up = false;                                                                            // the pads open from a sampler's keys button
   const down = !!padT && !!e.target.closest('.pads');                                          // swipe down on the sheet: close it
   sw = { x: e.clientX, y: e.clientY, id: e.pointerId, horiz: false, vert: false, up, down };
