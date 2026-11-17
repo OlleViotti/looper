@@ -441,7 +441,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
     <div class="cpad"><div class="dots" id="measDots" hidden></div><p id="measRes" hidden></p><button class="btn on wide" id="measUse" hidden></button></div>
     <div class="cr"><span>Screen</span><div class="pill" id="scrStep"><button class="sbtn" data-d="-1" aria-label="Shorter">−</button><output id="scrVal"></output><button class="sbtn" data-d="1" aria-label="Longer">+</button></div></div>
     <button class="cr act" id="measTap"><span>Measure by tapping<small>For the sampler. Headphones on, tap along with the clicks as you hear them.</small></span></button>
-    <div class="cpad"><button class="tappad" id="tapPad" hidden>Tap on every click</button><div class="dots" id="tapDots" hidden></div><p id="tapRes" hidden></p><button class="btn on wide" id="tapUse" hidden></button></div>
+    <div class="cpad"><button class="tappad" id="tapPad" hidden>Tap on the clicks</button><div class="dots" id="tapDots" hidden></div><p id="tapRes" hidden></p><button class="btn on wide" id="tapUse" hidden></button></div>
   </div>
 
   <h3>Loop</h3>
@@ -514,7 +514,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 17 Nov 13:10</p>
+  <p class="ver">Varv one, build 17 Nov 13:30</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in" id="apIn"></div></div>
@@ -620,7 +620,7 @@ function initAudio() {
   if (!AC) { toast('This browser lacks the audio engine.'); return Promise.resolve(false); }
   try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) {}
   try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e) { ctx = new AC(); }
-  sr = ctx.sampleRate; ctx.resume().catch(() => {});
+  sr = ctx.sampleRate; ctx.resume().catch(() => {}); audioT0 = performance.now();
   PRE = latN(PRE_MS); XF = latN(XF_MS); MAXLAT = latN(MAXLAT_MS); OPEN_LP = Math.min(20000, sr * 0.45);
   buildGraph();
   for (const t of tracks) buildTrackNodes(t);          // tracks prepared before audio started
@@ -748,7 +748,7 @@ const BUILTIN = /iphone|ipad|built-?in|inbyggd|intern/i;
 const wantsBuiltin = () => !st.micId || st.micId === 'builtin';
 const builtinId = list => (list.find(m => BUILTIN.test(m.label)) || {}).deviceId || '';
 const chosenMic = list => wantsBuiltin() ? builtinId(list) : list.some(m => m.deviceId === st.micId) ? st.micId : builtinId(list);
-let micDev = '', micOpenAt = 0, micList = '', keepT = 0;
+let micDev = '', micOpenAt = 0, micList = '', keepT = 0, audioT0 = 0;
 async function openMic(id, auto) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { micOK = false; toast('The microphone needs the page to be opened over https.'); return false; }
   const base = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 };
@@ -1677,7 +1677,7 @@ function noTouchDefaults(node) {
 }
 
 /* ---------- screen latency, measured by tapping ----------
-   Sixteen clicks; you tap along with them. The offset of the taps from the clicks, after the first three,
+   Eight clicks after a count-in; you tap along with them. The offset of the taps from the clicks, after the first three,
    is the time from the click leaving the app until your touch reaches it: the headphones plus the screen. */
 let tapMeas = null, tapOut = null;
 async function measureTap() {
@@ -1686,28 +1686,27 @@ async function measureTap() {
   if (running) stop();
   const ok = await initAudio(); if (!ok) return;
   measuring = true; ui();
-  /* A count-in of four higher clicks, counted down on the pad, then the sixteen clicks that are measured. */
-  const N = 16, CI = 4, iv = Math.round(0.75 * sr), n = Math.round(0.04 * sr);
+  const dots = $('#tapDots'), pad = $('#tapPad');
+  dots.textContent = ''; dots.hidden = true; pad.hidden = false; $('#tapRes').hidden = true; $('#tapUse').hidden = true; $('#measTap').disabled = true;
+  pad.scrollIntoView({ block: 'nearest' }); pad.textContent = 'Getting ready…';
+  /* Just after the audio or the microphone starts, an iPhone can still be switching its audio route (and Varv
+     sets it again a moment later), which glitches the first clicks: wait until 2.5 s after the last of these. */
+  const settle = Math.max(audioT0, micOpenAt, raAt) + 2500 - performance.now();
+  if (settle > 0) await sleep(settle);
+  if (ctx.state !== 'running') { try { await ctx.resume(); } catch (e) {} await sleep(300); }
+  /* Four higher clicks to count in, then eight that are measured. Nothing on the screen moves in time with the
+     clicks, since the screen has a delay of its own: you tap to what you hear. */
+  const N = 8, CI = 4, iv = Math.round(0.75 * sr), n = Math.round(0.04 * sr);
   const mk = f => { const b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.sin(2 * Math.PI * f * i / sr) * Math.exp(-i / (0.006 * sr)); return b; };
   const bc = mk(1760), b = mk(1320);
   const t0 = nowF() + Math.round(0.8 * sr) + CI * iv, g = gn(Math.max(st.clickVol, 0.6)); g.connect(clickComp);   // same path as the click
-  const dots = $('#tapDots'), pad = $('#tapPad'), at = f => Math.max(0, (f / sr - ctx.currentTime) * 1000);
-  dots.textContent = ''; dots.hidden = false; pad.hidden = false; $('#tapRes').hidden = true; $('#tapUse').hidden = true; $('#measTap').disabled = true;
-  pad.scrollIntoView({ block: 'nearest' }); pad.textContent = 'Listen…';
+  pad.textContent = 'Four high clicks, then tap on the next eight';
   tapMeas = { t0, iv, N, taps: [] };
-  const tm = [];
-  for (let k = -CI; k < N; k++) {
-    const s = ctx.createBufferSource(); s.buffer = k < 0 ? bc : b; s.connect(g); s.start((t0 + k * iv) / sr);
-    if (k < 0) tm.push(setTimeout(() => { pad.textContent = String(-k); }, at(t0 + k * iv)));
-    else {
-      const dot = el('i'); dots.append(dot);
-      tm.push(setTimeout(() => { dot.classList.add('on'); if (!k) pad.textContent = 'Tap on every click'; }, at(t0 + k * iv)));
-    }
-  }
+  for (let k = -CI; k < N; k++) { const s = ctx.createBufferSource(); s.buffer = k < 0 ? bc : b; s.connect(g); s.start((t0 + k * iv) / sr); }
   await sleep(((t0 + N * iv) / sr - ctx.currentTime + 0.6) * 1000);
   const m = tapMeas; tapMeas = null;
   try { g.disconnect(); } catch (e) {}
-  measuring = false; pad.hidden = true; pad.textContent = 'Tap on every click'; $('#measTap').disabled = false;
+  measuring = false; pad.hidden = true; $('#measTap').disabled = false;
   tapOut = analyzeTaps(m);
   const res = $('#tapRes'); res.hidden = false;
   if (!tapOut) res.textContent = 'Too few taps on the clicks. Try again, tapping on every click.';
@@ -1718,7 +1717,7 @@ async function measureTap() {
   ui();
 }
 function analyzeTaps(m) {
-  const { t0, iv, N, taps } = m; if (taps.length < 6) return null;
+  const { t0, iv, N, taps } = m; if (taps.length < 5) return null;
   let sx = 0, sy = 0;
   for (const A of taps) { const ph = 2 * Math.PI * (A - t0) / iv; sx += Math.cos(ph); sy += Math.sin(ph); }
   let c = Math.atan2(sy, sx) / (2 * Math.PI) * iv;          // the typical offset, from -0.15 to 0.85 of the interval
@@ -1728,7 +1727,7 @@ function analyzeTaps(m) {
     const j = Math.round((A - t0 - c) / iv); if (j < 1 || j >= N) continue;   // taps in the count-in and on the first click are left out
     const o = A - t0 - j * iv; if (Math.abs(o - c) < 0.3 * iv) offs.push(o / sr * 1000);
   }
-  if (offs.length < 6) return null;
+  if (offs.length < 5) return null;
   /* Taps far from the rest (more than three times the typical scatter) are dropped, and the rest averaged. */
   const m0 = med(offs), sp = Math.max(2, 1.4826 * med(offs.map(x => Math.abs(x - m0)))), keep = offs.filter(x => Math.abs(x - m0) <= 3 * sp);
   const ms = keep.reduce((a, x) => a + x, 0) / keep.length;
