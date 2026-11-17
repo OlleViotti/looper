@@ -499,7 +499,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 17 Nov 23:50</p>
+  <p class="ver">Varv one, build 17 Nov 21:50</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -2292,6 +2292,7 @@ function refreshPane(t) { if (mode === 'edit' && t && selId === t.id) renderPane
 let paneFor = null;
 function renderPane() {
   const pane = $('#epane'), keep = paneFor === selId ? pane.scrollTop : 0; pane.textContent = '';
+  if (paneFor !== selId) foldOver = {};
   for (const t of tracks) t.pcv = null;
   if (mode !== 'edit') return;
   if (selId !== 'master' && !tracks.some(t => t.id === selId)) selId = tracks.length ? tracks[0].id : 'master';
@@ -2312,12 +2313,11 @@ function renderPane() {
 /* A folded section: closed by default, and it stays as you left it. The content is only built when open. */
 /* A folded section in Edit. It is open when something in it differs from the default (auto), for the track (or
    master) being edited; opening or closing it by hand is remembered for that track until the app is closed. */
-const masterFolds = {};
-function fold(key, title, make, auto, own) {
-  own = own || masterFolds;
-  const open = own._f && key in own._f ? !!own._f[key] : !!auto, h = el('button', 'fh' + (open ? ' open' : ''), title);
+let foldOver = {};   // sections opened or closed by hand; forgotten when another track is shown or Edit is left
+function fold(key, title, make, auto) {
+  const open = key in foldOver ? foldOver[key] : !!auto, h = el('button', 'fh' + (open ? ' open' : ''), title);
   h.setAttribute('aria-expanded', open);
-  h.addEventListener('click', () => { own._f = Object.assign({}, own._f, { [key]: !open }); renderPane(); });
+  h.addEventListener('click', () => { foldOver[key] = !open; renderPane(); });
   return open ? [h, ...make()] : [h];
 }
 /* What counts as changed from the default, per section. */
@@ -2728,6 +2728,7 @@ function setMode(m) {
   if (mode === 'edit' && !st.hints.edit) { st.hints.edit = 1; save(); }
   setShift(); setHH(); $('#tape').scrollLeft = 0; mode = m; document.body.dataset.mode = m;
   if (m === 'edit') {
+    foldOver = {}; paneFor = null;
     if (tracks.some(t => t.id === lastTouched)) selId = lastTouched;
     else if (selId == null) selId = tracks.length ? tracks[0].id : 'master';
     renderPane();
