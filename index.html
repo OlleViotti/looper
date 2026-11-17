@@ -557,7 +557,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 02:25</p>
+  <p class="ver">Varv one, build 18 Nov 02:35</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -2658,20 +2658,21 @@ function trackPane(t) {
     filterRow(),
     sliderRow('Reverb', 0, 1, 0.01, t.rev, 0, pct, ap('rev')), sliderRow('Delay', 0, 1, 0.01, t.echo, 0, pct, ap('echo'))));
   if (t.sample) { const s = t.sample; s.hk = {}; s.onProc = () => { for (const f of Object.values(s.hk)) f(); }; }   // what to redraw when the sample is processed again
-  if (isSmp(t)) {
-    p.append(...fold('sample', 'Sample and envelope', () => t.sample ? sampleMain(t) : [emptySampleCard(t)], changedIn.sample(t), t));
-    if (t.sample) p.append(...fold('comp', 'Compressor' + (compOf(t).on ? ' · on' : ''), () => [compCard(t)], changedIn.comp(t), t),
-      ...fold('spitch', 'Pitch', () => [samplePitch(t)], changedIn.spitch(t), t), ...fold('tune', 'Autotune' + (t.tune ? ' · on' : ''), () => [tuneCard(t)], changedIn.tune(t), t));
-  }
   const ks = t.takes.filter(k => k.started);
-  p.append(...fold('takes', isSmp(t) ? 'Laps' : 'Takes', () => {
+  const takesFold = () => fold('takes', isSmp(t) ? 'Laps' : 'Takes', () => {
     if (ks.length) {
       const trk = el('div', 'trk'); t.pcv = el('canvas'); trk.append(t.pcv, el('i', 'ph'));
       const top = el('div', 'tktop'); top.append(trk);
       return [card(top, ...takeCommon(t, ks), ...ks.map((k, i) => [k, i + 1]).reverse().map(([k, n]) => takeRow(k, n)))];
     }
     return [card(el('p', 'cnote', isSmp(t) ? 'No laps yet. Tap the track’s record button on the play screen, or Rec lap on the pads.' : 'No recordings yet. Tap the track’s record button on the play screen, or its microphone button to record a sample.'))];
-  }, changedIn.takes(t), t));
+  }, changedIn.takes(t), t);
+  if (isSmp(t)) {
+    p.append(...fold('sample', 'Sample and envelope', () => t.sample ? sampleMain(t) : [emptySampleCard(t)], changedIn.sample(t), t), ...takesFold());   // the laps right after the sample
+    if (t.sample) p.append(...fold('comp', 'Compressor' + (compOf(t).on ? ' · on' : ''), () => [compCard(t)], changedIn.comp(t), t),
+      ...fold('spitch', 'Pitch', () => [samplePitch(t)], changedIn.spitch(t), t), ...fold('tune', 'Autotune' + (t.tune ? ' · on' : ''), () => [tuneCard(t)], changedIn.tune(t), t));
+  }
+  if (!isSmp(t)) p.append(...takesFold());
   p.append(...fold('eq', 'EQ and pan', () => [card(eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }), filterRow(), sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan')))], changedIn.eq(t), t));
   p.append(...fold('dist', 'Distortion' + (t.dist ? ' · on' : ''), () => {
     const ad = k => v => { t[k] = v; applyDist(t); markDirty(); };
@@ -2769,10 +2770,9 @@ function sampleMain(t) {
   const fine = el('div', 'finew'); fine.append(fa, fb);
   trim.onEnd = syncFine;                              // dragging the trim view moves the fine sliders' window with it
   s.hk.main = () => { trim.draw(); syncFine(); const w = $('.envw', $('#epane')); if (w) w.draw(); };
-  return [card(trim, acts, crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false))),
-    el('h3', '', 'Envelope'), card(envWidget(t), fine,
-      sliderRow('Punch', 0, 1, 0.01, envOf(t).p, 0, v => v ? '+' + (20 * Math.log10(1 + 2 * v)).toFixed(1) + ' dB' : 'off', v => { s.env = Object.assign(envOf(t), { p: v }); envChanged(t); const w = $('.envw', $('#epane')); if (w) w.draw(); }),
-      el('p', 'cnote', 'Start and End show each edge close up: drag to move it finely, double-tap for where Auto trim puts it.'))];
+  return [card(trim, fine, el('p', 'cnote', 'Start and End show each edge close up: drag to move it finely, double-tap for where Auto trim puts it.'), acts, crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false))),
+    el('h3', '', 'Envelope'), card(envWidget(t),
+      sliderRow('Punch', 0, 1, 0.01, envOf(t).p, 0, v => v ? '+' + (20 * Math.log10(1 + 2 * v)).toFixed(1) + ' dB' : 'off', v => { s.env = Object.assign(envOf(t), { p: v }); envChanged(t); const w = $('.envw', $('#epane')); if (w) w.draw(); }))];
 }
 function fineView(t, key, moved) {
   const s = t.sample, box = el('div', 'finev'), cv = el('canvas', 'finec'), out = el('output'), W = Math.round(0.15 * sr), gap = Math.round(0.02 * sr);
