@@ -539,7 +539,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 17 Nov 22:55</p>
+  <p class="ver">Varv one, build 17 Nov 23:20</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -626,7 +626,8 @@ let scenes = Array(NSCN).fill(null);
 let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, selId = null, mode = 'play';
 const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'chrom', tSpeed: 20, tAmt: 1,
   sampler: false, padMode: null, kOct: null, kBase: null, sGate: false,
-  dist: false, dTyp: 'soft', dDrv: 0.5, dTon: 0.7, dMix: 1, dLvl: 1 }, EQ_DEF);   // distortion: on, type, drive, tone, mix, level   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
+  dist: false, dTyp: 'soft', dDrv: 0.5, dTon: 0.7, dMix: 1, dLvl: 1,
+  speed: 1, tstop: false, trem: 0, tDep: 1, tHard: false, lofi: 0 }, EQ_DEF);   // sound tricks: speed (0.5, 1, 2), tape stop, tremolo (notes per beat, depth, gate), lo-fi   // distortion: on, type, drive, tone, mix, level   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
 const TRACK_KEYS = Object.keys(TRACK_DEF);
 const isSmp = t => !!t.sample;                       // a sampler when it holds a sample, a microphone track when it holds recordings
 const OD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="14" r="6.5"/><path d="M19 2.5v8M15 6.5h8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
@@ -932,7 +933,8 @@ function startSource(k, at) {
   if (!k.tg || !k.buf) return;
   at = Math.max(at, epoch);
   const s = ctx.createBufferSource(); s.buffer = k.buf; s.loop = true; s.connect(k.tg);
-  s.start(at / sr, (((at - epoch) % k.len + k.len) % k.len) / sr);
+  const n = k.buf.length;                            // a lap, or two at half speed
+  s.start(at / sr, (((at - epoch) % n + n) % n) / sr);
   if (k.src) { try { k.src.stop(at / sr); } catch (e) {} }
   k.src = s;
 }
@@ -1047,9 +1049,10 @@ function fillRaw(k) {
    The seam sits PRE before the downbeat so an early hit on the one is kept whole,
    and XF crossfades the seam. Two consecutive laps then sum to exactly the original. */
 function render(k) {
-  const N = k.len, out = k.notes ? renderNotes(k) : new Float32Array(N);
+  const N0 = k.len; let out = k.notes ? renderNotes(k) : new Float32Array(N0);
   if (!k.notes) {
     const d = clamp(latN(k.lat), 0, MAXLAT), raw = k.raw, filled = k.filled;
+    const N = N0;
     for (let i = 0; i < N + XF; i++) {
       const ri = d + i; if (ri >= filled) break;
       const w = i < XF ? i / XF : i >= N ? 1 - (i - N) / XF : 1;
@@ -1057,8 +1060,9 @@ function render(k) {
       out[pos] += w * raw[ri];
     }
     if (k.reverse) out.reverse();
+    out = tricks(k.track, out);
   }
-  let pk = 0; const NB = 600, peaks = new Float32Array(NB);
+  let pk = 0; const NB = 600, peaks = new Float32Array(NB), N = out.length;
   for (let b = 0; b < NB; b++) {
     const a = Math.floor(b * N / NB), e = Math.floor((b + 1) * N / NB); let m = 0;
     for (let i = a; i < e; i++) { const v = Math.abs(out[i]); if (v > m) m = v; }
@@ -1076,6 +1080,44 @@ function render(k) {
     if (!y) { k.final = false; return; }                  // the worker failed: render again, on the main thread
     k.buf = mkBuf(y); goLive(k, nowF(), k.F0 + k.len, !k.started);
   });
+}
+/* Sound tricks on a microphone take, applied as it is rendered: speed (half speed plays over two laps an octave down,
+   double speed plays twice per lap an octave up), tape stop (the lap's last beat slows to a halt), tremolo or gate in
+   time with the beat, and lo-fi (fewer bits and a lower sample rate). */
+function tricks(t, x) {
+  let N = x.length;
+  if (t.speed === 2) {
+    const y = new Float32Array(N);
+    for (let i = 0; i < N; i++) { const a = (2 * i) % N; y[i] = 0.5 * (x[a] + x[(a + 1) % N]); }
+    x = y;
+  } else if (t.speed === 0.5) {
+    const y = new Float32Array(2 * N);
+    for (let i = 0; i < 2 * N; i++) { const p = i / 2, a = Math.floor(p), f = p - a; y[i] = x[a % N] * (1 - f) + x[(a + 1) % N] * f; }
+    x = y; N = 2 * N;
+  }
+  const beat = isFree() ? x.length / (t.speed === 0.5 ? 8 : 4) : barsLen(1) / st.beats;
+  if (t.tstop) {
+    const T = Math.min(Math.round(beat), Math.floor(N / 2)), s0 = N - T, y = x.slice();
+    for (let i = 0; i < T; i++) {
+      const p = i - i * i / (2 * T), a = Math.floor(p), f = p - a;          // the speed falls from 1 to 0 over the last beat
+      y[s0 + i] = (x[s0 + a] * (1 - f) + x[Math.min(N - 1, s0 + a + 1)] * f) * Math.min(1, (T - i) / 400);
+    }
+    x = y;
+  }
+  if (t.trem) {
+    const per = beat / t.trem, dep = t.tDep;
+    for (let i = 0; i < N; i++) {
+      const ph = (i % per) / per;
+      const g = t.tHard ? (ph < 0.5 ? Math.min(1, Math.min(ph, 0.5 - ph) * per / 120) : 0)   // a gate, with short ramps against clicks
+                        : 0.5 + 0.5 * Math.cos(2 * Math.PI * ph);
+      x[i] *= 1 - dep * (1 - g);
+    }
+  }
+  if (t.lofi > 0) {
+    const q = Math.pow(2, Math.round(15 - t.lofi * 12)), hold = 1 + Math.round(t.lofi * t.lofi * 15); let v = 0;
+    for (let i = 0; i < N; i++) { if (i % hold === 0) v = Math.round(x[i] * q) / q; x[i] = v; }
+  }
+  return x;
 }
 function mkBuf(d) { const b = ctx.createBuffer(1, d.length, sr); if (b.copyToChannel) b.copyToChannel(d, 0); else b.getChannelData(0).set(d); return b; }
 
@@ -2386,7 +2428,8 @@ const changedIn = {
   spitch: t => !!(t.oct || t.semi || t.cent || (t.sample && t.sample.adj)),
   pitch: t => !!(t.oct || t.semi || t.cent),
   tune: t => !!t.tune,
-  takes: t => t.takes.some(k => k.off || k.solo || k.reverse || k.lat !== (k.notes ? prof().scr : prof().ms)),
+  tricks: t => t.takes.some(k => k.reverse) || t.speed !== 1 || t.tstop || !!t.trem || t.lofi > 0,
+  takes: t => t.takes.some(k => k.off || k.solo || k.lat !== (k.notes ? prof().scr : prof().ms)),
   eq: t => eqChanged(t, 'filt') || !near(t.pan, 0),
   dist: t => !!t.dist,
   track: t => t.bars != null
@@ -2437,11 +2480,24 @@ function trackPane(t) {
   p.append(...fold('takes', isSmp(t) ? 'Laps' : 'Takes', () => {
     if (ks.length) {
       const trk = el('div', 'trk'); t.pcv = el('canvas'); trk.append(t.pcv, el('i', 'ph'));
-      const c = takeCommon(t, ks), top = el('div', 'tktop'); top.append(trk); if (c.rv) top.append(c.rv);   // the mix, with Reverse beside it
-      return [card(top, ...c.rows, ...ks.map((k, i) => [k, i + 1]).reverse().map(([k, n]) => takeRow(k, n)))];
+      const top = el('div', 'tktop'); top.append(trk);
+      return [card(top, ...takeCommon(t, ks), ...ks.map((k, i) => [k, i + 1]).reverse().map(([k, n]) => takeRow(k, n)))];
     }
     return [card(el('p', 'cnote', isSmp(t) ? 'No laps yet. Tap the track’s record button on the play screen, or Rec lap on the pads.' : 'No recordings yet. Tap the track’s record button on the play screen, or its microphone button to record a sample.'))];
   }, changedIn.takes(t), t));
+  if (!isSmp(t)) p.append(...fold('tricks', 'Sound tricks', () => {            // the less usual edits of a microphone track's takes
+    const mic = t.takes.filter(k => !k.notes), redo = () => { for (const k of mic) k.final = false; markDirty(); };
+    const tr = k => v => { t[k] = v; redo(); };
+    const sp = el('div', 'seg full'), spr = el('div', 'cr'); seg(sp, [[0.5, 'Half speed'], [1, 'Normal'], [2, 'Double']], () => t.speed, v => { t.speed = v; redo(); }, 1); spr.append(sp);
+    const tm = el('div', 'seg full'), tmr = el('div', 'cr'); seg(tm, [[0, 'Off'], [1, '1/4'], [2, '1/8'], [4, '1/16']], () => t.trem, v => { t.trem = v; redo(); renderPane(); }, 0); tmr.append(tm);
+    const rows = [crow('Reverse', swtch(el('div'), () => mic.length > 0 && mic.every(k => k.reverse), v => { for (const k of mic) k.reverse = v; redo(); }, false)),
+      el('p', 'csub', 'Speed'), spr, el('p', 'cnote', 'Half speed plays an octave down over two laps, double an octave up, twice per lap.'),
+      crow('Tape stop', swtch(el('div'), () => t.tstop, tr('tstop'), false)),
+      el('p', 'csub', 'Tremolo, in time with the beat'), tmr];
+    if (t.trem) rows.push(sliderRow('Depth', 0, 1, 0.01, t.tDep, 1, pct, tr('tDep')), crow('Hard (gate)', swtch(el('div'), () => t.tHard, tr('tHard'), false)));
+    rows.push(sliderRow('Lo-fi', 0, 1, 0.01, t.lofi, 0, v => v === 0 ? 'off' : Math.round(15 - v * 12) + ' bit', tr('lofi')));
+    return [card(...rows)];
+  }, changedIn.tricks(t), t));
   p.append(...fold('eq', 'EQ and pan', () => [card(eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }), filterRow(), sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan')))], changedIn.eq(t), t));
   p.append(...fold('dist', 'Distortion' + (t.dist ? ' · on' : ''), () => {
     const ad = k => v => { t[k] = v; applyDist(t); markDirty(); };
@@ -2749,13 +2805,8 @@ function takeCommon(t, ks) {
     save(); show(); ui(); toast((notes ? 'New laps on the sampler shift by ' : 'New recordings shift by ') + lat() + ' ms.');
   });
   const lr = crow(notes ? 'Screen latency' : 'Latency', pill(out, () => setAll(lat() - 1), () => setAll(lat() + 1)));
-  let rv = null;
-  if (!notes) {
-    rv = el('button', 'tbtn' + (ks.every(k => k.reverse) ? ' on' : ''), 'Reverse');
-    rv.addEventListener('click', () => { const v = !ks.every(k => k.reverse); for (const k of ks) { k.reverse = v; k.final = false; } rv.classList.toggle('on', v); markDirty(); });
-  }
   const ur = el('div', 'cr'); ur.append(use); show();
-  return { rv, rows: [lr, ur] };
+  return [lr, ur];
 }
 function drawTakeWave(k, cv) {
   const { g, w, h } = sizeCanvas(cv); if (!w || !k.peaks) return;
