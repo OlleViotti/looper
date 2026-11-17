@@ -514,7 +514,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 17 Nov 13:30</p>
+  <p class="ver">Varv one, build 17 Nov 14:00</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in" id="apIn"></div></div>
@@ -1438,9 +1438,49 @@ function envGain(e, i) {
   return g;
 }
 const envFlat = e => e.a === 0 && e.s === 1 && e.p === 0;
+/* ---------- sample compressor ----------
+   Applied to the sample after pitch and autotune and before the envelope. The sample is processed in advance,
+   so the compressor looks ahead: the gain starts coming down Attack before a loud part, and is down by the time
+   it arrives, so no peak slips through; Release is how fast it comes back up. The level that sets the gain is
+   the peak, held for the release; the gain curve has a 6 dB soft knee. Afterwards the sample is brought back to
+   its own loudness (RMS, with the peaks kept within full scale), so the quieter body and tail come forward and
+   compressing changes the character rather than the level; Gain adds or takes away from that. For a harder
+   attack, Punch in the envelope lifts the start after compressing. Done once per change, not while playing. */
+const COMP_DEF = { on: false, thr: -20, ratio: 4, at: 5, rel: 120, gain: 0 };
+const compOf = t => Object.assign({}, COMP_DEF, t.sample && t.sample.comp);
+function compress(x, c) {
+  const n = x.length, out = new Float32Array(n), K = 6, La = Math.max(1, Math.round(c.at / 1000 * sr));
+  const aR = Math.exp(-1 / Math.max(1, c.rel / 1000 * sr)), aA = Math.exp(-3 / La);
+  const gt = new Float32Array(n);                  // the gain each sample needs, in dB (0 or less)
+  let e = 0, pin = 0, ein = 0;
+  for (let i = 0; i < n; i++) {
+    const v = Math.abs(x[i]); if (v > pin) pin = v; ein += v * v;
+    e = Math.max(v, aR * e);
+    const over = 20 * Math.log10(e + 1e-9) - c.thr;
+    gt[i] = 2 * over < -K ? 0 : 2 * Math.abs(over) <= K ? (1 / c.ratio - 1) * (over + K / 2) * (over + K / 2) / (2 * K) : (1 / c.ratio - 1) * over;
+  }
+  /* look ahead: the lowest gain needed in the next La samples (a sliding minimum), approached smoothly */
+  const q = new Int32Array(n); let qh = 0, qt = 0, g = 0, maxGr = 0, pout = 0, eout = 0;
+  const push = j => { while (qt > qh && gt[q[qt - 1]] >= gt[j]) qt--; q[qt++] = j; };
+  for (let j = 0; j < Math.min(n, La); j++) push(j);
+  for (let i = 0; i < n; i++) {
+    if (i + La < n) push(i + La);
+    while (q[qh] < i) qh++;
+    const m = gt[q[qh]];
+    g = m < g ? aA * g + (1 - aA) * m : aR * g + (1 - aR) * m;
+    if (g < maxGr) maxGr = g;
+    const y = x[i] * Math.pow(10, g / 20); out[i] = y; eout += y * y; const a = Math.abs(y); if (a > pout) pout = a;
+  }
+  const mk = Math.min(eout > 1e-12 ? Math.sqrt(ein / eout) : 1, pout > 1e-6 ? Math.max(pin, 0.99) / pout : 1) * Math.pow(10, c.gain / 20);
+  for (let i = 0; i < n; i++) out[i] *= mk;
+  out.maxGr = maxGr;
+  return out;
+}
 function applyEnv(t) {
   const s = t.sample; if (!s || !s.proc0) return;
-  const e = envOf(t), y = s.proc0;
+  const c = compOf(t);
+  s.procC = c.on ? compress(s.proc0, c) : s.proc0;
+  const e = envOf(t), y = s.procC;
   if (envFlat(e)) s.proc = y;
   else { const z = new Float32Array(y.length); for (let i = 0; i < y.length; i++) z[i] = y[i] * envGain(e, i); s.proc = z; }
   s.buf = ctx ? mkBuf(s.proc) : null;
@@ -1467,7 +1507,8 @@ function sampleTune(t) {
 function setSample(t, raw) {
   const [a, b] = autoTrim(raw);
   const env = t.sample && t.sample.env ? Object.assign({}, t.sample.env) : Object.assign({}, ENV_DEF);   // a new sample keeps the envelope
-  t.sample = { key: rid(), raw, a, b, det: detectRoot(raw.subarray(a, b)), adj: 0, rev: false, env, proc: null, proc0: null, buf: null, tuned: null, savedTo: null, gen: 0 };
+  const comp = t.sample && t.sample.comp ? Object.assign({}, t.sample.comp) : Object.assign({}, COMP_DEF);   // and the compressor
+  t.sample = { key: rid(), raw, a, b, det: detectRoot(raw.subarray(a, b)), adj: 0, rev: false, env, comp, proc: null, proc0: null, buf: null, tuned: null, savedTo: null, gen: 0 };
   t.auto = false; t.sampler = true; t.padMode = null; t.kOct = null;
   prepSample(t); drawHead(t); ensureProject(); markDirty();
 }
@@ -2329,17 +2370,37 @@ function sampleSection(t) {
   return [card(trim, acts),
     el('h3', '', 'Envelope'), card(envWidget(t),
       sliderRow('Punch', 0, 1, 0.01, envOf(t).p, 0, v => v ? '+' + (20 * Math.log10(1 + 2 * v)).toFixed(1) + ' dB' : 'off', v => { s.env = Object.assign(envOf(t), { p: v }); envChanged(t); const w = $('.envw', $('#epane')); if (w) w.draw(); })),
+    el('h3', '', 'Compressor'), compCard(t),
     el('h3', '', 'Pitch'), card(crow('Root', rp), rn, ...pitchRows(t)),
     ...fold('tune', 'Autotune', () => [tuneCard(t)]),
     card(crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false)),
       crow('Notes', gs), el('p', 'cnote', 'Full plays the whole sample on every note; Held stops it when you let go.')),
     ];
 }
+/* The sample's compressor: the settings show while it is on, with how far the loudest part is pulled down. */
+function compCard(t) {
+  const s = t.sample, c = compOf(t), res = el('p', 'cnote');
+  const showRes = () => { const g = s.procC && s.procC.maxGr; res.textContent = !compOf(t).on ? '' : g == null ? '' : g > -0.05 ? 'The sample stays under the threshold, so nothing is compressed.' : 'The loudest part is pulled down by ' + (-g).toFixed(1) + ' dB, then the whole sample is brought back to its own loudness, so the quieter parts come forward.'; };
+  const set = (k, v) => {
+    s.comp = Object.assign(compOf(t), { [k]: v }); markDirty(); clearTimeout(t.compT);
+    t.compT = setTimeout(() => { applyEnv(t); showRes(); const w = $('.envw', $('#epane')); if (w) w.draw(); }, 90);
+  };
+  const on = crow('On', swtch(el('div'), () => compOf(t).on, v => { s.comp = Object.assign(compOf(t), { on: v }); markDirty(); applyEnv(t); renderPane(); }, false));
+  if (!c.on) return card(on, el('p', 'cnote', 'Evens out the sample: loud parts are pulled down, so the body and tail come forward. Before the envelope.'));
+  showRes();
+  return card(on,
+    sliderRow('Threshold', -50, 0, 1, c.thr, -20, v => '−' + Math.abs(Math.round(v)) + ' dB', v => set('thr', Math.round(v))),
+    sliderRow('Ratio', 1, 20, 0.1, c.ratio, 4, v => v >= 19.95 ? '∞:1' : v.toFixed(1) + ':1', v => set('ratio', v >= 19.95 ? 100 : v)),
+    sliderRow('Attack', 0.1, 100, 0.1, c.at, 5, v => (v < 10 ? v.toFixed(1) : Math.round(v)) + ' ms', v => set('at', v)),
+    sliderRow('Release', 10, 1000, 5, c.rel, 120, v => Math.round(v) + ' ms', v => set('rel', Math.round(v))),
+    sliderRow('Gain', -12, 24, 0.5, c.gain, 0, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + ' dB', v => set('gain', v)),
+    res, el('p', 'cnote', 'It looks ahead, so nothing slips through: Attack is how smoothly it pulls down before a loud part, Release how fast it lets go. For a harder attack, use Punch in the envelope. Gain adds to or takes away from the level after compressing.'));
+}
 /* A new track with the same sample and all its settings, but none of the laps. */
 function copySampler(t) {
   const s = t.sample; if (!s) return;
   const u = newTrack(Object.assign({}, pick(t, TRACK_KEYS), { name: t.name + ' 2', mute: false, solo: false, sampler: true }), tracks.indexOf(t) + 1);
-  u.sample = { key: rid(), raw: s.raw, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: Object.assign({}, s.env), proc: null, proc0: null, buf: null, tuned: null, savedTo: null, gen: 0 };
+  u.sample = { key: rid(), raw: s.raw, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: Object.assign({}, s.env), comp: Object.assign({}, COMP_DEF, s.comp), proc: null, proc0: null, buf: null, tuned: null, savedTo: null, gen: 0 };
   u.auto = false; applyTrack(u); prepSample(u); drawHead(u); markDirty(); selectTrack(u.id); toast(u.name + ': the same sample, no laps.');
 }
 function sampleEdited(t, redetect, wait) {
@@ -2355,7 +2416,7 @@ function envWidget(t) {
   wrap.append(cv, out);
   let W = 0, H = 0, act = null, lastTap = 0, lastH = null;
   const PAD = 12, RMAX = 2000, TOP = 1.33;
-  const dur = () => s.proc0 ? s.proc0.length / sr * 1000 : 1000;
+  const dur = () => s.proc0 ? s.proc0.length / sr * 1000 : 1000;   // (the compressor keeps the length)
   const xr0 = () => W * 0.76, xs = ms => PAD + ms / dur() * (xr0() - 2 * PAD), msx = x => (x - PAD) / (xr0() - 2 * PAD) * dur();
   const xrel = ms => xr0() + PAD + ms / RMAX * (W - xr0() - 2 * PAD), relx = x => (x - xr0() - PAD) / (W - xr0() - 2 * PAD) * RMAX;
   const ly = L => H - PAD - Math.min(L, TOP) / TOP * (H - 2 * PAD), yl = y => (H - PAD - y) / (H - 2 * PAD) * TOP;
@@ -2366,7 +2427,7 @@ function envWidget(t) {
     const dpr = Math.min(window.devicePixelRatio || 1, 3); W = cv.clientWidth; H = cv.clientHeight; if (!W) return;
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
     const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-    const e = envOf(t), y = s.proc0, x0 = PAD, x1 = xr0() - PAD, base = ly(0);
+    const e = envOf(t), y = s.procC || s.proc0, x0 = PAD, x1 = xr0() - PAD, base = ly(0);
     g.strokeStyle = 'rgba(160,168,192,.25)'; g.lineWidth = 1;
     g.beginPath(); g.moveTo(0, Math.round(ly(1)) + 0.5); g.lineTo(xr0(), Math.round(ly(1)) + 0.5); g.stroke();
     g.setLineDash([4, 4]); g.beginPath(); g.moveTo(Math.round(xr0()) + 0.5, 4); g.lineTo(Math.round(xr0()) + 0.5, H - 4); g.stroke(); g.setLineDash([]);
@@ -2831,7 +2892,7 @@ async function saveProject() {
       sample: (s => {                                     // the sample's raw recording is stored like a take's
         if (!s) return null;
         keep.add(s.key); if (s.savedTo !== pid) { puts.push([pid + '/' + s.key, s.raw]); s.savedTo = pid; }
-        return { key: s.key, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: s.env };
+        return { key: s.key, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: s.env, comp: s.comp };
       })(t.sample),
       takes: t.takes.filter(k => k.full && k.started).map(k => {
         if (k.notes) return { key: k.key, lat: k.lat, off: !!k.off, bars: isFree() ? null : Math.round(k.len / barsLen(1)), notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
@@ -2909,7 +2970,7 @@ async function openProject(id) {
       if (raw) {
         if (!same) raw = resample(raw, ratio);
         const sm = tm.sample, b = Math.min(raw.length, Math.round(sm.b * ratio)), a = clamp(Math.round(sm.a * ratio), 0, Math.max(0, b - 16));
-        t.sample = { key: sm.key, raw, a, b, det: sm.det == null ? null : sm.det, adj: sm.adj || 0, rev: !!sm.rev, env: Object.assign({}, ENV_DEF, sm.env), proc: null, proc0: null, buf: null, tuned: null, savedTo: same ? id : null, gen: 0 };
+        t.sample = { key: sm.key, raw, a, b, det: sm.det == null ? null : sm.det, adj: sm.adj || 0, rev: !!sm.rev, env: Object.assign({}, ENV_DEF, sm.env), comp: Object.assign({}, COMP_DEF, sm.comp), proc: null, proc0: null, buf: null, tuned: null, savedTo: same ? id : null, gen: 0 };
         prepSample(t);
       } else missing++;
     }
