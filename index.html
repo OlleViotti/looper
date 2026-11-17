@@ -405,7 +405,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
       <p class="hint" id="hTrack" hidden>Each track has its own buttons: <b>M</b> mutes it, <b>S</b> solos it, <b>●</b> records one lap into it from its next lap, and the <b>microphone</b> records a sample, which makes it a sampler (then the <b>keys</b> open its pads). <b>Swipe right on a track</b> to edit it.</p>
-      <p class="hint" id="hSwipe" hidden><b>Swipe right</b> to edit a track, <b>left</b> for settings, <b>up</b> from the bottom for the sampler pads. Tap the edge, or the logo, to come back.</p>
+      <p class="hint" id="hSwipe" hidden><b>Swipe right</b> to edit a track, <b>left</b> for settings. Tap the edge, or the logo, to come back.</p>
       <p class="hint" id="hUndo" hidden><b>Undo</b> removes the latest recording, and the bar that appears can bring it back. <b>Capture last</b> keeps the lap you just played, even without pressing Record.</p>
       <div class="row"><button class="addtrk nmcol" id="addTrk">+ Track</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
       <div class="row masterrow" id="masterRow"><button class="tname nmcol" id="masterName"><b>Master</b><small>effects</small></button><div></div></div>
@@ -419,7 +419,6 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="hintbar" id="hintBar">
     <p class="hint" id="hScenes" hidden><b>Scenes A–E</b> remember which tracks are muted: hold one to store, tap it to bring that mix back, for a verse and a chorus say.</p>
   </div>
-  <div class="hrow" id="hrow"><button class="handle" id="padHand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15l7-7 7 7"/></svg><span id="padHandTxt">Pads</span></button></div>
   <div class="scenes" id="sceneRow"><div class="scn" id="scn" aria-label="Scenes"></div></div>
   <footer class="bar">
     <button id="playBtn"><svg viewBox="0 0 24 24" id="playIco"><path d="M7 4l13 8-13 8z"/></svg><span id="playLbl">Start</span></button>
@@ -500,6 +499,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Microphone</h3>
   <div class="card">
+    <button class="cr act" id="restartBtn"><span>Restart audio<small>Starts the sound and the microphone again, as when the app opens.</small></span></button>
     <button class="cr act" id="toAudio"><span>Audio setup<small>Microphone and output, with live meters. Also opens from the in and out meters at the top.</small></span></button>
     <div id="micRows"><p class="cnote" style="padding-top:12px">Start the audio first to choose the microphone.</p></div>
     <div id="inGainRow"></div>
@@ -514,7 +514,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 17 Nov 14:00</p>
+  <p class="ver">Varv one, build 17 Nov 21:35</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in" id="apIn"></div></div>
@@ -614,6 +614,34 @@ function setEq(eq, o) {
 const lpHz = v => v < 0 ? 18000 * Math.pow(180 / 18000, -v) : 20000;
 const hpHz = v => v > 0 ? 20 * Math.pow(5000 / 20, v) : 10;
 
+/* Restart: close the audio engine and the microphone completely and start them again, as on opening the app.
+   Recordings, samples and settings stay; their sound is rebuilt for the new engine. Clears an audio route or a
+   delay that iOS has got stuck in (after Bluetooth switches or interruptions). Done from a tap, so iOS lets the
+   new audio start. */
+async function restartAudio() {
+  if (!ctx) return initAudio();
+  if (measuring || defining) { toast('Wait for the measurement or recording to finish.'); return false; }
+  if (srec) srec = null;
+  if (perf) { try { perf.mr.stop(); } catch (e) {} }
+  stop(); closePads();
+  for (const t of tracks) dropTrackNodes(t);
+  for (const it of trash) for (const k of (it.take ? [it.take] : it.track.takes)) detachTake(k);
+  if (micStream) micStream.getTracks().forEach(tr => tr.stop());
+  try { if (micSrc) micSrc.disconnect(); } catch (e) {}
+  if (outRelay) { try { outRelay.au.pause(); outRelay.au.srcObject = null; } catch (e) {} outRelay = null; }
+  const old = ctx;
+  ctx = null; initP = null; capNode = null; micStream = null; micSrc = null; micOK = false; mAn = null;
+  ring = null; R = 0; capEnd = 0; capFirst = -1; clk = []; clkOff = null;
+  try { navigator.audioSession && (navigator.audioSession.type = 'auto'); } catch (e) {}
+  try { await old.close(); } catch (e) {}
+  for (const k of allTakes()) { k.buf = null; k.src = null; k.tg = null; k.final = false; }   // rendered again for the new engine on the next tick
+  for (const t of tracks) if (t.sample) { t.sample.buf = null; }
+  const ok = await initAudio();
+  for (const t of tracks) if (t.sample) prepSample(t);
+  ui(); if (mode === 'audio') drawAudio();
+  toast(ok ? 'Audio restarted. Measure the latency again if it still seems off.' : 'The audio could not start again. Close the app and open it again.');
+  return ok;
+}
 function initAudio() {
   if (ctx) { if (ctx.state !== 'running') ctx.resume().catch(() => {}); return initP; }
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -2651,7 +2679,7 @@ document.addEventListener('pointerdown', e => {
   sw = null;
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   if (e.target.closest('input,select,textarea,.eqc,.envc,.trimc,.tappad,.kb,.pbig,.etabs')) return;
-  const up = mode === 'play' && !padT && !!e.target.closest('.hrow,.scenes,.bar,.hintbar');   // swipe up from the bottom: the pads
+  const up = false;                                                                            // the pads open from a sampler's keys button
   const down = !!padT && !!e.target.closest('.pads');                                          // swipe down on the sheet: close it
   sw = { x: e.clientX, y: e.clientY, id: e.pointerId, horiz: false, vert: false, up, down };
 }, true);
@@ -3056,7 +3084,6 @@ function ui() {
   $('#hintBar').hidden = !bottom;
   $('#hMeasure').hidden = !!h.measure;
   if (allTakes().length) $('#cont').hidden = true;
-  const pt = padTrack(); $('#padHandTxt').textContent = pt ? pt.name + ' · pads' : 'Sampler pads';
   drawPadRec();
   $('#perfInd').hidden = !perf; $('#perfBtn').firstChild.textContent = perf ? 'Stop recording performance' : 'Record performance'; $('#perfBtn').classList.toggle('on', !!perf);
   $('#projName').textContent = project ? project.name : hasContent() ? 'unsaved' : '';
@@ -3179,6 +3206,10 @@ async function drawAudio() {
   // latency, which depends on the output
   const lat = el('button', 'cr act'); lat.append(el('span', '', 'Measure in Settings'));
   lat.addEventListener('click', () => { setMode('set'); requestAnimationFrame(() => { const h = $('#spage h3.first'); if (h) h.scrollIntoView(); }); });
+  const rs = el('button', 'cr act'); rs.append(el('span', '', 'Restart audio'));
+  rs.firstChild.append(el('small', '', 'Closes the sound and the microphone and starts them again, as when the app opens. Try it if the delay grows or the sound goes to the wrong place.'));
+  rs.addEventListener('click', () => restartAudio());
+  host.append(card(rs));
   host.append(el('h3', '', 'Latency'), card(crow('Headphones', el('b', '', prof().ms + ' ms')), crow('Screen', el('b', '', prof().scr + ' ms')),
     el('p', 'cnote', 'Both depend on the output in use. Measure again after changing it.'), lat));
 }
@@ -3252,9 +3283,9 @@ $('#backR').addEventListener('click', () => setMode('play'));
 $('#backL').addEventListener('click', () => setMode('play'));
 $('#metersBtn').addEventListener('click', () => setMode(mode === 'audio' ? 'play' : 'audio'));
 $('#toAudio').addEventListener('click', () => setMode('audio'));
+$('#restartBtn').addEventListener('click', () => restartAudio());
 $('#backT').addEventListener('click', closePads);
 const openPadSheet = () => { const t = padTrack(); if (t) openPads(t); else newSampler(); };
-$('#padHand').addEventListener('click', openPadSheet);
 const setHH = () => document.documentElement.style.setProperty('--hh', Math.round($('.status').getBoundingClientRect().bottom) + 'px');
 setHH();
 $('#masterName').addEventListener('click', () => selectTrack('master'));
@@ -3386,7 +3417,7 @@ window.__varv = { st, analyzeLoop, get ctx() { return ctx; }, applyTrackFor: t =
   get mode() { return mode; }, get selId() { return selId; }, get freeL() { return freeL; }, get rec() { return rec; },
   get info() { return { sr, L, epoch, running, capEnd, capFirst, R, PRE, XF, capMode, micOK, armedId, state: stateNow() }; },
   set synth(f) { synth = f; }, start, stop, toggleRec, capturePrev, measure, initAudio, saveProject, openProject, listProjects, setMode, eqResponse, nowF: () => nowF(),
-  setSample, openPads, closePads, recordInto, noteOn, noteOff, inRecWindow, playVoice, sampleRec, stopSampleRec, autoTrim, detectRoot, analyzeTaps, measureTap, sRoot, evFrame,
+  restartAudio, setSample, openPads, closePads, recordInto, noteOn, noteOff, inRecWindow, playVoice, sampleRec, stopSampleRec, autoTrim, detectRoot, analyzeTaps, measureTap, sRoot, evFrame,
   get padT() { return padT; }, get evLog() { return evLog; }, get tapMeas() { return tapMeas; }, get sr() { return sr; },
   get nodes() { return { comp, clickComp, echoDelay, echoFbG, echoOut, revOut, mEq, conv }; } };
 })();
