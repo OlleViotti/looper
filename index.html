@@ -514,7 +514,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 17 Nov 13:00</p>
+  <p class="ver">Varv one, build 17 Nov 13:10</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in" id="apIn"></div></div>
@@ -3015,13 +3015,18 @@ function ui() {
   if (document.activeElement !== $('#projInput')) $('#projInput').value = project ? project.name : '';
   $('#projNote').textContent = project ? 'Saves automatically.' : 'Saved automatically from the first recording.';
 }
-/* A destructive button asks for a second tap within three seconds. */
+/* A destructive button asks for a second tap within three seconds, counting down on the button: Sure? 3, 2, 1. */
 function twoTap(b, label, confirmLabel, needed, fn) {
-  let armedAt = 0;
+  let armedAt = 0, tm = 0;
+  const reset = () => { clearInterval(tm); armedAt = 0; b.textContent = label; };
   b.textContent = label;
   b.addEventListener('click', () => {
-    if (needed() && Date.now() - armedAt > 3000) { armedAt = Date.now(); b.textContent = confirmLabel; setTimeout(() => { b.textContent = label; }, 3000); return; }
-    armedAt = 0; b.textContent = label; fn();
+    if (needed() && !armedAt) {
+      armedAt = Date.now(); b.textContent = confirmLabel + ' 3';
+      tm = setInterval(() => { const left = 3 - Math.floor((Date.now() - armedAt) / 1000); if (left <= 0) reset(); else b.textContent = confirmLabel + ' ' + left; }, 100);
+      return;
+    }
+    reset(); fn();
   });
 }
 async function drawProjects() {
