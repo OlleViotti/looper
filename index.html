@@ -169,6 +169,9 @@ body[data-pads] #backT{display:block}
 .etab.on{background:var(--amber);color:#1b1f2e}
 .etab.mut{color:var(--mut)}
 .etab.add{background:transparent;border:1px dashed var(--line);color:var(--mut)}
+.ehead{position:sticky;top:54px;z-index:2;background:var(--panel);border-radius:14px;margin-bottom:8px;box-shadow:0 6px 12px -6px rgba(0,0,0,.6)}
+.tbtn.eplay{width:44px;height:40px;min-height:40px;border-radius:999px;background:var(--amber);color:#1b1f2e;display:grid;place-items:center;padding:0}
+.tbtn.eplay svg{width:18px;height:18px;fill:currentColor}
 .ename{flex:1;min-width:0;font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fh{display:flex;justify-content:space-between;align-items:center;width:100%;min-height:44px;margin:12px 0 2px;padding:0 10px;border-radius:10px;background:var(--panel);font-size:15px;font-weight:600;color:var(--mut)}
 .fh::after{content:'';width:8px;height:8px;margin-top:-4px;border-right:2px solid;border-bottom:2px solid;transform:rotate(45deg);transition:transform .15s}
@@ -511,7 +514,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 17 Nov 12:40</p>
+  <p class="ver">Varv one, build 17 Nov 12:55</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in" id="apIn"></div></div>
@@ -2220,8 +2223,16 @@ function trackPane(t) {
   const mb = el('button', 'tbtn' + (t.mute ? ' on' : ''), 'Mute'), sb = el('button', 'tbtn' + (t.solo ? ' on' : ''), 'Solo');
   mb.addEventListener('click', () => { toggleMute(t); renderPane(); }); sb.addEventListener('click', () => { toggleSolo(t); renderPane(); });
   const db = el('button', 'tbtn danger', 'Delete'); db.addEventListener('click', () => deleteTrack(t));   // the bar at the bottom can bring it back
-  const head = el('div', 'cr'), btns = el('div'); btns.style.cssText = 'display:flex;gap:10px;flex:none';
-  btns.append(db, mb, sb); head.append(el('b', 'ename', t.name), btns);
+  /* The header stays pinned under the tabs while the rest scrolls; on a sampler it has Play, to hear an edit at once. */
+  const head = el('div', 'cr ehead'), btns = el('div'); btns.style.cssText = 'display:flex;gap:10px;flex:none;align-items:center';
+  btns.append(db, mb, sb);
+  if (t.sample) {
+    const pl = el('button', 'tbtn eplay'); pl.setAttribute('aria-label', 'Play the sample');
+    pl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>';
+    pl.addEventListener('click', async () => { await initAudio(); playVoice(t, null); });
+    btns.append(pl);
+  }
+  head.append(el('b', 'ename', t.name), btns);
   /* Microphone or sampler: chosen at the top while the track is empty, then fixed. */
   const kindRow = () => {
     const kind = el('div', 'seg full'), r = el('div', 'cr');
@@ -2234,7 +2245,8 @@ function trackPane(t) {
     cp = el('button', 'cr act'); cp.append(el('span', '', 'New track with this sample'));
     cp.firstChild.append(el('small', '', 'Same sample and all track settings, without the laps.')); cp.addEventListener('click', () => copySampler(t));
   }
-  p.append(card(head, has ? null : kindRow(), cp));
+  p.append(head);
+  if (!has || cp) p.append(card(has ? null : kindRow(), cp));
   const eqDraw = () => { const w = $('.eqw', $('#epane')); if (w) w.draw(); };
   p.append(el('h3', '', 'Live'), card(sliderRow('Volume', 0, 1.5, 0.01, t.vol, 1, pct, ap('vol')),
     sliderRow('Filter', -1, 1, 0.01, t.filt, 0, filtTxt, v => { t.filt = v; applyTrack(t); markDirty(); eqDraw(); }),
@@ -2311,10 +2323,8 @@ function sampleSection(t) {
   else twoTap(recB, 'New', 'Replace?', () => true, () => sampleRec(t));
   const at = el('button', 'tbtn', 'Auto trim');
   at.addEventListener('click', () => { [s.a, s.b] = autoTrim(s.raw); trim.draw(); sampleEdited(t, true, 0); });
-  const pl = el('button', 'tbtn', 'Play');
-  pl.addEventListener('click', async () => { await initAudio(); playVoice(t, null); });
   const pd = el('button', 'tbtn', 'Pads'); pd.addEventListener('click', () => openPads(t));
-  const acts = el('div', 'cr wrap'); acts.append(recB, at, pl, pd);
+  const acts = el('div', 'cr wrap'); acts.append(recB, at, pd);
   const gs = el('div', 'seg');
   seg(gs, [[false, 'Full'], [true, 'Held']], () => !!t.sGate, v => { t.sGate = v; for (const k of t.takes) k.final = false; markDirty(); }, false);
   return [card(trim, acts),
