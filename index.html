@@ -557,7 +557,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 02:35</p>
+  <p class="ver">Varv one, build 18 Nov 02:50</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -711,7 +711,13 @@ async function restartAudio() {
   try { await old.close(); } catch (e) {}
   try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
   await new Promise(r => setTimeout(r, 900));       // give the phone time to leave its call mode before starting again
-  for (const k of allTakes()) { k.buf = null; k.src = null; k.tg = null; k.final = false; }   // rendered again for the new engine on the next tick
+  for (const k of allTakes()) {
+    k.buf = null; k.src = null; k.tg = null; k.final = false;     // rendered again for the new engine on the next tick
+    if (k.notes) {                                   // a lap of notes is timed by the old audio clock: made relative, as when a project is opened
+      const d = k.rawStart; for (const e of k.notes) { e.A -= d; if (e.O != null) e.O -= d; }
+      k.rawStart = 0; k.F0 = 0; k.k = -1; k.full = true;
+    }
+  }
   for (const t of tracks) if (t.sample) { t.sample.buf = null; }
   const ok = await initAudio();
   if (ok && keep && sr !== oldSr) await openProject(project.id);                  // a new rate: the project is read again and converted to it
@@ -724,7 +730,9 @@ function initAudio() {
   if (ctx) { if (ctx.state !== 'running') ctx.resume().catch(() => {}); return initP; }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) { toast('This browser lacks the audio engine.'); return Promise.resolve(false); }
-  try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) {}
+  /* The engine starts in plain playback, so the phone is not in its call mode (24 kHz) for the headphones when it takes
+     its rate; the session for recording is set just before the microphone opens. */
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
   /* The engine takes the phone's own rate. (Asking for a fixed 48 kHz made Safari play at the wrong speed when the phone
      changed its rate, going in or out of its call mode for a Bluetooth microphone.) */
   try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e) { ctx = new AC(); }
@@ -861,6 +869,10 @@ async function openMic(id, auto) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { micOK = false; toast('The microphone needs the page to be opened over https.'); return false; }
   const base = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 };
   let s = null;
+  if (!id && auto && wantsBuiltin()) {              // open the phone's microphone straight away when it is known, not the headphones' first
+    try { id = builtinId((await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput')); } catch (e) {}
+  }
+  try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) {}
   try { s = await navigator.mediaDevices.getUserMedia({ audio: id ? Object.assign({ deviceId: { exact: id } }, base) : base }); }
   catch (e) { if (id) { try { s = await navigator.mediaDevices.getUserMedia({ audio: base }); } catch (e2) {} } }
   if (!s) { micOK = false; toast('No access to the microphone. Allow the microphone for this page and try again.'); diag(); return false; }
