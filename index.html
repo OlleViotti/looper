@@ -539,7 +539,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 17 Nov 23:20</p>
+  <p class="ver">Varv one, build 17 Nov 23:35</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -627,7 +627,7 @@ let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, s
 const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'chrom', tSpeed: 20, tAmt: 1,
   sampler: false, padMode: null, kOct: null, kBase: null, sGate: false,
   dist: false, dTyp: 'soft', dDrv: 0.5, dTon: 0.7, dMix: 1, dLvl: 1,
-  speed: 1, tstop: false, trem: 0, tDep: 1, tHard: false, lofi: 0 }, EQ_DEF);   // sound tricks: speed (0.5, 1, 2), tape stop, tremolo (notes per beat, depth, gate), lo-fi   // distortion: on, type, drive, tone, mix, level   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
+  speed: 1, tstop: false, trem: 0, tDep: 1, tHard: false, lofi: 0, ring: 0, rFreq: 0.5, gran: 0, gSize: 0.4, gScat: 0.3 }, EQ_DEF);   // sound tricks: speed (0.5, 1, 2), tape stop, tremolo (notes per beat, depth, gate), lo-fi   // distortion: on, type, drive, tone, mix, level   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
 const TRACK_KEYS = Object.keys(TRACK_DEF);
 const isSmp = t => !!t.sample;                       // a sampler when it holds a sample, a microphone track when it holds recordings
 const OD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="14" r="6.5"/><path d="M19 2.5v8M15 6.5h8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
@@ -1084,6 +1084,7 @@ function render(k) {
 /* Sound tricks on a microphone take, applied as it is rendered: speed (half speed plays over two laps an octave down,
    double speed plays twice per lap an octave up), tape stop (the lap's last beat slows to a halt), tremolo or gate in
    time with the beat, and lo-fi (fewer bits and a lower sample rate). */
+const ringHz = v => 20 * Math.pow(100, v), granMs = v => 10 * Math.pow(20, v);   // 20 Hz to 2 kHz; 10 to 200 ms
 function tricks(t, x) {
   let N = x.length;
   if (t.speed === 2) {
@@ -1096,6 +1097,16 @@ function tricks(t, x) {
     x = y; N = 2 * N;
   }
   const beat = isFree() ? x.length / (t.speed === 0.5 ? 8 : 4) : barsLen(1) / st.beats;
+  if (t.gran > 0) {                                  // granular: small grains taken from around (or anywhere in) the loop, laid out anew
+    const G = Math.round(granMs(t.gSize) / 1000 * sr), hop = Math.max(1, Math.round(G / 4)), y = new Float32Array(N), win = new Float32Array(G);
+    for (let i = 0; i < G; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / G);
+    let seed = 12345; const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;   // the same grains on every render
+    for (let p = -G; p < N; p += hop) {
+      const src = Math.floor(p + (rnd() - 0.5) * t.gScat * N + N * 4) % N;
+      for (let i = 0; i < G; i++) { const o = p + i; if (o < 0 || o >= N) continue; y[o] += 0.5 * win[i] * x[(src + i) % N]; }
+    }
+    for (let i = 0; i < N; i++) x[i] = x[i] * (1 - t.gran) + y[i] * t.gran;
+  }
   if (t.tstop) {
     const T = Math.min(Math.round(beat), Math.floor(N / 2)), s0 = N - T, y = x.slice();
     for (let i = 0; i < T; i++) {
@@ -1112,6 +1123,10 @@ function tricks(t, x) {
                         : 0.5 + 0.5 * Math.cos(2 * Math.PI * ph);
       x[i] *= 1 - dep * (1 - g);
     }
+  }
+  if (t.ring > 0) {                                  // ring modulator: multiplied by a sine, with a mix
+    const w = 2 * Math.PI * ringHz(t.rFreq) / sr;
+    for (let i = 0; i < N; i++) x[i] = x[i] * (1 - t.ring) + x[i] * Math.sin(w * i) * t.ring;
   }
   if (t.lofi > 0) {
     const q = Math.pow(2, Math.round(15 - t.lofi * 12)), hold = 1 + Math.round(t.lofi * t.lofi * 15); let v = 0;
@@ -2428,7 +2443,7 @@ const changedIn = {
   spitch: t => !!(t.oct || t.semi || t.cent || (t.sample && t.sample.adj)),
   pitch: t => !!(t.oct || t.semi || t.cent),
   tune: t => !!t.tune,
-  tricks: t => t.takes.some(k => k.reverse) || t.speed !== 1 || t.tstop || !!t.trem || t.lofi > 0,
+  tricks: t => t.takes.some(k => k.reverse) || t.speed !== 1 || t.tstop || !!t.trem || t.lofi > 0 || t.ring > 0 || t.gran > 0,
   takes: t => t.takes.some(k => k.off || k.solo || k.lat !== (k.notes ? prof().scr : prof().ms)),
   eq: t => eqChanged(t, 'filt') || !near(t.pan, 0),
   dist: t => !!t.dist,
@@ -2496,6 +2511,12 @@ function trackPane(t) {
       el('p', 'csub', 'Tremolo, in time with the beat'), tmr];
     if (t.trem) rows.push(sliderRow('Depth', 0, 1, 0.01, t.tDep, 1, pct, tr('tDep')), crow('Hard (gate)', swtch(el('div'), () => t.tHard, tr('tHard'), false)));
     rows.push(sliderRow('Lo-fi', 0, 1, 0.01, t.lofi, 0, v => v === 0 ? 'off' : Math.round(15 - v * 12) + ' bit', tr('lofi')));
+    rows.push(el('p', 'csub', 'Ring modulator'), sliderRow('Mix', 0, 1, 0.01, t.ring, 0, v => v === 0 ? 'off' : pct(v), v => { const was = t.ring > 0; t.ring = v; redo(); if (was !== v > 0) renderPane(); }));
+    if (t.ring > 0) rows.push(sliderRow('Freq.', 0, 1, 0.005, t.rFreq, 0.5, v => hz(ringHz(v)), tr('rFreq')));
+    rows.push(el('p', 'csub', 'Granular'), sliderRow('Mix', 0, 1, 0.01, t.gran, 0, v => v === 0 ? 'off' : pct(v), v => { const was = t.gran > 0; t.gran = v; redo(); if (was !== v > 0) renderPane(); }));
+    if (t.gran > 0) rows.push(sliderRow('Grain', 0, 1, 0.01, t.gSize, 0.4, v => Math.round(granMs(v)) + ' ms', tr('gSize')),
+      sliderRow('Scatter', 0, 1, 0.01, t.gScat, 0.3, pct, tr('gScat')),
+      el('p', 'cnote', 'Breaks the sound into small grains and lays them out again, each taken from near its place, or with more scatter from anywhere in the loop: a moving, flowing texture.'));
     return [card(...rows)];
   }, changedIn.tricks(t), t));
   p.append(...fold('eq', 'EQ and pan', () => [card(eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }), filterRow(), sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan')))], changedIn.eq(t), t));
