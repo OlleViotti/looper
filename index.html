@@ -498,7 +498,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <h3>Microphone</h3>
   <div class="card">
     <button class="cr act" id="toAudio"><span>Audio setup<small>Microphone and output, with live meters. Also opens from the in and out meters at the top.</small></span></button>
-    <div class="cr"><select class="txt bare" id="micSel" aria-label="Microphone"><option value="">Start first to choose</option></select></div>
+    <div id="micRows"><p class="cnote" style="padding-top:12px">Start the audio first to choose the microphone.</p></div>
     <div id="inGainRow"></div>
     <div class="cr"><span>Low cut (80 Hz)</span><div id="lowCutSw"></div></div>
     <div class="cr"><span>Auto level recordings</span><div id="autoLvlSw"></div></div>
@@ -511,7 +511,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 17 Nov 12:30</p>
+  <p class="ver">Varv one, build 17 Nov 12:40</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in" id="apIn"></div></div>
@@ -3080,9 +3080,7 @@ async function drawAudio() {
   }
   const mrow = (label, id) => { const r = el('div', 'mrow'), m = el('i', 'mtr big'); m.id = id; m.append(el('b')); r.append(el('span', '', label), m); return r; };
   // input
-  const ms = el('select', 'txt bare micsel'); ms.setAttribute('aria-label', 'Microphone'); fillMicSel(ms);
-  ms.addEventListener('change', e => { st.micId = e.target.value; save(); openMic(chosenMic(mics), wantsBuiltin()).then(() => drawAudio()); });
-  const msr = el('div', 'cr'); msr.append(ms);
+  const msr = el('div', 'microws'); fillMicRows(msr);
   host.append(el('h3', '', 'Microphone'), card(msr, mrow('In', 'aIn'),
     sliderRow('Gain', -12, 30, 0.5, st.inGain, 0, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + ' dB', v => { st.inGain = v; save(); if (inG) inG.gain.setTargetAtTime(dbLin(v), ctx.currentTime, 0.02); }),
     crow('Low cut (80 Hz)', swtch(el('div'), () => st.lowCut, v => { st.lowCut = v; save(); if (inHP) inHP.frequency.setTargetAtTime(v ? 80 : 10, ctx.currentTime, 0.02); }, false)),
@@ -3109,18 +3107,25 @@ async function drawAudio() {
   host.append(el('h3', '', 'Latency'), card(crow('Headphones', el('b', '', prof().ms + ' ms')), crow('Screen', el('b', '', prof().scr + ' ms')),
     el('p', 'cnote', 'Both depend on the output in use. Measure again after changing it.'), lat));
 }
-function fillMicSel(sel) {
-  sel.textContent = '';
+/* The microphones as tappable rows, the one in use ticked, like the outputs: the phone's own first. */
+function fillMicRows(host) {
+  host.textContent = '';
   const bi = mics.find(m => BUILTIN.test(m.label));
-  const o0 = el('option', '', bi && bi.label ? bi.label : 'iPhone microphone'); o0.value = 'builtin'; o0.selected = wantsBuiltin(); sel.append(o0);
-  mics.forEach((m, i) => { if (m === bi) return; const o = el('option', '', m.label || 'Microphone ' + (i + 1)); o.value = m.deviceId; o.selected = !wantsBuiltin() && m.deviceId === st.micId; sel.append(o); });
+  const opts = [['builtin', bi && bi.label ? bi.label : 'iPhone microphone', wantsBuiltin()]];
+  mics.forEach((m, i) => { if (m !== bi) opts.push([m.deviceId, m.label || 'Microphone ' + (i + 1), !wantsBuiltin() && m.deviceId === st.micId]); });
+  for (const [id, label, on] of opts) {
+    const b = el('button', 'cr orow' + (on ? ' on' : '')); b.append(el('span', '', label));
+    b.addEventListener('click', () => {
+      if (!ctx) return;
+      st.micId = id; save(); fillMics();
+      openMic(chosenMic(mics), wantsBuiltin()).then(() => { fillMics(); if (mode === 'audio') drawAudio(); });
+    });
+    host.append(b);
+  }
 }
 function fillMics() {
-  if (mode === 'audio') { const ms = $('#apage .micsel'); if (ms) fillMicSel(ms); }
-  const sel = $('#micSel'); sel.textContent = '';
-  const bi = mics.find(m => BUILTIN.test(m.label));
-  const o0 = el('option', '', bi && bi.label ? bi.label : 'iPhone microphone'); o0.value = 'builtin'; o0.selected = wantsBuiltin(); sel.append(o0);
-  mics.forEach((m, i) => { if (m === bi) return; const o = el('option', '', m.label || 'Microphone ' + (i + 1)); o.value = m.deviceId; o.selected = !wantsBuiltin() && m.deviceId === st.micId; sel.append(o); });
+  if (mode === 'audio') { const ms = $('#apage .microws'); if (ms) fillMicRows(ms); }
+  fillMicRows($('#micRows'));
 }
 function diag() {
   if (!ctx) return;
@@ -3238,7 +3243,6 @@ swtch($('#perfMicSw'), () => st.perfMic, v => { st.perfMic = v; save(); }, true)
 $('#perfBtn').addEventListener('click', togglePerf);
 seg($('#muteSeg'), [['now', 'Immediately'], ['beat', 'Next beat'], ['bar', 'Next bar']], () => st.muteQ, v => { st.muteQ = v; save(); ui(); }, 'now');
 seg($('#sceneSeg'), [['now', 'Immediately'], ['bar', 'Next bar'], ['lap', 'End of lap']], () => st.sceneQ, v => { st.sceneQ = v; save(); ui(); }, 'lap');
-$('#micSel').addEventListener('change', e => { if (!ctx) return; st.micId = e.target.value; save(); openMic(chosenMic(mics), wantsBuiltin()); });
 if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (performance.now() - micOpenAt > 1500) keepMic(false); });
 $('#exportBtn').addEventListener('click', exportWav);
 $('#hintReset').addEventListener('click', () => { st.hints = {}; save(); ui(); toast('The guide will show on the play screen again.'); });
