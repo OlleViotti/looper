@@ -559,7 +559,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 03:30</p>
+  <p class="ver">Varv one, build 18 Nov 04:00</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -710,7 +710,7 @@ async function restartAudio() {
   try { if (micSrc) micSrc.disconnect(); } catch (e) {}
   if (outRelay) { try { outRelay.au.pause(); outRelay.au.srcObject = null; } catch (e) {} outRelay = null; }
   const old = ctx;
-  ctx = null; initP = null; capNode = null; micStream = null; micSrc = null; micOK = false; mAn = null;
+  ctx = null; initP = null; capNode = null; guardOK = false; micStream = null; micSrc = null; micOK = false; mAn = null;
   ring = null; R = 0; capEnd = 0; capFirst = -1; clk = []; clkOff = null;
   try { navigator.audioSession && (navigator.audioSession.type = 'auto'); } catch (e) {}
   try { await old.close(); } catch (e) {}
@@ -813,13 +813,23 @@ async function setupCapture() {
 process(i){const c=i[0]&&i[0][0],n=c?c.length:128;if(this.n+n>this.b.length)this.flush();if(this.n===0)this.s=currentFrame;
 if(c)this.b.set(c,this.n);this.n+=n;if(this.n>=this.b.length)this.flush();return true}
 flush(){const o=this.b.subarray(0,this.n).slice();this.port.postMessage({f:this.s,d:o},[o.buffer]);this.b.fill(0);this.n=0}}
-registerProcessor('varv-cap',C)`;
+registerProcessor('varv-cap',C);
+class G extends AudioWorkletProcessor{constructor(){super();this.t=-9}
+process(i,o){const a=i[0],b=o[0];let bad=false;for(let c=0;c<b.length;c++){const x=a[c]||a[0],y=b[c];if(!x){y.fill(0);continue}
+for(let k=0;k<y.length;k++){const v=x[k];if(v-v!==0){y[k]=0;bad=true}else y[k]=v}}
+if(bad&&currentTime-this.t>1){this.t=currentTime;this.port.postMessage(1)}return true}}
+registerProcessor('varv-guard',G)`;
   try {
     const url = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
     await ctx.audioWorklet.addModule(url);
     capNode = new AudioWorkletNode(ctx, 'varv-cap', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], channelCount: 1, channelCountMode: 'explicit', channelInterpretation: 'speakers' });
     capNode.port.onmessage = e => onCap(e.data.f, e.data.d);
-    capMode = 'worklet';
+    capMode = 'worklet'; guardOK = true; for (const t of tracks) addGuard(t);
+    try {                                             // and a last guard before the sound leaves Varv, so nothing invalid reaches the phone
+      const mg = new AudioWorkletNode(ctx, 'varv-guard', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
+      limiter.disconnect(ctx.destination); limiter.connect(mg); mg.connect(ctx.destination);
+      mg.port.onmessage = () => { alog('master: invalid sound removed'); toast('Varv’s sound went wrong. Tap the meters, then Restart audio.'); };
+    } catch (e) {}
   } catch (e) {
     const sp = ctx.createScriptProcessor(1024, 1, 1);
     sp.onaudioprocess = ev => onCap(Math.round(ev.playbackTime * sr) - 2048, new Float32Array(ev.inputBuffer.getChannelData(0)));
@@ -2115,6 +2125,22 @@ function rdStart(k, at) {
   if (k.rsrc) try { k.rsrc.stop(at / sr); } catch (e) {}
   k.rsrc = s;
 }
+/* The guard: a number that is not a number (NaN) in the sound would make every filter after it fall silent for good,
+   so all of Varv went quiet. Each track's output is cleaned here; if it happens, the track's own chain is built again. */
+let guardOK = false, guardAt = 0;
+function addGuard(t) {
+  if (!t.out || t.gd || !guardOK) return;
+  let g; try { g = new AudioWorkletNode(ctx, 'varv-guard', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] }); } catch (e) { return; }
+  try { t.out.disconnect(t.post); } catch (e) {}
+  t.out.connect(g); g.connect(t.post); t.gd = g;
+  g.port.onmessage = () => {
+    const on = ['speed', 'tstop', 'trem', 'lofi', 'ring', 'gran', 'dist', 'ebrk', 'rbrk', 'frz', 'phone', 'radio', 'isoL', 'isoM', 'isoH', 'slice', 'rdly', 'ping'].filter(k => k === 'speed' ? t.speed !== 1 : !!t[k]);
+    alog('track ' + (tracks.indexOf(t) + 1) + ': invalid sound removed' + (on.length ? ' (' + on.join(', ') + ')' : '') + (t.xyA ? ' pad: ' + Object.keys(t.xyA).join(', ') : '') + (isSmp(t) ? ', sampler' : ''));
+    if (performance.now() - guardAt > 2000 && tracks.includes(t)) {                // its filters were stuck: start them afresh, a moment later
+      guardAt = performance.now(); setTimeout(() => { if (tracks.includes(t) && ctx) { dropTrackNodes(t); buildTrackNodes(t); } }, 300);
+    }
+  };
+}
 function buildTrackNodes(t) {
   if (!ctx || t.lp) return;
   t.lp = bq('lowpass', OPEN_LP); t.hp = bq('highpass', 10); t.eq = mkEq(); t.g = gn(0);
@@ -2143,18 +2169,19 @@ function buildTrackNodes(t) {
   chain(t.isoIn, bq('highpass', 2800), bq('highpass', 2800), t.isoHg, t.isoOut);
   t.isoOut.connect(t.g);
   const out = t.pn || t.g; if (t.pn) t.g.connect(t.pn);
-  t.dry = gn(1); out.connect(t.dry); t.dry.connect(mix);                 // the breaks mute this while the sends go on
-  out.connect(t.es); t.es.connect(echoIn); out.connect(t.rs); t.rs.connect(revIn);
+  t.out = out; t.post = gn(1); out.connect(t.post); t.gd = null; if (guardOK) addGuard(t);   // all that leaves the track passes the guard
+  t.dry = gn(1); t.post.connect(t.dry); t.dry.connect(mix);                 // the breaks mute this while the sends go on
+  t.post.connect(t.es); t.es.connect(echoIn); t.post.connect(t.rs); t.rs.connect(revIn);
   /* freeze: four combs that sound like a small reverb; frozen, their input closes and they ring on */
   t.fzIn = gn(1); t.fzWet = gn(0); t.fzFb = [];
   for (const ms of [31, 37, 41, 47]) {
     const d = ctx.createDelay(0.1), lp = bq('lowpass', 6000), fb = gn(0.82); d.delayTime.value = ms / 1000;
     t.fzIn.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); d.connect(t.fzWet); t.fzFb.push(fb);
   }
-  out.connect(t.fzIn); t.fzWet.connect(mix);
+  t.post.connect(t.fzIn); t.fzWet.connect(mix);
   /* ping-pong delay, in time with the beat */
   t.ppIn = gn(0); t.ppL = ctx.createDelay(2); t.ppR = ctx.createDelay(2); t.ppFb = gn(0.55); t.ppM = ctx.createChannelMerger(2);
-  out.connect(t.ppIn); t.ppIn.connect(t.ppL); t.ppL.connect(t.ppR); t.ppR.connect(t.ppFb); t.ppFb.connect(t.ppL);
+  t.post.connect(t.ppIn); t.ppIn.connect(t.ppL); t.ppL.connect(t.ppR); t.ppR.connect(t.ppFb); t.ppFb.connect(t.ppL);
   t.ppL.connect(t.ppM, 0, 0); t.ppR.connect(t.ppM, 0, 1); t.ppM.connect(mix);
   t.an = ctx.createAnalyser(); t.an.fftSize = 2048; out.connect(t.an); t.lvS = 0;
   applyTrack(t);
@@ -2164,7 +2191,7 @@ function dropTrackNodes(t) {
   for (const k of t.takes) detachTake(k);
   if (!t.lp) return;
   for (const o of [t.rmOsc, t.trOsc]) if (o) try { o.stop(); } catch (e) {}
-  for (const n of [t.inp, t.dDryG, t.dWetG, t.dSh, t.dLp, t.lp, t.hp, t.eq[0], t.eq[1], t.eq[2], t.g, t.pn, t.es, t.rs, t.rmOsc, t.rmDry, t.rmMul, t.rmWet, t.crIn, t.crDry, t.crSh, t.crWet, t.trOsc, t.trDep, t.trG, t.tk, t.sl, t.rd, t.phIn, t.isoOut, t.dry, t.fzIn, t.fzWet, t.ppIn, t.ppM]) { if (n) try { n.disconnect(); } catch (e) {} }
+  for (const n of [t.inp, t.dDryG, t.dWetG, t.dSh, t.dLp, t.lp, t.hp, t.eq[0], t.eq[1], t.eq[2], t.g, t.pn, t.es, t.rs, t.rmOsc, t.rmDry, t.rmMul, t.rmWet, t.crIn, t.crDry, t.crSh, t.crWet, t.trOsc, t.trDep, t.trG, t.tk, t.sl, t.rd, t.phIn, t.isoOut, t.post, t.gd, t.dry, t.fzIn, t.fzWet, t.ppIn, t.ppM]) { if (n) try { n.disconnect(); } catch (e) {} }
   t.lp = t.g = t.pn = t.an = t.inp = null; t.dOn = false; t.dKey = '';
 }
 /* `at` is an audio-clock time for the gain change, so mute and solo can land on the beat or bar. */
@@ -3106,7 +3133,8 @@ function xyPane(t) {
   pad.append(dot);
   const show = () => { const p = t.xyP; dot.hidden = !p; if (p) { dot.style.left = p[0] * 100 + '%'; dot.style.top = (1 - p[1]) * 100 + '%'; } rel.hidden = !(t.xyHold && t.xyP); };
   const at = e => { const r = pad.getBoundingClientRect(); return [clamp((e.clientX - r.left) / r.width, 0, 1), clamp(1 - (e.clientY - r.top) / r.height, 0, 1)]; };
-  const move = e => { t.xyP = at(e); t.xyA = xyAmounts(t.xyMap || XY_DEF, t.xyP[0], t.xyP[1]); applyTrack(t); show(); };
+  let raf = 0;
+  const move = e => { t.xyP = at(e); t.xyA = xyAmounts(t.xyMap || XY_DEF, t.xyP[0], t.xyP[1]); show(); if (!raf) raf = requestAnimationFrame(() => { raf = 0; applyTrack(t); }); };   // the sound follows once a frame
   const release = () => { t.xyP = null; t.xyA = null; applyTrack(t); show(); };
   let pid = null;
   pad.addEventListener('pointerdown', e => { initAudio(); pid = e.pointerId; try { pad.setPointerCapture(pid); } catch (x) {} pad.classList.add('on'); move(e); e.preventDefault(); });
@@ -3909,7 +3937,7 @@ if (window.ResizeObserver) new ResizeObserver(() => { for (const t of tracks) dr
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* for debugging and tests */
-window.__varv = { st, analyzeLoop, get ctx() { return ctx; }, applyTrackFor: t => applyTrack(t), get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
+window.__varv = { st, rebuild: t => { dropTrackNodes(t); buildTrackNodes(t); }, analyzeLoop, get ctx() { return ctx; }, applyTrackFor: t => applyTrack(t), get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
   ringPeak: sec => { let pk = 0; for (let f = Math.max(availStart(), capEnd - Math.round(sec * sr)); f < capEnd; f++) pk = Math.max(pk, Math.abs(ring[f % R])); return pk; },
   arm: i => toggleArm(tracks[i]),
   get scenes() { return scenes; }, get perf() { return perf; }, togglePerf, get inG() { return inG; },
