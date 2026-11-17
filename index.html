@@ -559,7 +559,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 03:20</p>
+  <p class="ver">Varv one, build 18 Nov 03:30</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -739,7 +739,7 @@ function initAudio() {
      changed its rate, going in or out of its call mode for a Bluetooth microphone.) */
   try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e) { ctx = new AC(); }
   sr = ctx.sampleRate; ctx.resume().catch(() => {}); audioT0 = performance.now();
-  alog('audio started, ' + Math.round(sr / 100) / 10 + ' kHz, ' + ctx.state);
+  alog('audio started, ' + Math.round(sr / 100) / 10 + ' kHz, ' + ctx.state); wdC = null; wdBad = 0;
   { const c = ctx; c.onstatechange = () => { if (c === ctx) alog('audio ' + c.state); }; }
   PRE = latN(PRE_MS); XF = latN(XF_MS); MAXLAT = latN(MAXLAT_MS); OPEN_LP = Math.min(20000, sr * 0.45);
   buildGraph();
@@ -1482,7 +1482,7 @@ function dropSilent(k) {
 let lastState = '';
 /* Watchdog: the audio clock must keep pace with the real clock. If the phone changes its audio rate under a running
    engine, Safari can run it at the wrong speed (half speed, notes arriving late); then the audio is started again. */
-let wdC = null, wdP = 0, wdBad = 0, wdAt = -1e9;
+let wdC = null, wdP = 0, wdBad = 0, wdAt = -1e9, hbAt = -1e9;
 /* A short log of what the audio did, shown on the audio page, to find out why sound stops. */
 const alogL = [];
 function alog(m) {
@@ -1498,6 +1498,11 @@ function watchdog() {
   const rate = (ctx.currentTime - wdC) / ((pn - wdP) / 1000); wdC = ctx.currentTime; wdP = pn;
   wdBad = rate < 0.8 || rate > 1.25 ? wdBad + 1 : 0;
   if (Math.abs(rate - 1) > 0.05) alog('clock ' + rate.toFixed(2) + '× real time');
+  if (pn - hbAt > 30000) {                                      // a heartbeat: is the engine making sound, and where does it go
+    hbAt = pn;
+    const ol = ctx.outputLatency ? Math.round(ctx.outputLatency * 1000) + ' ms out' : '';
+    alog((running ? 'playing' : 'stopped') + ', out ' + (outS > 1e-4 ? Math.round(20 * Math.log10(outS)) + ' dB' : 'silent') + ', in ' + (inPeak > 1e-4 ? Math.round(20 * Math.log10(inPeak)) + ' dB' : 'silent') + (ol ? ', ' + ol : '') + (st.outId ? ', output chosen' : ''));
+  }
   if (wdBad >= 2 && pn - wdAt > 20000) {
     wdAt = pn; wdBad = 0;
     toast('The audio runs at the wrong speed (' + rate.toFixed(2) + '×). Tap the meters, then Restart audio.');
