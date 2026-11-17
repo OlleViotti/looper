@@ -238,6 +238,21 @@ input[type=range].bi::-webkit-slider-runnable-track{background:linear-gradient(9
 .tkl{flex:1;font-size:15px;color:var(--text)!important}
 .tkw{display:block;height:36px;width:calc(100% - 20px);margin:0 10px 4px;background:var(--wave);border-radius:8px}
 .take.takeoff .tkw{opacity:.4}
+.tktop{display:flex;align-items:center;gap:8px;padding:0 10px}
+.tktop .trk{flex:1;min-width:0;margin:6px 0}
+.cr:has(> .tbtn[hidden]:only-child){display:none}
+.tkr{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:6px;height:56px;margin:6px 10px 0}
+.tkr:last-child{margin-bottom:8px}
+.tms{display:flex;flex-direction:column;border-radius:8px;overflow:hidden;background:var(--raise);box-shadow:inset 3px 0 0 var(--ink)}
+.tms .sg{flex:1;display:grid;place-items:center;font:700 14px/1 var(--ui);color:var(--mut)}
+.tms .sg+.sg{border-top:1px solid var(--panel)}
+.tms .sg.mu.on{background:var(--tape);color:#1b1f2e}
+.tms .sg.so.on{background:var(--amber);color:#1b1f2e}
+.tkv{position:relative;background:var(--wave);border-radius:8px;overflow:hidden;transition:opacity .15s}
+.tkv .tkw{width:100%;height:100%;margin:0;border-radius:0;background:none}
+.tkv .tno{position:absolute;left:7px;top:4px;font:700 12px/1 var(--ui);color:var(--ink);pointer-events:none;text-shadow:0 0 3px #1b1f2e,0 0 3px #1b1f2e}
+.tkr.takeoff .tkv{opacity:.4}
+.tkx{border-radius:8px;background:var(--raise);color:#ff8b9a;font-size:24px;font-weight:500}
 .sbtn{height:44px;border-radius:8px;background:var(--raise);font-weight:600;font-variant-numeric:tabular-nums}
 .sbtn:active,.btn:active,.bar button:active,.tname:active,.hb:active{filter:brightness(1.25)}
 .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
@@ -524,7 +539,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 17 Nov 22:45</p>
+  <p class="ver">Varv one, build 17 Nov 22:55</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -1306,8 +1321,10 @@ function serviceTake(k, now) {
   else if (!k.started && !k.pend && now >= end - LEAD_S * sr) { render(k); afterRender(k, now, end); }
 }
 /* A lap recorded with the track's overdub button (k.od) plays on top of what is there; one recorded with its record
-   button replaces it: the earlier takes are kept, silent, so Undo brings them back. A take switched off is silent; one switched back on (k.pin) plays until the next replacing lap. */
-const takeOn = k => {
+   button replaces it: the earlier takes are kept, silent, so Undo brings them back. A take switched off is silent; one switched back on (k.pin) plays until the next replacing lap. With a take soloed
+   (in Edit) only the soloed takes of that track play. */
+const takeOn = k => k.track.takes.some(j => j.solo) ? !!k.solo : takeLive(k);
+const takeLive = k => {
   if (k.off) return false;
   if (k.pin) return true;
   for (const j of k.track.takes) if (j.id > k.id && j.started && !j.off && !j.od) return false;
@@ -2369,7 +2386,7 @@ const changedIn = {
   spitch: t => !!(t.oct || t.semi || t.cent || (t.sample && t.sample.adj)),
   pitch: t => !!(t.oct || t.semi || t.cent),
   tune: t => !!t.tune,
-  takes: t => t.takes.some(k => k.off || k.reverse || k.lat !== (k.notes ? prof().scr : prof().ms)),
+  takes: t => t.takes.some(k => k.off || k.solo || k.reverse || k.lat !== (k.notes ? prof().scr : prof().ms)),
   eq: t => eqChanged(t, 'filt') || !near(t.pan, 0),
   dist: t => !!t.dist,
   track: t => t.bars != null
@@ -2420,7 +2437,8 @@ function trackPane(t) {
   p.append(...fold('takes', isSmp(t) ? 'Laps' : 'Takes', () => {
     if (ks.length) {
       const trk = el('div', 'trk'); t.pcv = el('canvas'); trk.append(t.pcv, el('i', 'ph'));
-      return [card(trk, ...ks.map((k, i) => [k, (k.notes ? 'Lap ' : 'Take ') + (i + 1)]).reverse().map(([k, l]) => takeRow(k, l)))];
+      const c = takeCommon(t, ks), top = el('div', 'tktop'); top.append(trk); if (c.rv) top.append(c.rv);   // the mix, with Reverse beside it
+      return [card(top, ...c.rows, ...ks.map((k, i) => [k, i + 1]).reverse().map(([k, n]) => takeRow(k, n)))];
     }
     return [card(el('p', 'cnote', isSmp(t) ? 'No laps yet. Tap the track’s record button on the play screen, or Rec lap on the pads.' : 'No recordings yet. Tap the track’s record button on the play screen, or its microphone button to record a sample.'))];
   }, changedIn.takes(t), t));
@@ -2706,24 +2724,38 @@ function setTrackBars(t, b, show) {
 }
 /* A take: switch it on or off, see it on its own, set its latency (a take of notes keeps its screen latency
    the same way a recording keeps its headphone latency), reverse it or remove it. Newest first. */
-function takeRow(k, label) {
-  const box = el('div', 'take' + (takeOn(k) ? '' : ' takeoff')), out = el('output'), use = el('button', 'tbtn');
-  const head = el('div', 'cr tkh'), rm = el('button', 'tbtn danger', 'Remove');
-  head.append(swtch(el('div'), () => takeOn(k), v => { k.off = !v; k.pin = v; applyTakes(k.track); drawLane(k.track); markDirty(); renderPane(); }), el('span', 'tkl', label), rm);
-  rm.addEventListener('click', () => removeTake(k));
-  const cv = el('canvas', 'tkw'); cv.draw = () => drawTakeWave(k, cv);
-  const cur = () => k.notes ? prof().scr : prof().ms;
-  const show = () => { out.innerHTML = k.lat + '<small>ms</small>'; use.hidden = k.lat === cur(); use.textContent = 'Use for new'; };
-  const step = d => () => { k.lat = clamp(k.lat + d, 0, MAXLAT_MS); k.final = false; show(); markDirty(); };
-  dbl(out, () => { k.lat = cur(); k.final = false; show(); markDirty(); });     // back to the current latency setting
+/* One row per take: mute above solo on the left (as on the play screen), the take's waveform with its number, and remove. */
+function takeRow(k, no) {
+  const t = k.track, row = el('div', 'tkr' + (takeOn(k) ? '' : ' takeoff')); row.style.setProperty('--ink', t.ink);
+  const ms = el('div', 'tms'), redo = () => { applyTakes(t); drawLane(t); markDirty(); renderPane(); };
+  const mb = el('button', 'sg mu' + (takeLive(k) ? '' : ' on'), 'M'), sb = el('button', 'sg so' + (k.solo ? ' on' : ''), 'S');
+  mb.setAttribute('aria-label', 'Mute take ' + no); sb.setAttribute('aria-label', 'Solo take ' + no);
+  mb.addEventListener('click', () => { const live = takeLive(k); k.off = live; k.pin = !live; redo(); });   // unmuting a replaced take plays it on top
+  sb.addEventListener('click', () => { k.solo = !k.solo; redo(); });
+  ms.append(mb, sb);
+  const wv = el('div', 'tkv'), cv = el('canvas', 'tkw'); cv.draw = () => drawTakeWave(k, cv); wv.append(cv, el('span', 'tno', String(no)));
+  const rm = el('button', 'tkx', '×'); rm.setAttribute('aria-label', 'Remove take ' + no); rm.addEventListener('click', () => removeTake(k));
+  row.append(ms, wv, rm); return row;
+}
+/* Latency and Reverse for all the takes of a track at once. */
+function takeCommon(t, ks) {
+  const out = el('output'), use = el('button', 'tbtn'), notes = !!ks[0].notes, cur = () => notes ? prof().scr : prof().ms;
+  const lat = () => ks[ks.length - 1].lat;
+  const setAll = v => { for (const k of ks) { k.lat = clamp(v, 0, MAXLAT_MS); k.final = false; } show(); markDirty(); };
+  const show = () => { out.innerHTML = lat() + '<small>ms</small>'; use.hidden = lat() === cur(); use.textContent = 'Use for new'; };
+  dbl(out, () => setAll(cur()));
   use.addEventListener('click', () => {
-    if (k.notes) prof().scr = k.lat; else { prof().ms = k.lat; prof().guess = false; }
-    save(); show(); ui(); toast((k.notes ? 'New laps on the sampler shift by ' : 'New recordings shift by ') + k.lat + ' ms.');
+    if (notes) prof().scr = lat(); else { prof().ms = lat(); prof().guess = false; }
+    save(); show(); ui(); toast((notes ? 'New laps on the sampler shift by ' : 'New recordings shift by ') + lat() + ' ms.');
   });
-  const rv = el('button', 'tbtn' + (k.reverse ? ' on' : ''), 'Reverse');
-  rv.addEventListener('click', () => { k.reverse = !k.reverse; k.final = false; rv.classList.toggle('on', k.reverse); markDirty(); });
-  const acts = el('div', 'cr wrap'); if (!k.notes) acts.append(rv); acts.append(use);
-  box.append(head, cv, crow(k.notes ? 'Screen latency' : 'Latency', pill(out, step(-1), step(1))), acts); show(); return box;
+  const lr = crow(notes ? 'Screen latency' : 'Latency', pill(out, () => setAll(lat() - 1), () => setAll(lat() + 1)));
+  let rv = null;
+  if (!notes) {
+    rv = el('button', 'tbtn' + (ks.every(k => k.reverse) ? ' on' : ''), 'Reverse');
+    rv.addEventListener('click', () => { const v = !ks.every(k => k.reverse); for (const k of ks) { k.reverse = v; k.final = false; } rv.classList.toggle('on', v); markDirty(); });
+  }
+  const ur = el('div', 'cr'); ur.append(use); show();
+  return { rv, rows: [lr, ur] };
 }
 function drawTakeWave(k, cv) {
   const { g, w, h } = sizeCanvas(cv); if (!w || !k.peaks) return;
@@ -3031,10 +3063,10 @@ async function saveProject() {
         return { key: s.key, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: s.env, comp: s.comp };
       })(t.sample),
       takes: t.takes.filter(k => k.full && k.started).map(k => {
-        if (k.notes) return { key: k.key, lat: k.lat, off: !!k.off, pin: !!k.pin, bars: isFree() ? null : Math.round(k.len / barsLen(1)), notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
+        if (k.notes) return { key: k.key, lat: k.lat, off: !!k.off, pin: !!k.pin, solo: !!k.solo, bars: isFree() ? null : Math.round(k.len / barsLen(1)), notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
         keep.add(k.key);
         if (k.savedTo !== pid) { puts.push([pid + '/' + k.key, k.raw.slice(0, k.filled)]); k.savedTo = pid; }
-        return { key: k.key, lat: k.lat, off: !!k.off, pin: !!k.pin, od: !!k.od, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
+        return { key: k.key, lat: k.lat, off: !!k.off, pin: !!k.pin, solo: !!k.solo, od: !!k.od, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
       }) })) };
   const prev = saving;
   const job = (async () => {
@@ -3114,7 +3146,7 @@ async function openProject(id) {
       if (km.notes) {                                     // a lap of notes: rendered from the sample once it is ready
         if (!t.sample || (isFree() && !freeL)) { missing++; continue; }
         const len = isFree() ? freeL : barsLen(km.bars || tm.bars || meta.bars);
-        t.takes.push({ id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw: null, span: len + MAXLAT + 8, sig: '', off: !!km.off, pin: !!km.pin,
+        t.takes.push({ id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw: null, span: len + MAXLAT + 8, sig: '', off: !!km.off, pin: !!km.pin, solo: !!km.solo,
           notes: km.notes.map(([p, n, o]) => ({ A: Math.round(p * ratio), n, O: o == null ? null : Math.round(o * ratio), tid: t.id })),
           filled: 0, lat: km.lat, reverse: false, norm: 1, peak: 0, peaks: null, buf: null, src: null, tg: null,
           final: false, started: true, full: true, auto: false, track: t, savedTo: same ? id : null });
@@ -3124,7 +3156,7 @@ async function openProject(id) {
       if (!raw || (isFree() && !freeL)) { missing++; continue; }
       if (!same) raw = resample(raw, ratio);
       const len = isFree() ? freeL : barsLen(km.bars || tm.bars || meta.bars);
-      const k = { id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, off: !!km.off, pin: !!km.pin, od: !!km.od, reverse: !!km.reverse,
+      const k = { id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, off: !!km.off, pin: !!km.pin, solo: !!km.solo, od: !!km.od, reverse: !!km.reverse,
         norm: km.norm == null ? null : km.norm, peak: 0, peaks: null, buf: null, src: null, tg: null,
         final: true, started: true, full: true, auto: false, track: t, savedTo: same ? id : null };
       render(k); t.takes.push(k); attachTake(k);
