@@ -189,8 +189,13 @@ body[data-pads] #backT{display:block}
 .etab{flex:none;height:36px;min-width:44px;padding:0 14px;border-radius:999px;background:var(--panel);font-weight:600;font-size:15px;color:var(--text);white-space:nowrap;touch-action:pan-x}
 .etab.on{background:var(--amber);color:#1b1f2e}
 .etab.mut{color:var(--mut)}
+.etab.tk{font-weight:700;color:var(--ink);box-shadow:inset 3px 0 0 var(--ink);border-radius:8px}
+.etab.tk.on{background:var(--ink);color:#1b1f2e}
+.etab.tk.mut:not(.on){opacity:.45}
+.epane .etab,.pads .etab{border-radius:8px}
 .etab.add{background:transparent;border:1px dashed var(--line);color:var(--mut)}
 .ehead{position:sticky;top:54px;z-index:2;background:var(--panel);border-radius:14px;margin-bottom:8px;box-shadow:0 6px 12px -6px rgba(0,0,0,.6)}
+.ehead.tk{box-shadow:inset 4px 0 0 var(--ink),0 6px 12px -6px rgba(0,0,0,.6)}
 .tbtn.eplay{flex:1 0 100%;margin-top:4px;height:40px;min-height:40px;border-radius:999px;background:var(--amber);color:#1b1f2e;display:grid;place-items:center;padding:0}
 .tbtn.eplay svg{width:18px;height:18px;fill:currentColor}
 .ehead .tbtn:not(.eplay){font-size:16px;padding:0 3px}
@@ -521,7 +526,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 17 Nov 22:15</p>
+  <p class="ver">Varv one, build 17 Nov 22:25</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -1686,6 +1691,7 @@ function drawPads() {
   const tabs = el('div', 'etabs');
   for (const x of tracks.filter(x => x.sample || x === t)) {
     const b = el('button', 'etab' + (x === t ? ' on' : '') + (audible(x) ? '' : ' mut'), String(tracks.indexOf(x) + 1));
+    b.classList.add('tk'); b.style.setProperty('--ink', x.ink);
     b.setAttribute('aria-label', x.name); b.addEventListener('click', () => { if (x !== t) openPads(x); }); tabs.append(b);
   }
   const nb = el('button', 'etab add', '+ Sampler'); nb.addEventListener('click', newSampler); tabs.append(nb);
@@ -2325,6 +2331,7 @@ function renderPane() {
   const mt = el('button', 'etab' + (selId === 'master' ? ' on' : ''), 'Master'); mt.addEventListener('click', () => selectTrack('master')); tabs.append(mt);
   for (const x of tracks) {
     const b = el('button', 'etab' + (x.id === selId ? ' on' : '') + (audible(x) ? '' : ' mut'), String(tracks.indexOf(x) + 1));
+    b.classList.add('tk'); b.style.setProperty('--ink', x.ink);   // in the track's colour, as on the play screen
     b.setAttribute('aria-label', x.name); b.addEventListener('click', () => selectTrack(x.id)); tabs.append(b);
   }
   pane.append(tabs);
@@ -2372,7 +2379,8 @@ function trackPane(t) {
   const db = el('button', 'tbtn danger'); twoTap(db, 'Reset', 'Sure?', () => true, () => clearTrack(t, true));
   const xb = el('button', 'tbtn danger'); twoTap(xb, 'Delete', 'Sure?', () => true, () => deleteTrack(t));   // removes the track itself
   /* The header stays pinned under the tabs while the rest scrolls; on a sampler it has Play, to hear an edit at once. */
-  const head = el('div', 'cr ehead'), btns = el('div'); btns.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 2px;flex:1;align-items:center;justify-content:space-between';
+  const head = el('div', 'cr ehead tk'); head.style.setProperty('--ink', t.ink);
+  const btns = el('div'); btns.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 2px;flex:1;align-items:center;justify-content:space-between';
   btns.append(xb, db, eb, mb, sb);
   if (t.sample) {
     const pl = el('button', 'tbtn eplay'); pl.setAttribute('aria-label', 'Play the sample');
