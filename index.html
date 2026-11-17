@@ -408,6 +408,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 .reclap.wait{background:var(--raise);color:var(--text);box-shadow:inset 0 0 0 3px var(--rec);animation:blink .5s steps(2,jump-none) infinite}
 .reclap.on{background:#fff;color:var(--rec)}
 .reclap:disabled{opacity:.35}
+.reclap.od:not(.on):not(.wait){background:var(--raise);color:var(--rec)}
 .pbig.rec{background:var(--rec);color:#fff}
 .pbig.rec small{color:#fff}
 .phead{display:flex;align-items:center;gap:8px;min-height:44px}
@@ -418,9 +419,10 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 .ptop .tbtn{flex:none}
 .pads .trk{flex:none;height:22px;background:var(--wave);border-radius:6px}
 .pads.run .ph{display:block}
-.popt{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--mut);font-size:14px}
+.popt{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px;color:var(--mut);font-size:14px}
 .popt>div{display:flex;align-items:center;gap:6px}
-.popt .pill .sbtn{width:38px}
+.popt .pill .sbtn{width:34px}
+.popt .pill .sbtn.oj{width:30px;font-size:18px;color:var(--mut)}
 .popt .pill.sm output{min-width:34px}
 .pnote{color:var(--mut);font-size:14px;margin:0}
 .pnote b{color:var(--text);font-weight:600}
@@ -539,6 +541,8 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <button class="fh sfh" data-fold="sCtl">Recording, mute and scenes</button>
   <div class="sfb">
   <div class="card">
+    <div class="cr"><span>Overdub with Record</span><div id="overdubSw"></div></div>
+    <p class="cnote">For the big Record button: on, a lap recorded onto a track that already has one plays on top of it; off, it replaces it. A track's own buttons choose for themselves.</p>
     <p class="csub">Mute and solo</p>
     <div class="cr"><div class="seg full" id="muteSeg"></div></div>
     <p class="cnote" id="muteNote"></p>
@@ -553,7 +557,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 02:00</p>
+  <p class="ver">Varv one, build 18 Nov 02:25</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -603,7 +607,7 @@ const EQ_DEF = { eqL: 0, eqM: 0, eqH: 0, eqLf: 200, eqMf: 1000, eqHf: 4000 };
 const FX_KEYS = ['master', 'gFilter', 'eqL', 'eqM', 'eqH', 'eqLf', 'eqMf', 'eqHf', 'gEcho', 'echoDiv', 'echoMs', 'echoFb', 'echoLvl', 'gRev', 'revSize', 'revLvl', 'compThr', 'compAmt'];
 const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
 const st = Object.assign({
-  v: 6, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now', sceneQ: 'lap',
+  v: 6, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, overdub: false, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now', sceneQ: 'lap',
   profiles: [{ name: 'AirPods', ms: 185, guess: true }, { name: 'Wired or speaker', ms: 20, guess: true }],
   active: 0, micId: 'builtin', master: 0.9, gFilter: 0,
   gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1,
@@ -641,7 +645,7 @@ let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, s
 /* The XY pad: what each axis, edge and corner controls (see xyPane). */
 const XY_DEF = { x: 'filter', y: 'rev', l: '', r: '', t: '', b: '', tl: '', tr: '', bl: '', br: '' };
 const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'chrom', tSpeed: 20, tAmt: 1,
-  sampler: false, padMode: null, kOct: null, kBase: null, sGate: false,
+  sampler: false, padMode: null, kOct: null, kBase: null, kW: null, sGate: false,   // kW: the lowest key, counted in white keys from C0
   dist: false, dTyp: 'soft', dDrv: 0.5, dTon: 0.7, dMix: 1, dLvl: 1,
   speed: 1, tstop: false, trem: 0, tDep: 1, tShape: 'smooth', lofi: 0, ring: 0, rFreq: 0.5, gran: 0, gSize: 0.4, gScat: 0.3,
   xyMap: XY_DEF, xyHold: false,
@@ -1037,7 +1041,7 @@ function addTake(r, auto, lat) {
   t.takes.push({ id: ++uid, key: rid(), k: r.k, len: r.len, run: runId, F0, rawStart: F0 - PRE, raw: ev ? null : new Float32Array(r.len + XF + MAXLAT + 8), filled: 0,
     notes: ev ? [] : null, span: r.len + MAXLAT + 8, sig: '',
     lat: lat == null ? (ev ? prof().scr : prof().ms) : lat, reverse: false, norm: ev ? 1 : null, peak: 0, peaks: null, buf: null, src: null, tg: null,
-    final: false, started: false, full: false, auto, track: t, savedTo: null, od: !!r.od });
+    final: false, started: false, full: false, auto, track: t, savedTo: null, od: r.od != null ? !!r.od : !!st.overdub });   // the big Record button follows Overdub in Settings
   if (armedId === t.id) { armedId = null; drawHeads(); }        // armed for one recording
   touched(t); drawHead(t); ensureProject();
   return t;
@@ -1808,10 +1812,20 @@ function newSampler() {
 function drawPadRec() {
   const b = $('#recLap'); if (!b || !padT) return;
   const t = padT, mine = !!rec && rec.tid === t.id, wait = mine && (!running || (heardPos() < rec.k * rec.len && !inTail(heardPos())));
-  b.className = 'reclap' + (mine ? (wait ? ' wait' : ' on') : '');
-  b.textContent = !mine ? 'Rec lap' : wait ? 'Cancel' : rec.cont ? (rec.last ? 'Keep going' : 'Finish') : 'Cancel';
-  b.disabled = !t.sample;
+  const od = $('#recOd'), isOd = mine && !!rec.od;
+  b.className = 'reclap' + (mine && !isOd ? (wait ? ' wait' : ' on') : '');
+  b.textContent = !mine || isOd ? 'Rec lap' : wait ? 'Cancel' : rec.cont ? (rec.last ? 'Keep going' : 'Finish') : 'Cancel';
+  b.disabled = !t.sample || isOd;
+  if (od) {                                          // the same, on top of the laps already there
+    od.className = 'reclap od' + (isOd ? (wait ? ' wait' : ' on') : '');
+    od.textContent = !isOd ? '+ Overdub' : wait ? 'Cancel' : rec.cont ? (rec.last ? 'Keep going' : 'Finish') : 'Cancel';
+    od.disabled = !t.sample || (mine && !isOd);
+  }
 }
+const kStart = t => t.kW != null ? t.kW : kBaseOf(t) * 7;
+const WHITE = [0, 2, 4, 5, 7, 9, 11];
+const wMidi = w => 12 * (Math.floor(w / 7) + 1) + WHITE[((w % 7) + 7) % 7];
+const wName = w => 'CDEFGAB'[((w % 7) + 7) % 7] + Math.floor(w / 7);
 const kBaseOf = t => t.kBase != null ? t.kBase : clamp(Math.floor(Math.round(sRoot(t)) / 12) - 1 - ((Math.max(1, kOctOf(t)) - 1) >> 1), 0, 7);
 function drawPads() {
   const host = $('#pads'), t = padT; host.textContent = '';
@@ -1827,9 +1841,10 @@ function drawPads() {
   const nb = el('button', 'etab add', '+ Sampler'); nb.addEventListener('click', newSampler); tabs.append(nb);
   const top = el('div', 'ptop'), head = el('div', 'phead'), rb = el('button', 'reclap'), done = el('button', 'tbtn', 'Done');
   rb.id = 'recLap'; rb.addEventListener('click', () => recordInto(t));
+  const ob = el('button', 'reclap od'); ob.id = 'recOd'; ob.addEventListener('click', () => recordInto(t, true));
   done.addEventListener('click', closePads);
   top.append(tabs, done);
-  head.append(rb);
+  head.append(rb, ob);
   if (t.sample) {                                   // whether a note plays in full or while held
     const gs = el('div', 'seg');
     seg(gs, [[false, 'Full'], [true, 'Held']], () => !!t.sGate, v => { t.sGate = v; for (const k of t.takes) k.final = false; markDirty(); }, false);
@@ -1853,7 +1868,7 @@ function drawPads() {
   let area = null;
   const show = () => {
     const n = kOctOf(t);
-    ro.innerHTML = n ? n : '0<small>pad</small>'; bo.textContent = 'C' + kBaseOf(t); o2.style.visibility = n ? '' : 'hidden';
+    ro.innerHTML = n ? n : '0<small>pad</small>'; bo.textContent = wName(kStart(t)); o2.style.visibility = n ? '' : 'hidden';
     if (!area || area.classList.contains('kb') !== !!n) {
       let nw;
       if (n) nw = el('div', 'kb');
@@ -1865,11 +1880,14 @@ function drawPads() {
     if (n) buildKeys(t, area);
   };
   const setRows = v => { v = clamp(v, 0, 4); if (v === kOctOf(t)) return; t.kOct = v; markDirty(); show(); };
-  const setBase = v => { v = clamp(v, 0, 8); if (v === kBaseOf(t)) return; t.kBase = v; markDirty(); show(); };
-  dbl(bo, () => { t.kBase = null; markDirty(); show(); });
-  const p1 = pill(ro, () => setRows(kOctOf(t) - 1), () => setRows(kOctOf(t) + 1)), p2 = pill(bo, () => setBase(kBaseOf(t) - 1), () => setBase(kBaseOf(t) + 1));
+  const setStart = v => { v = clamp(v, 0, 8 * 7); if (v === kStart(t)) return; t.kW = v; markDirty(); show(); };   // a white key at a time, or an octave with « »
+  dbl(bo, () => { t.kW = null; t.kBase = null; markDirty(); show(); });
+  const p1 = pill(ro, () => setRows(kOctOf(t) - 1), () => setRows(kOctOf(t) + 1)), p2 = pill(bo, () => setStart(kStart(t) - 1), () => setStart(kStart(t) + 1));
+  const oDn = el('button', 'sbtn oj', '«'), oUp = el('button', 'sbtn oj', '»'); oDn.setAttribute('aria-label', 'An octave down'); oUp.setAttribute('aria-label', 'An octave up');
+  oDn.addEventListener('click', () => setStart(kStart(t) - 7)); oUp.addEventListener('click', () => setStart(kStart(t) + 7));
+  p2.prepend(oDn); p2.append(oUp);
   p1.classList.add('sm'); p2.classList.add('sm');
-  o1.append(el('span', '', 'Octaves'), p1); o2.append(el('span', '', 'From'), p2); opt.append(o1, o2);
+  o1.append(el('span', '', 'Octaves'), p1); o2.append(el('span', '', 'From'), p2); o2.classList.add('pfrom'); opt.append(o1, o2);
   host.append(opt); show();
   requestAnimationFrame(() => drawLane(t));
 }
@@ -1877,12 +1895,16 @@ function drawPads() {
 function buildKeys(t, area) {
   if (!area) return;
   area.textContent = '';
-  const base = kBaseOf(t), rootN = Math.round(sRoot(t)), WH = [0, 2, 4, 5, 7, 9, 11], BK = [[1, 1], [3, 2], [6, 4], [8, 5], [10, 6]], NM = 'CDEFGAB';
-  for (let r = kOctOf(t) - 1; r >= 0; r--) {
-    const o = base + r, row = el('div', 'oct'), m0 = 12 * (o + 1);
-    WH.forEach((pc, i) => { const k = el('div', 'ky' + (m0 + pc === rootN ? ' root' : ''), pc ? NM[i] : 'C' + o); k.dataset.n = m0 + pc; row.append(k); });
-    for (const [pc, j] of BK) {
-      const k = el('div', 'ky bk' + (m0 + pc === rootN ? ' root' : '')); k.dataset.n = m0 + pc;
+  const w0 = kStart(t), rootN = Math.round(sRoot(t));
+  for (let r = kOctOf(t) - 1; r >= 0; r--) {                // each row seven white keys, from any white key
+    const s0 = w0 + 7 * r, row = el('div', 'oct');
+    for (let i = 0; i < 7; i++) {
+      const w = s0 + i, m = wMidi(w), first = i === 0 || w % 7 === 0;
+      const k = el('div', 'ky' + (m === rootN ? ' root' : ''), first ? wName(w) : 'CDEFGAB'[w % 7]); k.dataset.n = m; row.append(k);
+    }
+    for (let i = 0; i < 6; i++) {                            // a black key after C, D, F, G and A
+      const w = s0 + i; if (![0, 1, 3, 4, 5].includes(w % 7)) continue;
+      const m = wMidi(w) + 1, j = i + 1, k = el('div', 'ky bk' + (m === rootN ? ' root' : '')); k.dataset.n = m;
       k.style.left = 'calc((100% - 18px) / 7 * ' + (j - 0.31) + ' + ' + (3 * j - 1.5) + 'px)';
       row.append(k);
     }
@@ -3789,6 +3811,7 @@ $('#tapPad').addEventListener('pointerdown', e => {
 $('#tapUse').addEventListener('click', () => { if (!tapOut) return; prof().scr = tapOut.ms; save(); $('#tapUse').hidden = true; ui(); toast('New laps on the sampler shift by ' + tapOut.ms + ' ms.'); });
 
 $('#clickVolRow').append(sliderRow('Volume', 0, 1, 0.01, st.clickVol, 0.6, pct, v => { st.clickVol = v; save(); if (ctx && running && st.clickOn && nowF() >= epoch) clickGain.gain.setTargetAtTime(v, ctx.currentTime, 0.01); }));
+swtch($('#overdubSw'), () => st.overdub, v => { st.overdub = v; save(); }, false);
 swtch($('#autoLvlSw'), () => st.autoLevel, v => { st.autoLevel = v; save(); }, false);
 swtch($('#perfMicSw'), () => st.perfMic, v => { st.perfMic = v; save(); }, true);
 $('#perfBtn').addEventListener('click', togglePerf);
