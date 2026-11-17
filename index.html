@@ -79,6 +79,7 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 .tb{width:38px;height:44px;border-radius:8px;background:var(--panel);color:var(--mut);font:700 15px/1 var(--ui);display:grid;place-items:center;touch-action:pan-y}
 .tb svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2}
 .tb.rc svg{fill:currentColor;stroke:none;width:16px;height:16px}
+.tb.rc.od svg{width:22px;height:22px}
 .tb.rc{color:var(--rec)}
 .tb.rc.on{background:var(--rec);color:#fff}
 .tb.rc.wait{background:var(--raise);box-shadow:inset 0 0 0 3px var(--rec);animation:blink .5s steps(2,jump-none) infinite}
@@ -438,7 +439,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
       </div>
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
-      <p class="hint" id="hTrack" hidden><b>M</b> mutes, <b>S</b> solos, <b>●</b> records a lap, the <b>mic</b> records a sample.</p>
+      <p class="hint" id="hTrack" hidden><b>M</b> mutes, <b>S</b> solos, <b>●</b> records a lap, <b>+●</b> adds one on top, the <b>mic</b> records a sample.</p>
       <p class="hint" id="hSwipe" hidden><b>Swipe right</b> on a track to edit it, <b>left</b> for settings.</p>
       <p class="hint" id="hUndo" hidden><b>Undo</b> takes back a recording, <b>Capture last</b> keeps the lap just played.</p>
       <div class="row"><button class="addtrk nmcol" id="addTrk" aria-label="Add a track">+</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
@@ -510,8 +511,6 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <button class="fh sfh" data-fold="sCtl">Recording, mute and scenes</button>
   <div class="sfb">
   <div class="card">
-    <div class="cr"><span>Overdub</span><div id="overdubSw"></div></div>
-    <p class="cnote" id="overdubNote"></p>
     <p class="csub">Mute and solo</p>
     <div class="cr"><div class="seg full" id="muteSeg"></div></div>
     <p class="cnote" id="muteNote"></p>
@@ -526,7 +525,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 17 Nov 22:25</p>
+  <p class="ver">Varv one, build 17 Nov 22:35</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -576,7 +575,7 @@ const EQ_DEF = { eqL: 0, eqM: 0, eqH: 0, eqLf: 200, eqMf: 1000, eqHf: 4000 };
 const FX_KEYS = ['master', 'gFilter', 'eqL', 'eqM', 'eqH', 'eqLf', 'eqMf', 'eqHf', 'gEcho', 'echoDiv', 'echoMs', 'echoFb', 'echoLvl', 'gRev', 'revSize', 'revLvl', 'compThr', 'compAmt'];
 const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
 const st = Object.assign({
-  v: 6, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, overdub: false, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now', sceneQ: 'lap',
+  v: 6, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now', sceneQ: 'lap',
   profiles: [{ name: 'AirPods', ms: 185, guess: true }, { name: 'Wired or speaker', ms: 20, guess: true }],
   active: 0, micId: 'builtin', master: 0.9, gFilter: 0,
   gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1,
@@ -593,7 +592,7 @@ const LAT_DEF = 185, TOUCH_MS = 60, scrGuess = p => p.ms + TOUCH_MS;
 if ((saved.v || 0) < 3) for (const p of st.profiles) if (p.guess && p.ms === 180) p.ms = LAT_DEF;
 if ((saved.v || 0) < 4) { st.v = 4; for (const p of st.profiles) delete p.scr; }
 if ((saved.v || 0) < 6) { st.v = 6; st.folds = {}; }
-if ((saved.v || 0) < 5) { st.v = 6; st.muteQ = 'now'; st.overdub = false; st.sceneQ = 'lap'; }   // new defaults: mute and solo at once, scenes at the end of the lap, overdub off
+if ((saved.v || 0) < 5) { st.v = 6; st.muteQ = 'now'; st.sceneQ = 'lap'; }   // new defaults: mute and solo at once, scenes at the end of the lap
 for (const p of st.profiles) if (p.scr == null) p.scr = scrGuess(p);
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
 const prof = () => st.profiles[st.active];
@@ -616,6 +615,7 @@ const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute
   dist: false, dTyp: 'soft', dDrv: 0.5, dTon: 0.7, dMix: 1, dLvl: 1 }, EQ_DEF);   // distortion: on, type, drive, tone, mix, level   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
 const TRACK_KEYS = Object.keys(TRACK_DEF);
 const isSmp = t => !!t.sample;                       // a sampler when it holds a sample, a microphone track when it holds recordings
+const OD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="14" r="6.5"/><path d="M19 2.5v8M15 6.5h8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
 const MIC_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>';
 /* The sample button: records a sample (which makes the track a sampler), or on a sampler opens its keys. */
 function sampleButton(t) {
@@ -991,7 +991,7 @@ function addTake(r, auto, lat) {
   t.takes.push({ id: ++uid, key: rid(), k: r.k, len: r.len, run: runId, F0, rawStart: F0 - PRE, raw: ev ? null : new Float32Array(r.len + XF + MAXLAT + 8), filled: 0,
     notes: ev ? [] : null, span: r.len + MAXLAT + 8, sig: '',
     lat: lat == null ? (ev ? prof().scr : prof().ms) : lat, reverse: false, norm: ev ? 1 : null, peak: 0, peaks: null, buf: null, src: null, tg: null,
-    final: false, started: false, full: false, auto, track: t, savedTo: null });
+    final: false, started: false, full: false, auto, track: t, savedTo: null, od: !!r.od });
   if (armedId === t.id) { armedId = null; drawHeads(); }        // armed for one recording
   touched(t); drawHead(t); ensureProject();
   return t;
@@ -1306,9 +1306,13 @@ function serviceTake(k, now) {
   if (!k.final && k.filled >= need) { render(k); k.final = true; afterRender(k, now, end); }
   else if (!k.started && !k.pend && now >= end - LEAD_S * sr) { render(k); afterRender(k, now, end); }
 }
-/* Overdub on: every take on a track plays. Off: only the newest; the earlier ones are kept, silent, so Undo brings them back. */
-const newestTake = t => { let n = null; for (const k of t.takes) if (k.started && !k.off && (!n || k.id > n.id)) n = k; return n; };
-const takeOn = k => !k.off && (st.overdub || newestTake(k.track) === k);   // a take switched off is silent
+/* A lap recorded with the track's overdub button (k.od) plays on top of what is there; one recorded with its record
+   button replaces it: the earlier takes are kept, silent, so Undo brings them back. A take switched off is silent. */
+const takeOn = k => {
+  if (k.off) return false;
+  for (const j of k.track.takes) if (j.id > k.id && j.started && !j.off && !j.od) return false;
+  return true;
+};
 function applyTakes(t, at) {
   if (!ctx) return;
   for (const k of t.takes) {
@@ -1355,7 +1359,7 @@ function tick() {
     const armedBefore = armedId, r = rec, t = addTake(r, r.cont); recTail = { start: r.k * r.len, end: (r.k + 1) * r.len };
     serviceTake(t.takes[t.takes.length - 1], now);                        // judge the lap now: a silent one is dropped, so its track stays first in line
     const stay = r.stay || armedBefore === t.id;
-    rec = !r.cont || r.last ? null : stay ? { tid: t.id, len: r.len, k: r.k + 1, cont: true, last: false, stay: true } : plan((r.k + 1) * r.len);
+    rec = !r.cont || r.last ? null : stay ? { tid: t.id, len: r.len, k: r.k + 1, cont: true, last: false, stay: true, od: r.od } : plan((r.k + 1) * r.len);
     ui();                                                                    // the target may have moved on
   }
   if (srec && now - srec.F >= SMAX_S * sr) stopSampleRec();
@@ -1964,7 +1968,7 @@ function toggleSolo(t) { touched(t); hintDone('track'); t.solo = !t.solo; const 
 /* Hold a track: record into it from its next lap. Stopped: start with the count-in first.
    Holding again cancels a recording that has not started, or makes a running Auto recording end after this lap. */
 const recInto = t => rec && rec.tid === t.id;
-async function recordInto(t) {
+async function recordInto(t, od) {          // od: overdub, on top of what the track has; otherwise the lap replaces it
   touched(t); hintDone('track');
   if (measuring) return;
   if (t.sample) {                                   // a sampler: the pad screen opens and the lap records what is played on it
@@ -1975,7 +1979,7 @@ async function recordInto(t) {
   if (!running) {
     if (!(await start(true))) return;
     if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
-    rec = { tid: t.id, len: trackLen(t), k: isFree() ? 1 : 0, cont: false, last: false, stay: true }; ui(); return;
+    rec = { tid: t.id, len: trackLen(t), k: isFree() ? 1 : 0, cont: false, last: false, stay: true, od: !!od }; ui(); return;
   }
   const p = heardPos();
   if (recInto(t)) {
@@ -1985,7 +1989,7 @@ async function recordInto(t) {
   }
   if (rec && !(p < rec.k * rec.len && !inTail(p))) { toast('Wait for the recording into ' + (tracks.find(x => x.id === rec.tid) || {}).name + ' to finish.'); return; }
   const len = trackLen(t), kk = Math.floor(p / len);
-  rec = { tid: t.id, len, k: p < 0 ? 0 : (p - kk * len < GRACE_S * sr ? kk : kk + 1), cont: false, last: false, stay: true };   // a hold records one lap
+  rec = { tid: t.id, len, k: p < 0 ? 0 : (p - kk * len < GRACE_S * sr ? kk : kk + 1), cont: false, last: false, stay: true, od: !!od };   // a hold records one lap
   while (taken(rec)) rec.k++;
   ui();
 }
@@ -2015,6 +2019,7 @@ function mountTrack(t, idx) {
   /* On the right: sample (or keys on a sampler) and record. */
   const bs = el('div', 'tbs'), mk = (cls, label, html, fn) => { const b = el('button', 'tb ' + cls); b.setAttribute('aria-label', label); b.innerHTML = html; b.addEventListener('click', () => { if (mode === 'play') fn(); }); bs.append(b); return b; };
   t.bX = mk('sx', 'Record a sample', MIC_ICON, () => sampleButton(t));
+  t.bO = mk('rc od', 'Overdub a lap', OD_ICON, () => recordInto(t, true));    // on a recorded microphone track, in the sample button's place
   t.bR = mk('rc', 'Record a lap', '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>', () => recordInto(t));
   row.addEventListener('pointerdown', () => touched(t), true);       // a swipe right that starts on this track edits it
   row.append(nb, trk, bs); t.row = row;
@@ -2060,7 +2065,9 @@ function drawHead(t) {
   t.row.classList.toggle('silent', !audible(t));
   t.row.classList.toggle('sel', mode === 'edit' && selId === t.id);
   if (t.bR) {
-    t.bR.className = 'tb rc' + (queued ? ' wait' : into || armedId === t.id ? ' on' : '');
+    const od = recInto(t) && rec.od, mic = !isSmp(t) && t.takes.length > 0;
+    t.bR.className = 'tb rc' + (od ? '' : queued ? ' wait' : into || armedId === t.id ? ' on' : '');
+    t.bO.className = 'tb rc od' + (!mic ? ' off' : od && queued ? ' wait' : od && into ? ' on' : '');
     t.bS.classList.toggle('on', !!t.solo); t.bM.classList.toggle('on', !!t.mute);
     const smp = isSmp(t) && !!t.sample, sampling = !!srec && srec.tid === t.id;
     t.bX.innerHTML = smp ? KB_ICON : MIC_ICON; t.bX.setAttribute('aria-label', smp ? 'Play ' + t.name + ' on the keys' : 'Record a sample');
@@ -3026,7 +3033,7 @@ async function saveProject() {
         if (k.notes) return { key: k.key, lat: k.lat, off: !!k.off, bars: isFree() ? null : Math.round(k.len / barsLen(1)), notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
         keep.add(k.key);
         if (k.savedTo !== pid) { puts.push([pid + '/' + k.key, k.raw.slice(0, k.filled)]); k.savedTo = pid; }
-        return { key: k.key, lat: k.lat, off: !!k.off, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
+        return { key: k.key, lat: k.lat, off: !!k.off, od: !!k.od, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
       }) })) };
   const prev = saving;
   const job = (async () => {
@@ -3116,7 +3123,7 @@ async function openProject(id) {
       if (!raw || (isFree() && !freeL)) { missing++; continue; }
       if (!same) raw = resample(raw, ratio);
       const len = isFree() ? freeL : barsLen(km.bars || tm.bars || meta.bars);
-      const k = { id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, off: !!km.off, reverse: !!km.reverse,
+      const k = { id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, off: !!km.off, od: !!km.od, reverse: !!km.reverse,
         norm: km.norm == null ? null : km.norm, peak: 0, peaks: null, buf: null, src: null, tg: null,
         final: true, started: true, full: true, auto: false, track: t, savedTo: same ? id : null };
       render(k); t.takes.push(k); attachTake(k);
@@ -3435,11 +3442,6 @@ $('#tapPad').addEventListener('pointerdown', e => {
 $('#tapUse').addEventListener('click', () => { if (!tapOut) return; prof().scr = tapOut.ms; save(); $('#tapUse').hidden = true; ui(); toast('New laps on the sampler shift by ' + tapOut.ms + ' ms.'); });
 
 $('#clickVolRow').append(sliderRow('Volume', 0, 1, 0.01, st.clickVol, 0.6, pct, v => { st.clickVol = v; save(); if (ctx && running && st.clickOn && nowF() >= epoch) clickGain.gain.setTargetAtTime(v, ctx.currentTime, 0.01); }));
-const drawOverdubNote = () => { $('#overdubNote').textContent = st.overdub
-  ? 'A new lap recorded onto a track that already has one plays together with it.'
-  : 'A new lap recorded onto a track replaces what was there. The earlier laps are kept silent, and Undo brings them back.'; };
-swtch($('#overdubSw'), () => st.overdub, v => { st.overdub = v; save(); drawOverdubNote(); for (const t of tracks) { applyTakes(t); drawLane(t); } renderPane(); }, false);
-drawOverdubNote();
 swtch($('#autoLvlSw'), () => st.autoLevel, v => { st.autoLevel = v; save(); }, false);
 swtch($('#perfMicSw'), () => st.perfMic, v => { st.perfMic = v; save(); }, true);
 $('#perfBtn').addEventListener('click', togglePerf);
