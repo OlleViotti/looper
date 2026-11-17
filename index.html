@@ -20,7 +20,7 @@
 :root{
   --desk:#1b1f2e; --panel:#252a3d; --raise:#30364d; --line:#3c4361;
   --tape:#ece5d0; --text:#f0f2f8; --mut:#a0a8c0;
-  --amber:#ffb224; --rec:#ff3d57; --nw:104px;
+  --amber:#ffb224; --rec:#ff3d57; --nw:84px;
   --ui:"Barlow Semi Condensed",-apple-system,"Helvetica Neue",Arial,sans-serif;
   --pen:"Permanent Marker","Marker Felt","Bradley Hand",cursive;
 }
@@ -64,7 +64,20 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 .tape{flex:1;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;padding:10px 16px 16px;--ph:0;display:flex;flex-direction:column}
 .tape>*{flex:none}
 #lanes{flex:1 1 auto;display:flex;flex-direction:column;min-height:min-content}
-#lanes .track{flex:1 1 0;min-height:52px;max-height:200px}
+#lanes .track{flex:1 1 0;min-height:52px;max-height:200px;grid-template-columns:var(--nw) minmax(0,1fr) auto}
+/* each row: name, tape strip, then its own buttons: sample or keys, solo, mute, record */
+.tbs{display:flex;gap:4px;align-items:center}
+.tb{width:38px;height:44px;border-radius:8px;background:var(--panel);color:var(--mut);font:700 15px/1 var(--ui);display:grid;place-items:center;touch-action:pan-y}
+.tb svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2}
+.tb.rc svg{fill:currentColor;stroke:none;width:16px;height:16px}
+.tb.rc{color:var(--rec)}
+.tb.rc.on{background:var(--rec);color:#fff}
+.tb.rc.wait{background:var(--raise);box-shadow:inset 0 0 0 3px var(--rec);animation:blink .5s steps(2,jump-none) infinite}
+.tb.so.on{background:var(--amber);color:#1b1f2e}
+.tb.mu.on{background:var(--tape);color:#1b1f2e}
+.tb.sx{color:var(--amber)}
+.tb.sx.on{background:var(--rec);color:#fff;animation:blink .5s steps(2,jump-none) infinite}
+.tb.off{visibility:hidden}
 .row{display:grid;grid-template-columns:var(--nw) 1fr;column-gap:8px;margin-bottom:8px}
 .trk{position:relative;overflow:hidden}
 .trk canvas{display:block;width:100%;height:100%}
@@ -112,7 +125,7 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 .track .tname .kbi{display:none;position:absolute;right:2px;top:2px;width:30px;height:30px;place-items:center;color:var(--amber)}
 .track .tname .kbi svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
 .track.smp .tname .kbi{display:grid}
-.track.smp .tname{padding-right:30px}
+
 .track.silent .trk canvas{opacity:.25}
 .track .trk em{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:700 13px/1 var(--ui);font-style:normal;color:#1b1f2e;display:none;pointer-events:none}
 .track.muted .trk em{display:block}
@@ -182,6 +195,10 @@ input[type=range].bi::-webkit-slider-runnable-track{background:linear-gradient(9
 .step output{text-align:center;font-weight:600;font-variant-numeric:tabular-nums}
 .take{border-top:1px solid var(--line);margin-top:8px;padding-top:6px}
 .take h3{margin-top:0}
+.tkh{justify-content:flex-start}
+.tkl{flex:1;font-size:15px;color:var(--text)!important}
+.tkw{display:block;height:36px;width:calc(100% - 20px);margin:0 10px 4px;background:var(--tape);border-radius:2px}
+.take.takeoff .tkw{opacity:.4}
 .sbtn{height:44px;border-radius:8px;background:var(--raise);font-weight:600;font-variant-numeric:tabular-nums}
 .sbtn:active,.btn:active,.bar button:active,.tname:active,.hb:active{filter:brightness(1.25)}
 .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
@@ -379,7 +396,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
       </div>
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
-      <p class="hint" id="hTrack" hidden><b>Tap</b> a track to mute it. <b>Hold</b> it to record one lap into it, from its next lap; hold again to cancel. Tap its <b>name</b> to solo it.</p>
+      <p class="hint" id="hTrack" hidden>Each track has its own buttons: <b>M</b> mutes it, <b>S</b> solos it, <b>●</b> records one lap into it from its next lap, and the <b>microphone</b> records a sample, which makes it a sampler (then the <b>keys</b> open its pads). <b>Swipe right on a track</b> to edit it.</p>
       <p class="hint" id="hSwipe" hidden><b>Swipe right</b> to edit a track, <b>left</b> for settings, <b>up</b> from the bottom for the sampler pads. Tap the edge, or the logo, to come back.</p>
       <p class="hint" id="hUndo" hidden><b>Undo</b> removes the latest recording, and the bar that appears can bring it back. <b>Capture last</b> keeps the lap you just played, even without pressing Record.</p>
       <div class="row"><button class="addtrk nmcol" id="addTrk">+ Track</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
@@ -483,7 +500,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 16 Nov 19:20</p>
+  <p class="ver">Varv one, build 17 Nov 10:30</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in" id="apIn"></div></div>
@@ -548,6 +565,14 @@ const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute
   dist: false, dTyp: 'soft', dDrv: 0.5, dTon: 0.7, dMix: 1, dLvl: 1 }, EQ_DEF);   // distortion: on, type, drive, tone, mix, level   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
 const TRACK_KEYS = Object.keys(TRACK_DEF);
 const isSmp = t => t.sampler || !!t.sample;
+const MIC_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>';
+/* The sample button: records a sample (which makes the track a sampler), or on a sampler opens its keys. */
+function sampleButton(t) {
+  if (isSmp(t) && t.sample) { openPads(t); return; }
+  if (srec && srec.tid === t.id) { stopSampleRec(); return; }
+  if (t.takes.length && !isSmp(t)) { toast(t.name + ' has recordings; a sample needs an empty track.'); return; }
+  sampleRec(t);
+}
 const KB_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v10M12 4v10M16 4v10M8 14v6M12 14v6M16 14v6"/></svg>';          // a sampler track, with or without its sample yet
 const allTakes = () => { const a = []; for (const t of tracks) for (const k of t.takes) a.push(k); return a; };
 const anySolo = () => tracks.some(t => t.solo);
@@ -1201,8 +1226,8 @@ function serviceTake(k, now) {
   else if (!k.started && !k.pend && now >= end - LEAD_S * sr) { render(k); afterRender(k, now, end); }
 }
 /* Overdub on: every take on a track plays. Off: only the newest; the earlier ones are kept, silent, so Undo brings them back. */
-const newestTake = t => { let n = null; for (const k of t.takes) if (k.started && (!n || k.id > n.id)) n = k; return n; };
-const takeOn = k => st.overdub || newestTake(k.track) === k;
+const newestTake = t => { let n = null; for (const k of t.takes) if (k.started && !k.off && (!n || k.id > n.id)) n = k; return n; };
+const takeOn = k => !k.off && (st.overdub || newestTake(k.track) === k);   // a take switched off is silent
 function applyTakes(t, at) {
   if (!ctx) return;
   for (const k of t.takes) {
@@ -1313,23 +1338,28 @@ function pruneEv(now) {
   if (evLog[0].A < lim) evLog = evLog.filter(e => e.A >= lim);
 }
 
-/* Auto trim, in 5 ms blocks measured against the loudest block and the background noise: the start is the
-   first sample of the attack, found within the first loud block, less 1.5 ms; the end is the last block above
-   the lower decay level, plus 10 ms. A sound with no quiet part is kept whole. */
+/* Auto trim, in 5 ms blocks. The start: going back from the loudest block to where the sound falls below a
+   tenth of that peak (or into the noise), then to the first sample of the attack there, less 2 ms, so breaths
+   and noise before the sound are cut. The end: the first moment after the peak where the level, averaged over
+   30 ms, is back down at the noise level heard before the sound, plus 10 ms. The noise level is taken from
+   the start of the recording (the quiet part before the peak), or from its quietest tenth if that is lower. */
 function autoTrim(x) {
   const B = Math.max(64, Math.round(0.005 * sr)), nb = Math.floor(x.length / B);
   if (nb < 4) return [0, x.length];
-  const e = new Float32Array(nb); let pk = 0;
-  for (let b = 0; b < nb; b++) { let m = 0; for (let i = b * B; i < (b + 1) * B; i++) { const v = Math.abs(x[i]); if (v > m) m = v; } e[b] = m; if (m > pk) pk = m; }
+  const e = new Float32Array(nb); let pk = 0, P = 0;
+  for (let b = 0; b < nb; b++) { let m = 0; for (let i = b * B; i < (b + 1) * B; i++) { const v = Math.abs(x[i]); if (v > m) m = v; } e[b] = m; if (m > pk) { pk = m; P = b; } }
   if (pk < 1e-4) return [0, x.length];
-  const floor = Array.from(e).sort((p, q) => p - q)[Math.floor(nb * 0.1)];
-  const on = Math.max(pk * 0.06, Math.min(floor * 4, pk * 0.5)), off = Math.max(pk * 0.015, Math.min(floor * 2.5, pk * 0.25));
-  let a = 0; while (a < nb && e[a] < on) a++;
-  if (a >= nb) return [0, x.length];
-  let b = nb - 1; while (b > a && e[b] < off) b--;
-  const lo = Math.max(floor * 2, on * 0.25);
-  let s = Math.max(0, (a - 1) * B); while (s < (a + 1) * B && Math.abs(x[s]) < lo) s++;
-  return [Math.max(0, s - Math.round(0.0015 * sr)), Math.min(x.length, (b + 3) * B)];
+  const q10 = Array.from(e).sort((p, q) => p - q)[Math.floor(nb * 0.1)];
+  const preN = Math.min(P, Math.round(0.1 * sr / B));
+  const noise = Math.max(1e-6, Math.min(pk * 0.05, preN >= 2 ? Math.min(med(e.subarray(0, preN)), q10 * 1.5) : q10));   // never close to the sound itself
+  const lo = Math.max(pk * 0.1, noise * 3);
+  let a = P; while (a > 0 && e[a - 1] > lo) a--;
+  const th = Math.max(pk * 0.05, noise * 2);
+  let s0 = Math.max(0, (a - 1) * B); while (s0 < (a + 1) * B && Math.abs(x[s0]) < th) s0++;
+  const W = Math.max(2, Math.round(0.03 * sr / B)), quiet = Math.max(noise * 1.5, pk * 0.002);
+  let b = nb;
+  for (let c = P + 1; c + W <= nb; c++) { let m = 0; for (let k = c; k < c + W; k++) m += e[k]; if (m / W <= quiet) { b = c; break; } }
+  return [Math.max(0, s0 - Math.round(0.002 * sr)), Math.min(x.length, b * B + Math.round(0.01 * sr))];
 }
 /* The pitch of a sample, as a MIDI note with cents: the median over its voiced frames (YIN, as for autotune).
    Null when too little of it has a pitch, as with most drums. */
@@ -1452,10 +1482,10 @@ async function sampleRec(t) {
   if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
   ensureRing();
   srec = { tid: t.id, F: nowF() - Math.round(0.03 * sr) };
-  refreshPane(t); if (padT === t) drawPads(); ui();
+  refreshPane(t); if (padT === t) drawPads(); drawHead(t); ui();
 }
 async function stopSampleRec() {
-  const r = srec; if (!r) return; srec = null; ui();
+  const r = srec; if (!r) return; srec = null; ui(); drawHeads();
   const F1 = nowF();
   for (let i = 0; i < 20 && capEnd < F1; i++) await sleep(30);
   const t = tracks.find(x => x.id === r.tid);
@@ -1851,14 +1881,18 @@ function newTrack(opts, idx) {
 }
 function mountTrack(t, idx) {
   const row = el('div', 'row track'); row.style.setProperty('--ink', t.ink);
-  const nb = el('button', 'tname nmcol'), ki = el('i', 'kbi'); nb.append(el('b'), el('small'), el('i', 'lv'), ki); t.lvEl = null;
-  ki.innerHTML = KB_ICON; ki.setAttribute('aria-label', 'Play ' + t.name + ' on the screen');
-  ki.addEventListener('click', e => { e.stopPropagation(); if (mode === 'play') openPads(t); });
-  nb.addEventListener('click', () => { if (mode === 'edit') selectTrack(t.id); else toggleSolo(t); });
-  const trk = el('div', 'trk slide'); trk.tabIndex = 0; trk.setAttribute('role', 'button');
-  t.cv = el('canvas'); trk.append(t.cv, el('i', 'ph'), el('i', 'lp'), el('em', '', 'muted'));
-  pressable(trk, () => toggleMute(t), () => recordInto(t));
-  row.append(nb, trk); t.row = row;
+  const nb = el('button', 'tname nmcol'); nb.append(el('b'), el('small'), el('i', 'lv')); t.lvEl = null;
+  nb.addEventListener('click', () => { if (mode === 'edit') selectTrack(t.id); else touched(t); });
+  const trk = el('div', 'trk slide');
+  t.cv = el('canvas'); trk.append(t.cv, el('i', 'ph'), el('em', '', 'muted'));
+  /* The buttons: sample (or keys on a sampler), solo, mute, record. */
+  const bs = el('div', 'tbs'), mk = (cls, label, html, fn) => { const b = el('button', 'tb ' + cls); b.setAttribute('aria-label', label); b.innerHTML = html; b.addEventListener('click', () => { if (mode === 'play') fn(); }); bs.append(b); return b; };
+  t.bX = mk('sx', 'Record a sample', MIC_ICON, () => sampleButton(t));
+  t.bS = mk('so', 'Solo', 'S', () => toggleSolo(t));
+  t.bM = mk('mu', 'Mute', 'M', () => toggleMute(t));
+  t.bR = mk('rc', 'Record a lap', '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>', () => recordInto(t));
+  row.addEventListener('pointerdown', () => touched(t), true);       // a swipe right that starts on this track edits it
+  row.append(nb, trk, bs); t.row = row;
   const host = $('#lanes'); host.insertBefore(row, host.children[idx] || null);
   buildTrackNodes(t);
   drawLane(t);
@@ -1899,6 +1933,13 @@ function drawHead(t) {
   t.row.classList.toggle('muted', t.mute);
   t.row.classList.toggle('silent', !audible(t));
   t.row.classList.toggle('sel', mode === 'edit' && selId === t.id);
+  if (t.bR) {
+    t.bR.className = 'tb rc' + (queued ? ' wait' : into || armedId === t.id ? ' on' : '');
+    t.bS.classList.toggle('on', !!t.solo); t.bM.classList.toggle('on', !!t.mute);
+    const smp = isSmp(t) && !!t.sample, sampling = !!srec && srec.tid === t.id;
+    t.bX.innerHTML = smp ? KB_ICON : MIC_ICON; t.bX.setAttribute('aria-label', smp ? 'Play ' + t.name + ' on the keys' : 'Record a sample');
+    t.bX.className = 'tb sx' + (sampling ? ' on' : '') + (!smp && !sampling && t.takes.length ? ' off' : '');
+  }
 }
 const drawHeads = () => { for (const t of tracks) drawHead(t); $('#masterRow').classList.toggle('sel', selId === 'master'); drawScenes(); };
 
@@ -2126,19 +2167,19 @@ function renderPane() {
   for (const t of tracks) t.pcv = null;
   if (mode !== 'edit') return;
   if (selId !== 'master' && !tracks.some(t => t.id === selId)) selId = tracks.length ? tracks[0].id : 'master';
-  const tabs = el('div', 'etabs');                  // the track names as tabs
+  const tabs = el('div', 'etabs');                  // Master first, then the track names as tabs
+  const mt = el('button', 'etab' + (selId === 'master' ? ' on' : ''), 'Master'); mt.addEventListener('click', () => selectTrack('master')); tabs.append(mt);
   for (const x of tracks) {
     const b = el('button', 'etab' + (x.id === selId ? ' on' : '') + (audible(x) ? '' : ' mut'), x.name);
     b.addEventListener('click', () => selectTrack(x.id)); tabs.append(b);
   }
-  const mt = el('button', 'etab' + (selId === 'master' ? ' on' : ''), 'Master'); mt.addEventListener('click', () => selectTrack('master')); tabs.append(mt);
   pane.append(tabs);
   if (!st.hints.edit) { const g = el('p', 'hint'); g.innerHTML = 'Tap a <b>tab</b> to edit that track, or <b>Master</b> for the whole mix. <b>Double-tap</b> any setting to reset it. Tap the strip on the right, or swipe left, to go back.'; pane.append(g); }
   pane.append(selId === 'master' ? masterPane() : trackPane(tracks.find(t => t.id === selId)));
   requestAnimationFrame(() => { const on = $('.etab.on', tabs); if (on) tabs.scrollLeft = Math.max(0, on.offsetLeft - tabs.clientWidth / 2 + on.offsetWidth / 2); });
   paneFor = selId; pane.scrollTop = keep;
   drawHeads();
-  requestAnimationFrame(() => { for (const w of pane.querySelectorAll('.eqw,.trimw')) w.draw(); const t = tracks.find(x => x.id === selId); if (t) drawLane(t); });
+  requestAnimationFrame(() => { for (const w of pane.querySelectorAll('.eqw,.trimw,.tkw')) w.draw(); const t = tracks.find(x => x.id === selId); if (t) drawLane(t); });
 }
 /* A folded section: closed by default, and it stays as you left it. The content is only built when open. */
 function fold(key, title, make) {
@@ -2153,8 +2194,9 @@ function trackPane(t) {
   const p = el('div'), ap = k => v => { t[k] = v; applyTrack(t); markDirty(); }, has = t.takes.length > 0;
   const mb = el('button', 'tbtn' + (t.mute ? ' on' : ''), 'Mute'), sb = el('button', 'tbtn' + (t.solo ? ' on' : ''), 'Solo');
   mb.addEventListener('click', () => { toggleMute(t); renderPane(); }); sb.addEventListener('click', () => { toggleSolo(t); renderPane(); });
-  const head = el('div', 'cr'), btns = el('div'); btns.style.cssText = 'display:flex;gap:6px;flex:none';
-  btns.append(mb, sb); head.append(el('b', 'ename', t.name), btns);
+  const db = el('button', 'tbtn danger', 'Delete'); db.addEventListener('click', () => deleteTrack(t));   // the bar at the bottom can bring it back
+  const head = el('div', 'cr'), btns = el('div'); btns.style.cssText = 'display:flex;gap:10px;flex:none';
+  btns.append(db, mb, sb); head.append(el('b', 'ename', t.name), btns);
   /* Microphone or sampler: chosen at the top while the track is empty, then fixed. */
   const kindRow = () => {
     const kind = el('div', 'seg full'), r = el('div', 'cr');
@@ -2172,9 +2214,9 @@ function trackPane(t) {
   p.append(el('h3', '', isSmp(t) ? 'Laps' : 'Takes'));
   if (ks.length) {
     const trk = el('div', 'trk'); t.pcv = el('canvas'); trk.append(t.pcv, el('i', 'ph'));
-    p.append(card(trk, ...ks.map((k, i) => takeRow(k, ks.length > 1 ? (k.notes ? 'Lap ' : 'Take ') + (i + 1) : 'Latency'))));
-  } else if (isSmp(t)) p.append(card(el('p', 'cnote', t.sample ? 'No laps yet. Swipe up for the pads and tap Rec lap, or hold the track on the play screen.' : 'Record a sample first.')));
-  else p.append(card(el('p', 'cnote', 'Empty. Hold the track on the play screen to record into it.')));
+    p.append(card(trk, ...ks.map((k, i) => [k, (k.notes ? 'Lap ' : 'Take ') + (i + 1)]).reverse().map(([k, l]) => takeRow(k, l))));
+  } else if (isSmp(t)) p.append(card(el('p', 'cnote', t.sample ? 'No laps yet. Tap the track’s record button on the play screen, or Rec lap on the pads.' : 'Record a sample first.')));
+  else p.append(card(el('p', 'cnote', 'Empty. Tap the track’s record button on the play screen to record into it.')));
   p.append(...fold('dist', 'Distortion' + (t.dist ? ' · on' : ''), () => {
     const ad = k => v => { t[k] = v; applyDist(t); markDirty(); };
     const ty = el('div', 'seg full'), tr = el('div', 'cr');
@@ -2192,8 +2234,7 @@ function trackPane(t) {
     const nm = el('input', 'txt bare'); nm.value = t.name; nm.maxLength = 28; nm.setAttribute('aria-label', 'Track name');
     nm.addEventListener('input', () => { t.name = nm.value.trim() || 'Track'; t.auto = false; drawHead(t); $('.ename', $('#epane')).textContent = t.name; const tb = $('.etab.on', $('#epane')); if (tb) tb.textContent = t.name; ui(); markDirty(); });
     nm.addEventListener('change', () => renderPane());
-    const del = el('button', 'tbtn danger', 'Delete'); del.addEventListener('click', () => deleteTrack(t));
-    const nameRow = el('div', 'cr'); nameRow.append(nm, del);
+    const nameRow = el('div', 'cr'); nameRow.append(nm);
     let barsRow = null, barsNote = null;
     if (!isFree()) {
       const out = el('output'), show = () => { out.innerHTML = trackBars(t) + (t.bars ? '' : '<small>lap</small>'); };
@@ -2252,7 +2293,15 @@ function sampleSection(t) {
     el('h3', '', 'Pitch'), card(crow('Root', rp), rn, ...pitchRows(t)),
     ...fold('tune', 'Autotune', () => [tuneCard(t)]),
     card(crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false)),
-      crow('Notes', gs), el('p', 'cnote', 'Full plays the whole sample on every note; Held stops it when you let go.'))];
+      crow('Notes', gs), el('p', 'cnote', 'Full plays the whole sample on every note; Held stops it when you let go.')),
+    card((() => { const b = el('button', 'cr act'); b.append(el('span', '', 'New track with this sample')); b.firstChild.append(el('small', '', 'The same sample and settings, without the laps.')); b.addEventListener('click', () => copySampler(t)); return b; })())];
+}
+/* A new track with the same sample and all its settings, but none of the laps. */
+function copySampler(t) {
+  const s = t.sample; if (!s) return;
+  const u = newTrack(Object.assign({}, pick(t, TRACK_KEYS), { name: t.name + ' 2', mute: false, solo: false, sampler: true }), tracks.indexOf(t) + 1);
+  u.sample = { key: rid(), raw: s.raw, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: Object.assign({}, s.env), proc: null, proc0: null, buf: null, tuned: null, savedTo: null, gen: 0 };
+  u.auto = false; applyTrack(u); prepSample(u); drawHead(u); markDirty(); selectTrack(u.id); toast(u.name + ': the same sample, no laps.');
 }
 function sampleEdited(t, redetect, wait) {
   const s = t.sample; clearTimeout(s.eT);
@@ -2421,9 +2470,14 @@ function setTrackBars(t, b, show) {
   if (rec && rec.tid === t.id) { const p = heardPos(); if (p < rec.k * rec.len) { rec.len = trackLen(t); rec.k = Math.max(0, Math.ceil(Math.max(p, 0) / rec.len)); } }
   show(); drawLane(t); markDirty(); ui();
 }
-/* A take of notes keeps its screen latency the same way a recording keeps its headphone latency. */
+/* A take: switch it on or off, see it on its own, set its latency (a take of notes keeps its screen latency
+   the same way a recording keeps its headphone latency), reverse it or remove it. Newest first. */
 function takeRow(k, label) {
-  const box = el('div', takeOn(k) ? '' : 'takeoff'), out = el('output'), use = el('button', 'tbtn');
+  const box = el('div', 'take' + (takeOn(k) ? '' : ' takeoff')), out = el('output'), use = el('button', 'tbtn');
+  const head = el('div', 'cr tkh'), rm = el('button', 'tbtn danger', 'Remove');
+  head.append(swtch(el('div'), () => !k.off, v => { k.off = !v; applyTakes(k.track); drawLane(k.track); markDirty(); renderPane(); }), el('span', 'tkl', label), rm);
+  rm.addEventListener('click', () => removeTake(k));
+  const cv = el('canvas', 'tkw'); cv.draw = () => drawTakeWave(k, cv);
   const cur = () => k.notes ? prof().scr : prof().ms;
   const show = () => { out.innerHTML = k.lat + '<small>ms</small>'; use.hidden = k.lat === cur(); use.textContent = 'Use for new'; };
   const step = d => () => { k.lat = clamp(k.lat + d, 0, MAXLAT_MS); k.final = false; show(); markDirty(); };
@@ -2434,9 +2488,19 @@ function takeRow(k, label) {
   });
   const rv = el('button', 'tbtn' + (k.reverse ? ' on' : ''), 'Reverse');
   rv.addEventListener('click', () => { k.reverse = !k.reverse; k.final = false; rv.classList.toggle('on', k.reverse); markDirty(); });
-  const rm = el('button', 'tbtn danger', 'Remove'); rm.addEventListener('click', () => removeTake(k));
-  const acts = el('div', 'cr'); if (!k.notes) acts.append(rv); acts.append(use, rm);
-  box.append(crow(label, pill(out, step(-1), step(1))), acts); show(); return box;
+  const acts = el('div', 'cr wrap'); if (!k.notes) acts.append(rv); acts.append(use);
+  box.append(head, cv, crow(k.notes ? 'Screen latency' : 'Latency', pill(out, step(-1), step(1))), acts); show(); return box;
+}
+function drawTakeWave(k, cv) {
+  const { g, w, h } = sizeCanvas(cv); if (!w || !k.peaks) return;
+  const NB = k.peaks.length, mid = h / 2; let top = 1e-4;
+  for (let b = 0; b < NB; b++) top = Math.max(top, k.peaks[b]);
+  g.fillStyle = k.track.ink;
+  for (let x = 0; x < w; x++) {
+    const a = Math.floor(x / w * NB), e = Math.max(a + 1, Math.floor((x + 1) / w * NB)); let m = 0;
+    for (let b = a; b < e && b < NB; b++) if (k.peaks[b] > m) m = k.peaks[b];
+    const hh = Math.max(0.6, m / top * (mid - 3)); g.fillRect(x, mid - hh, 1, hh * 2);
+  }
 }
 function masterPane() {
   const p = el('div');
@@ -2517,7 +2581,7 @@ function sizeCanvas(cv) {
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   return { g, w, h };
 }
-function drawLane(t) { for (const cv of [t.cv, t.pcv, t.kcv]) if (cv) drawWave(t, cv); }
+function drawLane(t) { for (const cv of [t.cv, t.pcv, t.kcv]) if (cv) drawWave(t, cv); if (mode === 'edit' && selId === t.id) for (const c of document.querySelectorAll('#epane .tkw')) c.draw(); }
 function drawWave(t, cv) {
   const { g, w, h } = sizeCanvas(cv), tot = isFree() ? 0 : trackBars(t) * st.beats, mid = h / 2;
   if (!w) return;
@@ -2731,10 +2795,10 @@ async function saveProject() {
         return { key: s.key, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: s.env };
       })(t.sample),
       takes: t.takes.filter(k => k.full && k.started).map(k => {
-        if (k.notes) return { key: k.key, lat: k.lat, bars: isFree() ? null : Math.round(k.len / barsLen(1)), notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
+        if (k.notes) return { key: k.key, lat: k.lat, off: !!k.off, bars: isFree() ? null : Math.round(k.len / barsLen(1)), notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
         keep.add(k.key);
         if (k.savedTo !== pid) { puts.push([pid + '/' + k.key, k.raw.slice(0, k.filled)]); k.savedTo = pid; }
-        return { key: k.key, lat: k.lat, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
+        return { key: k.key, lat: k.lat, off: !!k.off, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
       }) })) };
   const prev = saving;
   const job = (async () => {
@@ -2814,7 +2878,7 @@ async function openProject(id) {
       if (km.notes) {                                     // a lap of notes: rendered from the sample once it is ready
         if (!t.sample || (isFree() && !freeL)) { missing++; continue; }
         const len = isFree() ? freeL : barsLen(km.bars || tm.bars || meta.bars);
-        t.takes.push({ id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw: null, span: len + MAXLAT + 8, sig: '',
+        t.takes.push({ id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw: null, span: len + MAXLAT + 8, sig: '', off: !!km.off,
           notes: km.notes.map(([p, n, o]) => ({ A: Math.round(p * ratio), n, O: o == null ? null : Math.round(o * ratio), tid: t.id })),
           filled: 0, lat: km.lat, reverse: false, norm: 1, peak: 0, peaks: null, buf: null, src: null, tg: null,
           final: false, started: true, full: true, auto: false, track: t, savedTo: same ? id : null });
@@ -2824,7 +2888,7 @@ async function openProject(id) {
       if (!raw || (isFree() && !freeL)) { missing++; continue; }
       if (!same) raw = resample(raw, ratio);
       const len = isFree() ? freeL : barsLen(km.bars || tm.bars || meta.bars);
-      const k = { id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, reverse: !!km.reverse,
+      const k = { id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, off: !!km.off, reverse: !!km.reverse,
         norm: km.norm == null ? null : km.norm, peak: 0, peaks: null, buf: null, src: null, tg: null,
         final: true, started: true, full: true, auto: false, track: t, savedTo: same ? id : null };
       render(k); t.takes.push(k); attachTake(k);
