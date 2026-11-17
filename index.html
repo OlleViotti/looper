@@ -553,7 +553,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 01:45</p>
+  <p class="ver">Varv one, build 18 Nov 02:00</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -693,6 +693,8 @@ async function restartAudio() {
   if (srec) srec = null;
   if (perf) { try { perf.mr.stop(); } catch (e) {} }
   stop(); closePads();
+  const oldSr = sr, keep = project && tracks.some(t => t.takes.length || t.sample);
+  if (keep) { try { await saveProject(); } catch (e) {} }
   for (const t of tracks) dropTrackNodes(t);
   for (const it of trash) for (const k of (it.take ? [it.take] : it.takes || it.track.takes)) detachTake(k);
   if (micStream) micStream.getTracks().forEach(tr => tr.stop());
@@ -708,7 +710,8 @@ async function restartAudio() {
   for (const k of allTakes()) { k.buf = null; k.src = null; k.tg = null; k.final = false; }   // rendered again for the new engine on the next tick
   for (const t of tracks) if (t.sample) { t.sample.buf = null; }
   const ok = await initAudio();
-  for (const t of tracks) if (t.sample) prepSample(t);
+  if (ok && keep && sr !== oldSr) await openProject(project.id);                  // a new rate: the project is read again and converted to it
+  else for (const t of tracks) if (t.sample) prepSample(t);
   ui(); if (mode === 'audio') drawAudio();
   toast(ok ? 'Audio restarted. Measure the latency again if it still seems off.' : 'The audio could not start again. Close the app and open it again.');
   return ok;
@@ -718,9 +721,9 @@ function initAudio() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) { toast('This browser lacks the audio engine.'); return Promise.resolve(false); }
   try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) {}
-  /* Asked for 48 kHz: if the phone is still in its call mode (24 or 16 kHz, after a Bluetooth microphone was open), the
-     engine runs at 48 kHz anyway and the phone converts, instead of the engine being stuck at the low rate. */
-  try { ctx = new AC({ latencyHint: 'interactive', sampleRate: 48000 }); } catch (e) { try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e2) { ctx = new AC(); } }
+  /* The engine takes the phone's own rate. (Asking for a fixed 48 kHz made Safari play at the wrong speed when the phone
+     changed its rate, going in or out of its call mode for a Bluetooth microphone.) */
+  try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e) { ctx = new AC(); }
   sr = ctx.sampleRate; ctx.resume().catch(() => {}); audioT0 = performance.now();
   PRE = latN(PRE_MS); XF = latN(XF_MS); MAXLAT = latN(MAXLAT_MS); OPEN_LP = Math.min(20000, sr * 0.45);
   buildGraph();
@@ -1458,9 +1461,24 @@ function dropSilent(k) {
 }
 
 let lastState = '';
+/* Watchdog: the audio clock must keep pace with the real clock. If the phone changes its audio rate under a running
+   engine, Safari can run it at the wrong speed (half speed, notes arriving late); then the audio is started again. */
+let wdC = null, wdP = 0, wdBad = 0, wdAt = -1e9;
+function watchdog() {
+  const pn = performance.now();
+  if (ctx.state !== 'running' || document.hidden) { wdC = null; wdBad = 0; return; }
+  if (wdC == null) { wdC = ctx.currentTime; wdP = pn; return; }
+  if (pn - wdP < 2000) return;
+  const rate = (ctx.currentTime - wdC) / ((pn - wdP) / 1000); wdC = ctx.currentTime; wdP = pn;
+  wdBad = rate < 0.8 || rate > 1.25 ? wdBad + 1 : 0;
+  if (wdBad >= 2 && pn - wdAt > 20000 && !measuring && !defining && !srec) {
+    wdAt = pn; wdBad = 0; wdC = null;
+    toast('The phone changed its audio rate. Starting the audio again.'); restartAudio();
+  }
+}
 function tick() {
   if (!ctx) return;
-  clockSample();
+  clockSample(); watchdog();
   const now = nowF();
   if (defining && now - defining.T0 >= FREE_MAX_S * sr) endDefine();
   if (running && rec && now >= epoch + (rec.k + 1) * rec.len - LEAD_S * sr) {
