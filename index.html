@@ -72,6 +72,10 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 #lanes .track{flex:1 1 0;min-height:60px;max-height:200px;grid-template-columns:var(--nw) minmax(0,1fr) auto}
 /* each row: name, tape strip, then its own buttons: sample or keys, solo, mute, record */
 .tbs{display:flex;gap:4px;align-items:center}
+.track .tbs{flex-direction:column;align-items:stretch;gap:0;width:var(--nw);border-radius:8px;overflow:hidden;background:var(--panel)}
+.track .tbs .tb{width:auto;height:auto;flex:1;min-height:26px;border-radius:0}
+.track .tbs .tb+.tb{border-top:1px solid var(--desk)}
+.track .tbs .tb.off{display:none}
 .tb{width:38px;height:44px;border-radius:8px;background:var(--panel);color:var(--mut);font:700 15px/1 var(--ui);display:grid;place-items:center;touch-action:pan-y}
 .tb svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2}
 .tb.rc svg{fill:currentColor;stroke:none;width:16px;height:16px}
@@ -517,7 +521,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 17 Nov 22:20</p>
+  <p class="ver">Varv one, build 17 Nov 22:15</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
