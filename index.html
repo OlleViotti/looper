@@ -442,6 +442,7 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 body.s-rec .pads .kb,body.s-rec .pads .pbig,body.s-armed .pads .kb,body.s-armed .pads .pbig{outline:3px solid var(--rec);outline-offset:3px;border-radius:10px}
 body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 .trimw{padding:10px 14px 4px}
+.alog{margin:0;padding:6px 14px 12px;font:12px/1.4 ui-monospace,Menlo,monospace;color:var(--mut);white-space:pre-wrap;max-height:220px;overflow:auto;-webkit-user-select:text;user-select:text}
 .finew{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 10px 2px}
 .finev output{display:block;font-size:13px;color:var(--mut);text-align:center;padding-top:4px;font-variant-numeric:tabular-nums}
 .finec{display:block;width:100%;height:64px;border-radius:8px;background:var(--desk);touch-action:none;cursor:ew-resize}
@@ -558,7 +559,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 03:00</p>
+  <p class="ver">Varv one, build 18 Nov 03:15</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -582,6 +583,8 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
     <button class="cr act" id="restartBtn"><span>Restart audio<small>Closes the sound and the microphone and starts them again, as when the app opens. Try it if the delay grows or the sound goes to the wrong place.</small></span></button>
     <div class="cr"><span>Auto level recordings</span><div id="autoLvlSw"></div></div>
     <p class="cnote" id="diag">Audio starts the first time you tap Start, Record or Measure.</p>
+    <p class="csub">Audio log</p>
+    <pre class="alog" id="alog"></pre>
   </div>
   </div>
 </div></div>
@@ -694,6 +697,7 @@ const hpHz = v => v > 0 ? 20 * Math.pow(5000 / 20, v) : 10;
    new audio start. */
 async function restartAudio() {
   if (!ctx) return initAudio();
+  alog('restart audio');
   if (measuring || defining) { toast('Wait for the measurement or recording to finish.'); return false; }
   if (srec) srec = null;
   if (perf) { try { perf.mr.stop(); } catch (e) {} }
@@ -731,13 +735,13 @@ function initAudio() {
   if (ctx) { if (ctx.state !== 'running') ctx.resume().catch(() => {}); return initP; }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) { toast('This browser lacks the audio engine.'); return Promise.resolve(false); }
-  /* The engine starts in plain playback, so the phone is not in its call mode (24 kHz) for the headphones when it takes
-     its rate; the session for recording is set just before the microphone opens. */
-  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) {}
   /* The engine takes the phone's own rate. (Asking for a fixed 48 kHz made Safari play at the wrong speed when the phone
      changed its rate, going in or out of its call mode for a Bluetooth microphone.) */
   try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e) { ctx = new AC(); }
   sr = ctx.sampleRate; ctx.resume().catch(() => {}); audioT0 = performance.now();
+  alog('audio started, ' + Math.round(sr / 100) / 10 + ' kHz, ' + ctx.state);
+  { const c = ctx; c.onstatechange = () => { if (c === ctx) alog('audio ' + c.state); }; }
   PRE = latN(PRE_MS); XF = latN(XF_MS); MAXLAT = latN(MAXLAT_MS); OPEN_LP = Math.min(20000, sr * 0.45);
   buildGraph();
   for (const t of tracks) buildTrackNodes(t);          // tracks prepared before audio started
@@ -873,7 +877,6 @@ async function openMic(id, auto) {
   if (!id && auto && wantsBuiltin()) {              // open the phone's microphone straight away when it is known, not the headphones' first
     try { id = builtinId((await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput')); } catch (e) {}
   }
-  try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) {}
   try { s = await navigator.mediaDevices.getUserMedia({ audio: id ? Object.assign({ deviceId: { exact: id } }, base) : base }); }
   catch (e) { if (id) { try { s = await navigator.mediaDevices.getUserMedia({ audio: base }); } catch (e2) {} } }
   if (!s) { micOK = false; toast('No access to the microphone. Allow the microphone for this page and try again.'); diag(); return false; }
@@ -892,9 +895,7 @@ async function openMic(id, auto) {
   }
   fillMics(); diag();
   if (BUILTIN.test(micLabel)) reassertRoute();
-  if (ctx.sampleRate < 32000 && BUILTIN.test(micLabel) && !running && !measuring && performance.now() - autoRestartAt > 30000) {
-    autoRestartAt = performance.now(); setTimeout(() => restartAudio(), 400);   // started in the phone's call mode: start again once
-  }
+  alog('microphone: ' + (micLabel || 'unknown') + ', engine ' + Math.round(ctx.sampleRate / 100) / 10 + ' kHz');
   return true;
 }
 /* On some iPhones and iPads (seen on iOS 18.7), opening the phone's own microphone moves the sound from
@@ -906,6 +907,7 @@ function reassertRoute() {
   if (!navigator.audioSession || performance.now() - raAt < 4000) return;
   raAt = performance.now(); clearTimeout(raT);
   raT = setTimeout(() => {
+    alog('route: session set again');
     try { navigator.audioSession.type = 'auto'; } catch (e) {}
     setTimeout(() => {
       try { navigator.audioSession.type = 'play-and-record'; } catch (e) {}
@@ -917,6 +919,7 @@ function reassertRoute() {
 }
 /* Holds on to the chosen microphone when headphones connect or the system changes the audio route. */
 function keepMic(force) {
+  alog('microphone check' + (force ? ', reopening' : ''));
   clearTimeout(keepT);
   keepT = setTimeout(async () => {
     if (!ctx) return;
@@ -1481,6 +1484,13 @@ let lastState = '';
 /* Watchdog: the audio clock must keep pace with the real clock. If the phone changes its audio rate under a running
    engine, Safari can run it at the wrong speed (half speed, notes arriving late); then the audio is started again. */
 let wdC = null, wdP = 0, wdBad = 0, wdAt = -1e9;
+/* A short log of what the audio did, shown on the audio page, to find out why sound stops. */
+const alogL = [];
+function alog(m) {
+  const d = new Date(), ts = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
+  alogL.push(ts + ' ' + m); if (alogL.length > 40) alogL.shift();
+  const n = $('#alog'); if (n) n.textContent = alogL.slice().reverse().join('\n');
+}
 function watchdog() {
   const pn = performance.now();
   if (ctx.state !== 'running' || document.hidden) { wdC = null; wdBad = 0; return; }
@@ -1488,9 +1498,10 @@ function watchdog() {
   if (pn - wdP < 2000) return;
   const rate = (ctx.currentTime - wdC) / ((pn - wdP) / 1000); wdC = ctx.currentTime; wdP = pn;
   wdBad = rate < 0.8 || rate > 1.25 ? wdBad + 1 : 0;
-  if (wdBad >= 2 && pn - wdAt > 20000 && !measuring && !defining && !srec) {
-    wdAt = pn; wdBad = 0; wdC = null;
-    toast('The phone changed its audio rate. Starting the audio again.'); restartAudio();
+  if (Math.abs(rate - 1) > 0.05) alog('clock ' + rate.toFixed(2) + '× real time');
+  if (wdBad >= 2 && pn - wdAt > 20000) {
+    wdAt = pn; wdBad = 0;
+    toast('The audio runs at the wrong speed (' + rate.toFixed(2) + '×). Tap the meters, then Restart audio.');
   }
 }
 function tick() {
@@ -3833,7 +3844,7 @@ swtch($('#perfMicSw'), () => st.perfMic, v => { st.perfMic = v; save(); }, true)
 $('#perfBtn').addEventListener('click', togglePerf);
 seg($('#muteSeg'), [['now', 'Immediately'], ['beat', 'Next beat'], ['bar', 'Next bar']], () => st.muteQ, v => { st.muteQ = v; save(); ui(); }, 'now');
 seg($('#sceneSeg'), [['now', 'Immediately'], ['bar', 'Next bar'], ['lap', 'End of lap']], () => st.sceneQ, v => { st.sceneQ = v; save(); ui(); }, 'lap');
-if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { if (performance.now() - micOpenAt > 1500) keepMic(false); });
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => { alog('devices changed'); if (performance.now() - micOpenAt > 1500) keepMic(false); });
 $('#exportBtn').addEventListener('click', exportWav);
 $('#hintReset').addEventListener('click', () => { st.hints = {}; save(); ui(); toast('The guide will show on the play screen again.'); });
 
