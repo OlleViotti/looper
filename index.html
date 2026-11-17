@@ -243,6 +243,10 @@ body.s-rec #recBtn{background:#fff;color:var(--rec)}
 [data-mode=set] #spage,[data-mode=audio] #apage{transform:none;visibility:visible}
 .meters{cursor:pointer;padding:6px 0;border-radius:8px}
 .mtr.big{height:10px;border-radius:5px;flex:1}
+.orow{color:var(--text)}
+.orow::after{content:'';width:10px;height:18px;margin-right:6px;border-right:3px solid transparent;border-bottom:3px solid transparent;transform:rotate(45deg)}
+.orow.on{color:var(--amber);font-weight:600}
+.orow.on::after{border-color:var(--amber)}
 .mrow{display:flex;align-items:center;gap:12px;min-height:44px;padding:4px 14px;border-top:1px solid rgba(255,255,255,.06)}
 .mrow span{width:42px;color:var(--mut);font-size:15px}
 .sp-in{max-width:560px;margin:0 auto;padding:0 16px calc(28px + env(safe-area-inset-bottom))}
@@ -507,7 +511,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 17 Nov 10:50</p>
+  <p class="ver">Varv one, build 17 Nov 12:30</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in" id="apIn"></div></div>
@@ -617,7 +621,9 @@ function initAudio() {
   PRE = latN(PRE_MS); XF = latN(XF_MS); MAXLAT = latN(MAXLAT_MS); OPEN_LP = Math.min(20000, sr * 0.45);
   buildGraph();
   for (const t of tracks) buildTrackNodes(t);          // tracks prepared before audio started
-  initP = (async () => { await setupCapture(); await openMic(wantsBuiltin() ? '' : st.micId, true); diag(); if (st.outId && canPickOut()) setOutput(st.outId); return true; })();
+  if (st.outId && ctx.setSinkId) setOutput(st.outId, true);               // the saved output, while this is still the tap that started the audio
+  else if (st.outId && 'setSinkId' in HTMLMediaElement.prototype) setOutput(st.outId, true).then(ok => { if (!ok) { st.outId = ''; save(); } });
+  initP = (async () => { await setupCapture(); await openMic(wantsBuiltin() ? '' : st.micId, true); diag(); return true; })();
   return initP;
 }
 
@@ -3030,22 +3036,30 @@ async function drawProjects() {
 let outRelay = null;
 const canPickOut = () => !!ctx && (!!ctx.setSinkId || ('setSinkId' in HTMLMediaElement.prototype));
 async function listOutputs() { try { return (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audiooutput' && d.deviceId && d.deviceId !== 'default'); } catch (e) { return []; } }
-async function setOutput(id) {
-  if (!ctx) return false;
-  try {
-    if (ctx.setSinkId) await ctx.setSinkId(id || '');
-    else if (!id) {
-      if (outRelay) { try { limiter.disconnect(outRelay.dest); } catch (e) {} limiter.connect(ctx.destination); outRelay.au.pause(); outRelay.au.srcObject = null; outRelay = null; }
-    } else {
-      if (!outRelay) { const dest = ctx.createMediaStreamDestination(), au = new Audio(); au.srcObject = dest.stream; outRelay = { dest, au }; }
-      await outRelay.au.setSinkId(id); await outRelay.au.play();
-      limiter.connect(outRelay.dest); try { limiter.disconnect(ctx.destination); } catch (e) {}
-    }
-    st.outId = id || ''; save(); return true;
-  } catch (e) {
+/* iOS only lets a page switch its output inside a tap, so the switch is started at once, before anything waits:
+   the output rows on the audio page are buttons, not a drop-down list, whose choice does not count as a tap.
+   Returns a promise of whether it worked; quiet (when the saved output is restored at start) gives no message. */
+function setOutput(id, quiet) {
+  if (!ctx) return Promise.resolve(false);
+  const fail = e => {
     if (outRelay && !st.outId) { try { limiter.disconnect(outRelay.dest); } catch (er) {} limiter.connect(ctx.destination); outRelay = null; }
-    toast('The output could not be changed here: ' + ((e && e.message) || e)); return false;
-  }
+    if (!quiet) toast('The output could not be changed: ' + ((e && e.message) || e));
+    return false;
+  };
+  const done = () => { st.outId = id || ''; save(); return true; };
+  try {
+    if (ctx.setSinkId) return ctx.setSinkId(id || '').then(done, fail);
+    if (!id) {
+      if (outRelay) { try { limiter.disconnect(outRelay.dest); } catch (e) {} limiter.connect(ctx.destination); outRelay.au.pause(); outRelay.au.srcObject = null; outRelay = null; }
+      return Promise.resolve(done());
+    }
+    if (!outRelay) { const dest = ctx.createMediaStreamDestination(), au = new Audio(); au.srcObject = dest.stream; au.setAttribute('playsinline', ''); outRelay = { dest, au }; }
+    const pSink = outRelay.au.setSinkId(id), pPlay = outRelay.au.play();    // both started inside the tap
+    return Promise.all([pSink, pPlay]).then(() => {
+      limiter.connect(outRelay.dest); try { limiter.disconnect(ctx.destination); } catch (e) {}
+      return done();
+    }, fail);
+  } catch (e) { return Promise.resolve(fail(e)); }
 }
 function testTone() {
   if (!ctx) return;
@@ -3076,16 +3090,16 @@ async function drawAudio() {
   // output
   const outs = await listOutputs(), oc = [];
   if (canPickOut() && outs.length) {
-    const os = el('select', 'txt bare'); os.setAttribute('aria-label', 'Output');
-    const o0 = el('option', '', 'System default'); o0.value = ''; os.append(o0);
-    outs.forEach((d, i) => { const o = el('option', '', d.label || 'Output ' + (i + 1)); o.value = d.deviceId; o.selected = d.deviceId === st.outId; os.append(o); });
-    os.addEventListener('change', async e => {
-      const ok = await setOutput(e.target.value);
-      if (ok) toast((e.target.value ? 'Output: ' + e.target.selectedOptions[0].textContent : 'Output: system default') + '. Measure the latency again.');
-      drawAudio();
-    });
-    const r = el('div', 'cr'); r.append(os); oc.push(r);
-    if (!ctx.setSinkId) oc.push(el('p', 'cnote', 'On iPhone a chosen output is reached through the phone’s media player, which adds a little delay. System default plays directly.'));
+    /* one row per output; tapping it switches at once */
+    const opts = [['', 'System default']].concat(outs.map((d, i) => [d.deviceId, d.label || 'Output ' + (i + 1)]));
+    for (const [id, label] of opts) {
+      const b = el('button', 'cr orow' + ((st.outId || '') === id ? ' on' : '')); b.append(el('span', '', label));
+      b.addEventListener('click', () => {
+        setOutput(id).then(ok => { if (ok) toast('Output: ' + label + '. Measure the latency again.'); drawAudio(); });
+      });
+      oc.push(b);
+    }
+    if (!ctx.setSinkId) oc.push(el('p', 'cnote', 'Without headphones, an iPhone plays through the earpiece while the microphone is on (that is how Safari records). Choose the speaker here to hear it out loud. A chosen output is reached through the phone’s media player, which adds a little delay; System default plays directly.'));
   } else oc.push(el('p', 'cnote', 'This browser lets the system choose where the sound goes. On iPhone: open Control Center, press and hold the music controls and tap the AirPlay icon to choose the headphones or the phone’s speaker. (iOS 26 lets Varv choose it here.)'));
   const tt = el('button', 'cr act'); tt.append(el('span', '', 'Play a test sound')); tt.addEventListener('click', testTone);
   host.append(el('h3', '', 'Output'), card(...oc, mrow('Out', 'aOut'), tt));
