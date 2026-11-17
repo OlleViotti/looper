@@ -514,7 +514,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 
   <h3>Keys and pedal</h3>
   <div class="card"><p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
-  <p class="ver">Varv one, build 17 Nov 21:40</p>
+  <p class="ver">Varv one, build 17 Nov 22:10</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in" id="apIn"></div></div>
@@ -2278,8 +2278,8 @@ function renderPane() {
   requestAnimationFrame(() => { for (const w of pane.querySelectorAll('.eqw,.trimw,.tkw')) w.draw(); const t = tracks.find(x => x.id === selId); if (t) drawLane(t); });
 }
 /* A folded section: closed by default, and it stays as you left it. The content is only built when open. */
-function fold(key, title, make) {
-  const open = !!(st.folds && st.folds[key]), h = el('button', 'fh' + (open ? ' open' : ''), title);
+function fold(key, title, make, def) {
+  const open = st.folds && key in st.folds ? !!st.folds[key] : !!def, h = el('button', 'fh' + (open ? ' open' : ''), title);
   h.setAttribute('aria-expanded', open);
   h.addEventListener('click', () => { st.folds = Object.assign({}, st.folds, { [key]: !open }); save(); renderPane(); });
   return open ? [h, ...make()] : [h];
@@ -2319,14 +2319,20 @@ function trackPane(t) {
   p.append(el('h3', '', 'Live'), card(sliderRow('Volume', 0, 1.5, 0.01, t.vol, 1, pct, ap('vol')),
     sliderRow('Filter', -1, 1, 0.01, t.filt, 0, filtTxt, v => { t.filt = v; applyTrack(t); markDirty(); eqDraw(); }),
     sliderRow('Reverb', 0, 1, 0.01, t.rev, 0, pct, ap('rev')), sliderRow('Delay', 0, 1, 0.01, t.echo, 0, pct, ap('echo'))));
-  if (isSmp(t)) p.append(el('h3', '', 'Sample'), ...(t.sample ? sampleSection(t) : [emptySampleCard(t)]));
+  if (t.sample) { const s = t.sample; s.hk = {}; s.onProc = () => { for (const f of Object.values(s.hk)) f(); }; }   // what to redraw when the sample is processed again
+  if (isSmp(t)) {
+    p.append(...fold('sample', 'Sample and envelope', () => t.sample ? sampleMain(t) : [emptySampleCard(t)], true));
+    if (t.sample) p.append(...fold('comp', 'Compressor' + (compOf(t).on ? ' · on' : ''), () => [compCard(t)]),
+      ...fold('spitch', 'Pitch', () => [samplePitch(t)]), ...fold('tune', 'Autotune' + (t.tune ? ' · on' : ''), () => [tuneCard(t)]));
+  }
   const ks = t.takes.filter(k => k.started);
-  p.append(el('h3', '', isSmp(t) ? 'Laps' : 'Takes'));
-  if (ks.length) {
-    const trk = el('div', 'trk'); t.pcv = el('canvas'); trk.append(t.pcv, el('i', 'ph'));
-    p.append(card(trk, ...ks.map((k, i) => [k, (k.notes ? 'Lap ' : 'Take ') + (i + 1)]).reverse().map(([k, l]) => takeRow(k, l))));
-  } else if (isSmp(t)) p.append(card(el('p', 'cnote', t.sample ? 'No laps yet. Tap the track’s record button on the play screen, or Rec lap on the pads.' : 'Record a sample first.')));
-  else p.append(card(el('p', 'cnote', 'Empty. Tap the track’s record button on the play screen to record into it.')));
+  p.append(...fold('takes', isSmp(t) ? 'Laps' : 'Takes', () => {
+    if (ks.length) {
+      const trk = el('div', 'trk'); t.pcv = el('canvas'); trk.append(t.pcv, el('i', 'ph'));
+      return [card(trk, ...ks.map((k, i) => [k, (k.notes ? 'Lap ' : 'Take ') + (i + 1)]).reverse().map(([k, l]) => takeRow(k, l)))];
+    }
+    return [card(el('p', 'cnote', isSmp(t) ? (t.sample ? 'No laps yet. Tap the track’s record button on the play screen, or Rec lap on the pads.' : 'Record a sample first.') : 'Empty. Tap the track’s record button on the play screen to record into it.'))];
+  }, true));
   p.append(...fold('eq', 'EQ and pan', () => [card(eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }), sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan')))]));
   p.append(...fold('dist', 'Distortion' + (t.dist ? ' · on' : ''), () => {
     const ad = k => v => { t[k] = v; applyDist(t); markDirty(); };
@@ -2339,7 +2345,7 @@ function trackPane(t) {
       sliderRow('Level', 0, 1.5, 0.01, t.dLvl, 1, pct, ad('dLvl')),
       el('p', 'cnote', 'Soft rounds the peaks like an overdriven tube, Hard clips them, Fuzz is rougher and uneven. Drive sets how hard it is pushed; the level is evened out, so more drive gives more grit rather than more volume. Tone darkens the result, Mix blends in the clean sound. It comes before the EQ, so the EQ can shape it.'))];
   }));
-  if (!isSmp(t)) p.append(...fold('pitch', 'Pitch', () => [pitchCard(t)]), ...fold('tune', 'Autotune', () => [tuneCard(t)]));
+  if (!isSmp(t)) p.append(...fold('pitch', 'Pitch', () => [pitchCard(t)]), ...fold('tune', 'Autotune' + (t.tune ? ' · on' : ''), () => [tuneCard(t)]));
   p.append(...fold('track', 'Track', () => {
     const nm = el('input', 'txt bare'); nm.value = t.name; nm.maxLength = 28; nm.setAttribute('aria-label', 'Track name');
     nm.addEventListener('input', () => { t.name = nm.value.trim() || 'Track'; t.auto = false; drawHead(t); $('.ename', $('#epane')).textContent = t.name; const tb = $('.etab.on', $('#epane')); if (tb) tb.textContent = t.name; ui(); markDirty(); });
@@ -2373,37 +2379,53 @@ function emptySampleCard(t) {
   sb.addEventListener('click', () => sampleRec(t));
   return card(sb);
 }
-/* The sample: trim view and actions, root note and pitch, autotune, then reverse and note length. */
-function sampleSection(t) {
-  const s = t.sample, trim = trimWidget(t), ro = el('output'), rn = el('p', 'cnote');
+/* Sample and envelope: the trim view with its actions and Reverse, then the envelope with fine trimming and
+   Punch. Full or Held is chosen on the pads. */
+function sampleMain(t) {
+  const s = t.sample, trim = trimWidget(t), gap = Math.round(0.02 * sr);
+  const recB = el('button', 'tbtn' + (srec && srec.tid === t.id ? ' on' : ''));
+  if (srec && srec.tid === t.id) { recB.textContent = 'Stop'; recB.addEventListener('click', () => sampleRec(t)); }
+  else twoTap(recB, 'New', 'Replace?', () => true, () => sampleRec(t));
+  const at = el('button', 'tbtn', 'Auto trim');
+  at.addEventListener('click', () => { [s.a, s.b] = autoTrim(s.raw); trim.draw(); syncFine(); sampleEdited(t, true, 0); });
+  const pd = el('button', 'tbtn', 'Pads'); pd.addEventListener('click', () => openPads(t));
+  const acts = el('div', 'cr wrap'); acts.append(recB, at, pd);
+  /* fine trim: each edge within 150 ms either side of where it was when the section opened (or last moved by
+     dragging the trim view or Auto trim), in steps of a sample; double-tap for where auto trim puts it */
+  const W = Math.round(0.15 * sr), auto = autoTrim(s.raw), fmt = v => (v / sr).toFixed(3) + ' s';
+  const fineRow = (key, label) => {
+    const r = sliderRow(label, 0, 1, 1, s[key], key === 'a' ? auto[0] : auto[1], fmt, v => {
+      v = Math.round(v);
+      if (key === 'a') s.a = clamp(v, 0, s.b - gap); else s.b = clamp(v, s.a + gap, s.raw.length);
+      trim.draw(); sampleEdited(t, true);
+    });
+    const av = key === 'a' ? auto[0] : auto[1];       // the window always reaches the auto trim point, so a double-tap can go there
+    r.center = () => { const inp = $('input', r), c = s[key]; inp.min = Math.max(0, Math.min(c - W, av)); inp.max = Math.min(s.raw.length, Math.max(c + W, av)); r.set(c); };
+    r.center(); return r;
+  };
+  const fa = fineRow('a', 'Start'), fb = fineRow('b', 'End');
+  const syncFine = () => { fa.center(); fb.center(); };
+  trim.onEnd = syncFine;                              // dragging the trim view moves the fine sliders' window with it
+  s.hk.main = () => { trim.draw(); const w = $('.envw', $('#epane')); if (w) w.draw(); };
+  return [card(trim, acts, crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false))),
+    el('h3', '', 'Envelope'), card(envWidget(t), fa, fb,
+      sliderRow('Punch', 0, 1, 0.01, envOf(t).p, 0, v => v ? '+' + (20 * Math.log10(1 + 2 * v)).toFixed(1) + ' dB' : 'off', v => { s.env = Object.assign(envOf(t), { p: v }); envChanged(t); const w = $('.envw', $('#epane')); if (w) w.draw(); }),
+      el('p', 'cnote', 'Start and End trim the sample finely, within 150 ms of where they were; double-tap either for where Auto trim puts it.'))];
+}
+/* Pitch: the root note and the transposition of the sample. */
+function samplePitch(t) {
+  const s = t.sample, ro = el('output'), rn = el('p', 'cnote');
   const showRoot = () => {
     ro.innerHTML = s.det != null || s.adj ? midiName(sRoot(t)) + '<small>' + centsTxt(sRoot(t)).trim() + '</small>' : '–';
     rn.textContent = (s.det == null ? 'No clear pitch found, so the keys count from C4.' : 'Detected ' + midiName(s.det) + centsTxt(s.det) + '.')
       + (s.adj ? ' Moved by hand; double-tap to undo.' : ' The keys play in tune from it.');
   };
-  s.onProc = () => { showRoot(); trim.draw(); const w = $('.envw', $('#epane')); if (w) w.draw(); };
+  s.hk.pitch = showRoot;
   const setAdj = v => { s.adj = clamp(v, -24, 24); showRoot(); drawHead(t); for (const k of t.takes) k.final = false; if (padT === t) drawPads(); markDirty(); };
   const rp = pill(ro, () => setAdj(s.adj - 1), () => setAdj(s.adj + 1)); rp.classList.add('sm');
   dbl(ro, () => setAdj(0));
   showRoot();
-  const recB = el('button', 'tbtn' + (srec && srec.tid === t.id ? ' on' : ''));
-  if (srec && srec.tid === t.id) { recB.textContent = 'Stop'; recB.addEventListener('click', () => sampleRec(t)); }
-  else twoTap(recB, 'New', 'Replace?', () => true, () => sampleRec(t));
-  const at = el('button', 'tbtn', 'Auto trim');
-  at.addEventListener('click', () => { [s.a, s.b] = autoTrim(s.raw); trim.draw(); sampleEdited(t, true, 0); });
-  const pd = el('button', 'tbtn', 'Pads'); pd.addEventListener('click', () => openPads(t));
-  const acts = el('div', 'cr wrap'); acts.append(recB, at, pd);
-  const gs = el('div', 'seg');
-  seg(gs, [[false, 'Full'], [true, 'Held']], () => !!t.sGate, v => { t.sGate = v; for (const k of t.takes) k.final = false; markDirty(); }, false);
-  return [card(trim, acts),
-    el('h3', '', 'Envelope'), card(envWidget(t),
-      sliderRow('Punch', 0, 1, 0.01, envOf(t).p, 0, v => v ? '+' + (20 * Math.log10(1 + 2 * v)).toFixed(1) + ' dB' : 'off', v => { s.env = Object.assign(envOf(t), { p: v }); envChanged(t); const w = $('.envw', $('#epane')); if (w) w.draw(); })),
-    el('h3', '', 'Compressor'), compCard(t),
-    el('h3', '', 'Pitch'), card(crow('Root', rp), rn, ...pitchRows(t)),
-    ...fold('tune', 'Autotune', () => [tuneCard(t)]),
-    card(crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false)),
-      crow('Notes', gs), el('p', 'cnote', 'Full plays the whole sample on every note; Held stops it when you let go.')),
-    ];
+  return card(crow('Root', rp), rn, ...pitchRows(t));
 }
 /* The sample's compressor: the settings show while it is on, with how far the loudest part is pulled down. */
 function compCard(t) {
@@ -2536,7 +2558,7 @@ function trimWidget(t) {
   const px = e => e.clientX - cv.getBoundingClientRect().left;
   cv.addEventListener('pointerdown', e => {
     const x = px(e), now = performance.now();
-    if (now - lastTap < 320) { lastTap = 0; [s.a, s.b] = autoTrim(s.raw); draw(); sampleEdited(t, true, 0); return; }
+    if (now - lastTap < 320) { lastTap = 0; [s.a, s.b] = autoTrim(s.raw); draw(); sampleEdited(t, true, 0); if (wrap.onEnd) wrap.onEnd(); return; }
     lastTap = now;
     act = Math.abs(x - fx(s.a)) <= Math.abs(x - fx(s.b)) ? 'a' : 'b';
     try { cv.setPointerCapture(e.pointerId); } catch (er) {}
@@ -2547,7 +2569,7 @@ function trimWidget(t) {
     if (act === 'a') s.a = clamp(i, 0, s.b - gap); else s.b = clamp(i, s.a + gap, n());
     draw();
   });
-  const up = () => { if (!act) return; act = null; sampleEdited(t, true); };
+  const up = () => { if (!act) return; act = null; sampleEdited(t, true); if (wrap.onEnd) wrap.onEnd(); };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
   wrap.draw = draw;
   return wrap;
