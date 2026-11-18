@@ -574,13 +574,13 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 14:00</p>
+  <p class="ver">Varv one, build 18 Nov 14:10</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
   <div class="sp-head"><h2>Audio</h2><button class="tbtn" id="apDone">Done</button></div>
   <p class="hint" id="hMeasure" hidden></p>
-  <div id="apIn"></div>
+  <div id="apStart"></div>
   <h3>Latency</h3>
   <div>
   <div class="card">
@@ -592,6 +592,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
     <div class="cpad"><button class="tappad" id="tapPad" hidden>Tap on the clicks</button><div class="dots" id="tapDots" hidden></div><p id="tapRes" hidden></p><button class="btn on wide" id="tapUse" hidden></button></div>
   </div>
   </div>
+  <div id="apIn"></div>
   <h3>Restart and more</h3>
   <div>
   <div class="card">
@@ -626,7 +627,7 @@ const EQ_DEF = { eqL: 0, eqM: 0, eqH: 0, eqLf: 200, eqMf: 1000, eqHf: 4000 };
 const FX_KEYS = ['master', 'gFilter', 'eqL', 'eqM', 'eqH', 'eqLf', 'eqMf', 'eqHf', 'gEcho', 'echoDiv', 'echoMs', 'echoFb', 'echoLvl', 'gRev', 'revSize', 'revLvl', 'compThr', 'compAmt'];
 const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
 const st = Object.assign({
-  v: 6, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, overdub: false, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now', sceneQ: 'lap',
+  v: 7, hints: {}, bpm: 100, beats: 4, bars: 2, lenMode: 'bars', inGain: 0, lowCut: false, autoLevel: false, overdub: false, perfMic: true, clickOn: true, clickVol: 0.6, mode: 'one', muteQ: 'now', sceneQ: 'lap',
   profiles: [{ name: 'AirPods', ms: 185, guess: true }, { name: 'Wired or speaker', ms: 20, guess: true }],
   active: 0, micId: 'builtin', master: 0.9, gFilter: 0,
   gEcho: 0, echoDiv: 0.75, echoMs: 375, echoFb: 0.42, echoLvl: 1,
@@ -639,11 +640,12 @@ if ((saved.v || 0) < 2) { st.v = 2; st.muteQ = 'bar'; if (!saved.micId) st.micId
    Measured on the audio clock it includes the headphone delay, so until it is measured it is guessed as the
    headphone latency plus 60 ms for the touch. The headphones default to 185 ms. Screen latencies saved before
    the touch timing moved to this clock (settings version below 4) were measured another way and are reset. */
-const LAT_DEF = 185, TOUCH_MS = 60, scrGuess = p => p.ms + TOUCH_MS;
+const LAT_DEF = 185, SCR_DEF = 125, TOUCH_MS = 60, scrGuess = p => SCR_DEF;   // screen: 125 ms until measured
 if ((saved.v || 0) < 3) for (const p of st.profiles) if (p.guess && p.ms === 180) p.ms = LAT_DEF;
-if ((saved.v || 0) < 4) { st.v = 4; for (const p of st.profiles) delete p.scr; }
-if ((saved.v || 0) < 6) { st.v = 6; st.folds = {}; }
-if ((saved.v || 0) < 5) { st.v = 6; st.muteQ = 'now'; st.sceneQ = 'lap'; }   // new defaults: mute and solo at once, scenes at the end of the lap
+if ((saved.v || 0) < 4) { for (const p of st.profiles) delete p.scr; }
+if ((saved.v || 0) < 6) { st.v = 7; st.folds = {}; }
+if ((saved.v || 0) < 5) { st.v = 7; st.muteQ = 'now'; st.sceneQ = 'lap'; }   // new defaults: mute and solo at once, scenes at the end of the lap
+if ((saved.v || 0) < 7) { st.v = 7; for (const p of st.profiles) if (p.scr === p.ms + TOUCH_MS) p.scr = SCR_DEF; }   // the old guess (headphones + 60) becomes the new default
 for (const p of st.profiles) if (p.scr == null) p.scr = scrGuess(p);
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
 const prof = () => st.profiles[st.active];
@@ -4014,11 +4016,11 @@ function testTone() {
   setTimeout(() => { try { g.disconnect(); } catch (e) {} }, 1500);
 }
 async function drawAudio() {
-  const host = $('#apIn'); host.textContent = '';
+  const host = $('#apIn'), sh = $('#apStart'); host.textContent = ''; sh.textContent = '';   // first Start audio, then Latency, then the microphone and output
   if (!ctx) {
     const go = el('button', 'cr act'); go.append(el('span', '', 'Start audio'));
     go.addEventListener('click', async () => { await initAudio(); drawAudio(); ui(); });
-    host.append(card(go, el('p', 'cnote', 'Starts the microphone and the sound, so they can be chosen and checked here.'))); return;
+    sh.append(card(go, el('p', 'cnote', 'Starts the microphone and the sound, so they can be chosen and checked here.'))); return;
   }
   const mrow = (label, id) => { const r = el('div', 'mrow'), m = el('i', 'mtr big'); m.id = id; m.append(el('b')); r.append(el('span', '', label), m); return r; };
   // input
