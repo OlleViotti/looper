@@ -559,7 +559,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 04:00</p>
+  <p class="ver">Varv one, build 18 Nov 09:00</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -828,7 +828,12 @@ registerProcessor('varv-guard',G)`;
     try {                                             // and a last guard before the sound leaves Varv, so nothing invalid reaches the phone
       const mg = new AudioWorkletNode(ctx, 'varv-guard', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
       limiter.disconnect(ctx.destination); limiter.connect(mg); mg.connect(ctx.destination);
-      mg.port.onmessage = () => { alog('master: invalid sound removed'); toast('Varv’s sound went wrong. Tap the meters, then Restart audio.'); };
+      mg.port.onmessage = () => {
+        alog('master: invalid sound removed');
+        if (performance.now() - masterAt > 30000 && !measuring && !defining) {   // its filters are stuck for good: start the audio again, once
+          masterAt = performance.now(); toast('Varv’s sound went wrong. Starting the audio again.'); setTimeout(() => restartAudio(), 200);
+        }
+      };
     } catch (e) {}
   } catch (e) {
     const sp = ctx.createScriptProcessor(1024, 1, 1);
@@ -1497,8 +1502,10 @@ let wdC = null, wdP = 0, wdBad = 0, wdAt = -1e9, hbAt = -1e9;
 const alogL = [];
 function alog(m) {
   const d = new Date(), ts = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
-  alogL.push(ts + ' ' + m); if (alogL.length > 40) alogL.shift();
-  const n = $('#alog'); if (n) n.textContent = alogL.slice().reverse().join('\n');
+  const last = alogL[alogL.length - 1];
+  if (last && last.m === m) { last.n++; last.ts = ts; } else alogL.push({ ts, m, n: 1 });
+  if (alogL.length > 40) alogL.shift();
+  const n = $('#alog'); if (n) n.textContent = alogL.slice().reverse().map(l => l.ts + ' ' + l.m + (l.n > 1 ? ' (×' + l.n + ')' : '')).join('\n');
 }
 function watchdog() {
   const pn = performance.now();
@@ -2127,12 +2134,20 @@ function rdStart(k, at) {
 }
 /* The guard: a number that is not a number (NaN) in the sound would make every filter after it fall silent for good,
    so all of Varv went quiet. Each track's output is cleaned here; if it happens, the track's own chain is built again. */
-let guardOK = false, guardAt = 0;
+let guardOK = false, guardAt = 0, masterAt = -1e9;
 function addGuard(t) {
   if (!t.out || t.gd || !guardOK) return;
   let g; try { g = new AudioWorkletNode(ctx, 'varv-guard', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] }); } catch (e) { return; }
   try { t.out.disconnect(t.post); } catch (e) {}
   t.out.connect(g); g.connect(t.post); t.gd = g;
+  try {
+    const wg = new AudioWorkletNode(ctx, 'varv-guard', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
+    t.wet.disconnect(mix); t.wet.connect(wg); wg.connect(mix); t.wg = wg;
+    wg.port.onmessage = () => {
+      alog('track ' + (tracks.indexOf(t) + 1) + ': freeze or ping-pong went wrong (freeze ' + liveAmt(t, 'frz').toFixed(2) + ', ping-pong ' + liveAmt(t, 'ping').toFixed(2) + ')');
+      if (performance.now() - guardAt > 2000 && tracks.includes(t)) { guardAt = performance.now(); setTimeout(() => { if (tracks.includes(t) && ctx) { dropTrackNodes(t); buildTrackNodes(t); } }, 300); }
+    };
+  } catch (e) {}
   g.port.onmessage = () => {
     const on = ['speed', 'tstop', 'trem', 'lofi', 'ring', 'gran', 'dist', 'ebrk', 'rbrk', 'frz', 'phone', 'radio', 'isoL', 'isoM', 'isoH', 'slice', 'rdly', 'ping'].filter(k => k === 'speed' ? t.speed !== 1 : !!t[k]);
     alog('track ' + (tracks.indexOf(t) + 1) + ': invalid sound removed' + (on.length ? ' (' + on.join(', ') + ')' : '') + (t.xyA ? ' pad: ' + Object.keys(t.xyA).join(', ') : '') + (isSmp(t) ? ', sampler' : ''));
@@ -2178,11 +2193,13 @@ function buildTrackNodes(t) {
     const d = ctx.createDelay(0.1), lp = bq('lowpass', 6000), fb = gn(0.82); d.delayTime.value = ms / 1000;
     t.fzIn.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); d.connect(t.fzWet); t.fzFb.push(fb);
   }
-  t.post.connect(t.fzIn); t.fzWet.connect(mix);
+  t.wet = gn(1); t.wet.connect(mix); t.wg = null;                       // freeze and ping-pong come back through their own guard
+  t.post.connect(t.fzIn); t.fzWet.connect(t.wet);
   /* ping-pong delay, in time with the beat */
   t.ppIn = gn(0); t.ppL = ctx.createDelay(2); t.ppR = ctx.createDelay(2); t.ppFb = gn(0.55); t.ppM = ctx.createChannelMerger(2);
   t.post.connect(t.ppIn); t.ppIn.connect(t.ppL); t.ppL.connect(t.ppR); t.ppR.connect(t.ppFb); t.ppFb.connect(t.ppL);
-  t.ppL.connect(t.ppM, 0, 0); t.ppR.connect(t.ppM, 0, 1); t.ppM.connect(mix);
+  t.ppL.connect(t.ppM, 0, 0); t.ppR.connect(t.ppM, 0, 1); t.ppM.connect(t.wet);
+  t.ppL.delayTime.value = t.ppR.delayTime.value = 0.25;                   // never zero inside the feedback loop
   t.an = ctx.createAnalyser(); t.an.fftSize = 2048; out.connect(t.an); t.lvS = 0;
   applyTrack(t);
   for (const k of t.takes) { attachTake(k); if (running) startSource(k, nowF() + Math.round(SAFE_S * sr)); }
@@ -2191,7 +2208,7 @@ function dropTrackNodes(t) {
   for (const k of t.takes) detachTake(k);
   if (!t.lp) return;
   for (const o of [t.rmOsc, t.trOsc]) if (o) try { o.stop(); } catch (e) {}
-  for (const n of [t.inp, t.dDryG, t.dWetG, t.dSh, t.dLp, t.lp, t.hp, t.eq[0], t.eq[1], t.eq[2], t.g, t.pn, t.es, t.rs, t.rmOsc, t.rmDry, t.rmMul, t.rmWet, t.crIn, t.crDry, t.crSh, t.crWet, t.trOsc, t.trDep, t.trG, t.tk, t.sl, t.rd, t.phIn, t.isoOut, t.post, t.gd, t.dry, t.fzIn, t.fzWet, t.ppIn, t.ppM]) { if (n) try { n.disconnect(); } catch (e) {} }
+  for (const n of [t.inp, t.dDryG, t.dWetG, t.dSh, t.dLp, t.lp, t.hp, t.eq[0], t.eq[1], t.eq[2], t.g, t.pn, t.es, t.rs, t.rmOsc, t.rmDry, t.rmMul, t.rmWet, t.crIn, t.crDry, t.crSh, t.crWet, t.trOsc, t.trDep, t.trG, t.tk, t.sl, t.rd, t.phIn, t.isoOut, t.post, t.gd, t.wet, t.wg, t.ppL, t.ppR, t.ppFb, t.dry, t.fzIn, t.fzWet, t.ppIn, t.ppM]) { if (n) try { n.disconnect(); } catch (e) {} }
   t.lp = t.g = t.pn = t.an = t.inp = null; t.dOn = false; t.dKey = '';
 }
 /* `at` is an audio-clock time for the gain change, so mute and solo can land on the beat or bar. */
