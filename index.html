@@ -573,7 +573,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 13:10</p>
+  <p class="ver">Varv one, build 18 Nov 13:40</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -662,7 +662,7 @@ let scenes = Array(NSCN).fill(null);
 let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, selId = null, mode = 'play';
 /* The XY pad: what each axis, edge and corner controls (see xyPane). */
 const XY_DEF = { x: 'filter', y: 'rev', l: '', r: '', t: '', b: '', tl: '', tr: '', bl: '', br: '' };
-const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'chrom', tSpeed: 20, tAmt: 1,
+const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'chrom', tSpeed: 20, tAmt: 1, tMode: 'whole',
   sampler: false, padMode: null, kOct: null, kBase: null, kW: null, sGate: false,   // kW: the lowest key, counted in white keys from C0
   dist: false, dTyp: 'soft', dDrv: 0.5, dTon: 0.7, dMix: 1, dLvl: 1,
   speed: 1, tstop: false, trem: 0, tDep: 1, tShape: 'smooth', lofi: 0, ring: 0, rFreq: 0.5, gran: 0, gSize: 0.4, gScat: 0.3,
@@ -1718,16 +1718,18 @@ function prepSample(t) {
   for (let i = 0; i < fi; i++) seg[i] *= i / fi;
   for (let i = 0; i < fo; i++) seg[n - 1 - i] *= i / fo;
   if (s.rev) seg.reverse();
-  const st1 = sampleTune(t), r = pitchRatio(t) * Math.pow(2, st1.corr / 12), gen = s.gen = (s.gen || 0) + 1;   // autotune: one fixed shift
+  /* autotune on a sampler: Whole moves the whole sample by one amount; Continuous pulls each moment of it to the nearest
+     note, like autotune on a microphone track (its vibrato and slides are then evened out, as fast as Speed says) */
+  const cont = t.tune && t.tMode === 'cont', st1 = sampleTune(t), r = pitchRatio(t) * (cont ? 1 : Math.pow(2, st1.corr / 12)), gen = s.gen = (s.gen || 0) + 1;
   const done = y => {
     if (s.gen !== gen || t.sample !== s) return;
     s.proc0 = y; applyEnv(t);
     s.tuned = t.tune && s.det != null ? s.det + st1.corr : null;
     drawHead(t); if (s.onProc) s.onProc(); if (s.onTune) s.onTune(); if (padT === t) drawPads();
   };
-  if (Math.abs(r - 1) < 1e-6) { done(seg); return; }
+  if (Math.abs(r - 1) < 1e-6 && !cont) { done(seg); return; }
   const P0 = 4096, x = new Float32Array(P0 + n + 16384); x.set(seg, P0);
-  pvJob(x, r, null).then(y => {
+  pvJob(x, r, cont ? tuneOf(t) : null).then(y => {
     if (!y) { done(seg); return; }
     const z = y.slice(P0, P0 + n);
     for (let i = 0; i < fo; i++) z[n - 1 - i] *= i / fo;
@@ -3316,8 +3318,9 @@ function pitchRows(t) {
 }
 /* Autotune: snaps a single voice or instrument to the nearest note of a key and scale. */
 function tuneCard(t) {
+  const mr0 = () => { const md = el('div', 'seg full'), mr = el('div', 'cr'); seg(md, [['whole', 'Whole sample'], ['cont', 'Continuous']], () => t.tMode || 'whole', v => { t.tMode = v; pitchChanged(t); renderPane(); }, 'whole'); mr.append(md); return mr; };
   const smp = isSmp(t), on = crow('On', swtch(el('div'), () => t.tune, v => { t.tune = v; pitchChanged(t); renderPane(); }, false));
-  if (!t.tune) return card(on, el('p', 'cnote', smp ? 'Listens to the whole sample and moves it once to the nearest note of a key.' : 'Pulls a single voice or instrument to the nearest note in a key. Chords confuse it.'));
+  if (!t.tune) return card(on, el('p', 'cnote', smp ? 'Moves the sample to the nearest note of a key: all of it by one amount, or each moment of it.' : 'Pulls a single voice or instrument to the nearest note in a key. Chords confuse it.'));
   const res = el('p', 'cnote'), upd = () => {                  // on a sampler: what the one shift does
     if (!smp) return;
     const u = sampleTune(t);
@@ -3332,7 +3335,13 @@ function tuneCard(t) {
   const sg = el('div', 'seg full'), sr2 = el('div', 'cr');
   seg(sg, [['major', 'Major'], ['minor', 'Minor'], ['pent', 'Penta'], ['chrom', 'All 12']], () => t.tScale, v => { t.tScale = v; upd(); pitchChanged(t); }, 'chrom');
   sr2.append(sg);
-  if (smp) return card(on, crow('Key', kp), sr2,
+  if (smp) {
+    if (t.tMode === 'cont') return card(on, mr0(), crow('Key', kp), sr2,
+      sliderRow('Speed', 0, 200, 1, t.tSpeed, 20, v => v < 1 ? 'hard' : Math.round(v) + ' ms', v => { v = Math.round(v); if (t.tSpeed !== v) { t.tSpeed = v; pitchChanged(t); } }),
+      sliderRow('Amount', 0, 1, 0.01, t.tAmt, 1, pct, v => { if (t.tAmt !== v) { t.tAmt = v; upd(); pitchChanged(t); } }),
+      el('p', 'cnote', 'Pulls each moment of the sample to the nearest note, so a note that wavers or slides is held in tune. Speed is how fast it is pulled in: hard gives the robotic effect, slower keeps some vibrato. The key is what you hear, after any transposing.'));
+  }
+  if (smp) return card(on, mr0(), crow('Key', kp), sr2,
     sliderRow('Amount', 0, 1, 0.01, t.tAmt, 1, pct, v => { if (t.tAmt !== v) { t.tAmt = v; upd(); pitchChanged(t); } }), res,
     el('p', 'cnote', 'Listens to the whole sample once and moves all of it by one amount, so vibrato and slides stay as played. The key is what you hear, after any transposing. Penta is the major pentatonic; for minor pentatonic choose its relative major (A minor: C).'));
   return card(on, crow('Key', kp), sr2,
@@ -4268,7 +4277,7 @@ if (window.ResizeObserver) new ResizeObserver(() => { for (const t of tracks) dr
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* for debugging and tests */
-window.__varv = { st, rebuild: t => { dropTrackNodes(t); buildTrackNodes(t); }, analyzeLoop, get ctx() { return ctx; }, applyTrackFor: t => applyTrack(t), get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
+window.__varv = { st, pv: (x, r, tune) => pvJob(x, r, tune), rebuild: t => { dropTrackNodes(t); buildTrackNodes(t); }, analyzeLoop, get ctx() { return ctx; }, applyTrackFor: t => applyTrack(t), get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
   ringPeak: sec => { let pk = 0; for (let f = Math.max(availStart(), capEnd - Math.round(sec * sr)); f < capEnd; f++) pk = Math.max(pk, Math.abs(ring[f % R])); return pk; },
   arm: i => toggleArm(tracks[i]),
   get scenes() { return scenes; }, get perf() { return perf; }, togglePerf, get inG() { return inG; },
