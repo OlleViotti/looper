@@ -559,7 +559,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 10:10</p>
+  <p class="ver">Varv one, build 18 Nov 10:45</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -1751,7 +1751,46 @@ function applyEnv(t) {
   if (envFlat(e)) s.proc = y;
   else { const z = new Float32Array(y.length); for (let i = 0; i < y.length; i++) z[i] = y[i] * envGain(e, i); s.proc = z; }
   s.buf = ctx ? mkBuf(s.proc) : null;
+  s.loop = findLoop(s.proc, Math.round((e.a + e.d) / 1000 * sr));     // for Held notes: the tone goes on while the key is held
+  s.lproc = s.loop ? loopBake(s.proc, s.loop) : null; s.lbuf = s.lproc && ctx ? mkBuf(s.lproc) : null;
   for (const k of t.takes) k.final = false;
+  if (s.onLoop) s.onLoop();
+}
+/* Sustain loop. In the steady part after the attack and decay, a stretch about 120 ms long is chosen that is a whole
+   number of the tone's own cycles (its period found by autocorrelation), placed where its end matches its start best;
+   the last ~15 ms before its end are crossfaded with what comes before its start, so the jump back is seamless. */
+function findLoop(y, from) {
+  const n = y.length, lo = Math.max(from + Math.round(0.02 * sr), Math.round(0.03 * sr)), hi = n - Math.round(0.03 * sr);
+  if (hi - lo < Math.round(0.06 * sr)) return null;
+  let per = 0;
+  { const W = Math.min(2048, (hi - lo) >> 1), c = (lo + hi - W) >> 1, minL = Math.floor(sr / 1000), maxL = Math.min(Math.floor(sr / 50), W >> 1);
+    let e0 = 0; for (let i = 0; i < W; i++) e0 += y[c + i] * y[c + i];
+    let best = 0;
+    if (e0 > 1e-8) for (let L = minL; L <= maxL; L++) {
+      let a = 0, e1 = 0; for (let i = 0; i < W - L; i++) { a += y[c + i] * y[c + i + L]; e1 += y[c + i + L] * y[c + i + L]; }
+      const r = a / Math.sqrt(e0 * e1 + 1e-12); if (r > best + 0.02) { best = r; per = L; }   // the first strong peak, not a multiple
+      else if (per && r < best - 0.3) break;
+    }
+    if (best < 0.6) per = 0; }
+  const room = hi - lo;
+  let L = per ? per * Math.max(1, Math.round(0.12 * sr / per)) : Math.round(0.12 * sr);
+  while (L > room * 0.7 && per && L > per) L -= per;
+  if (L > room * 0.7) L = Math.round(room * 0.7);
+  const X = Math.max(32, Math.min(Math.round(0.015 * sr), L >> 2)), s0 = Math.max(lo, X), s1 = hi - L;
+  if (s1 <= s0) return null;
+  const step = Math.max(1, Math.floor((s1 - s0) / 400)), M = Math.min(X, 256);
+  let bs = s0, be = Infinity;
+  for (let st0 = s0; st0 <= s1; st0 += step) {
+    let d = 0, en = 1e-9;
+    for (let i = 0; i < M; i++) { const a = y[st0 - M + i], b = y[st0 + L - M + i]; d += (a - b) * (a - b); en += a * a + b * b; }
+    const v = d / en; if (v < be) { be = v; bs = st0; }
+  }
+  return { s: bs, e: bs + L, x: X };
+}
+function loopBake(y, lp) {
+  const z = y.slice(), { s, e, x } = lp;
+  for (let i = 0; i < x; i++) { const w = i / x; z[e - x + i] = y[e - x + i] * (1 - w) + y[s - x + i] * w; }
+  return z;
 }
 function envChanged(t) {
   markDirty(); clearTimeout(t.envT);
@@ -1783,15 +1822,16 @@ function setSample(t, raw) {
    or slower, like a classic sampler. A tail that runs past the end of the loop comes round at its start. */
 function renderNotes(k) {
   const t = k.track, s = t.sample, N = k.len, out = new Float32Array(N), d = clamp(latN(k.lat), 0, MAXLAT);
-  const y = s && s.proc, fade = Math.max(16, Math.round(envOf(t).r / 1000 * sr));
+  const lp = t.sGate && s && s.loop && s.lproc ? s.loop : null, y = lp ? s.lproc : s && s.proc, fade = Math.max(16, Math.round(envOf(t).r / 1000 * sr));
   if (!y) return out;
+  const LL = lp ? lp.e - lp.s : 0, at = lp ? i => i < lp.e ? y[i] : y[lp.s + (i - lp.s) % LL] : i => y[i];   // a Held note goes round its loop
   for (const e of k.notes) {
     const q = e.A - k.rawStart - d; if (q < 0 || q >= N) continue;
     const r = noteRatio(t, e.n), pos = (((q - PRE) % N) + N) % N;
-    let m = Math.min(Math.floor((y.length - 2) / r), N), g0 = Infinity;
+    let m = lp ? N : Math.min(Math.floor((y.length - 2) / r), N), g0 = Infinity;
     if (t.sGate && e.O != null) { g0 = Math.max(0, e.O - e.A); m = Math.min(m, g0 + fade); }
     for (let j = 0; j < m; j++) {
-      const x = j * r, i = x | 0, f = x - i, xm = i > 0 ? y[i - 1] : 0, x0 = y[i], x1 = y[i + 1] || 0, x2 = y[i + 2] || 0;
+      const x = j * r, i = x | 0, f = x - i, xm = i > 0 ? at(i - 1) : 0, x0 = at(i), x1 = at(i + 1) || 0, x2 = at(i + 2) || 0;
       let v = x0 + 0.5 * f * (x1 - xm + f * (2 * xm - 5 * x0 + 4 * x1 - x2 + f * (3 * (x0 - x1) + x2 - xm)));
       if (j > g0) v *= 1 - (j - g0) / fade;
       const p = pos + j; out[p < N ? p : p - N] += v;
@@ -1839,7 +1879,10 @@ function inRecWindow(t, A) {
 function playVoice(t, n) {
   const s = t.sample; if (!s || !s.buf || !t.lp) return null;
   const src = ctx.createBufferSource(), g = gn(1);
-  src.buffer = s.buf; src.playbackRate.value = noteRatio(t, n); src.connect(g); g.connect(t.inp); src.start();
+  const held = t.sGate && s.loop && s.lbuf;
+  src.buffer = held ? s.lbuf : s.buf; src.playbackRate.value = noteRatio(t, n); src.connect(g); g.connect(t.inp);
+  if (held) { src.loop = true; src.loopStart = s.loop.s / sr; src.loopEnd = s.loop.e / sr; }   // Held: on while the key is held
+  src.start();
   src.onended = () => { try { g.disconnect(); } catch (e) {} };
   return { src, g };
 }
@@ -2786,7 +2829,7 @@ function trackPane(t) {
   if (t.sample) {
     const pl = el('button', 'tbtn eplay'); pl.setAttribute('aria-label', 'Play the sample');
     pl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>';
-    pl.addEventListener('click', async () => { await initAudio(); playVoice(t, null); });
+    pl.addEventListener('click', async () => { await initAudio(); const v = playVoice(t, null); if (v && t.sGate && t.sample) setTimeout(() => stopVoice(v, t), t.sample.proc.length / sr * 1000); });   // a Held sample is let go after its own length
     btns.append(pl);
   }
   head.append(btns);                                // the tab above shows which track this is
@@ -3093,6 +3136,11 @@ function trimWidget(t) {
     const xa = fx(s.a), xb = fx(s.b), sc = (mid - 6) / top;
     g.fillStyle = 'rgba(236,229,208,.08)'; g.fillRect(xa, 0, xb - xa, h);
     for (let x = 0; x < w; x++) { const hh = Math.max(0.6, pk[x] * sc); g.fillStyle = x >= xa && x <= xb ? '#ece5d0' : 'rgba(160,168,192,.35)'; g.fillRect(x, mid - hh, 1, hh * 2); }
+    if (t.sGate && s.loop) {                         // the sustain loop of Held notes, in the sample as it was recorded
+      const r0 = s.rev ? s.a + (s.b - s.a) - s.loop.e : s.a + s.loop.s, r1 = r0 + (s.loop.e - s.loop.s);
+      g.fillStyle = 'rgba(255,178,36,.35)'; g.fillRect(fx(r0), 0, fx(r1) - fx(r0), h);
+      g.fillStyle = '#ffb224'; g.font = '600 11px ' + getComputedStyle(document.body).fontFamily; g.fillText('loop', fx(r0) + 3, h - 6);
+    }
     g.fillStyle = '#ffb224';
     for (const x of [xa, xb]) { g.fillRect(Math.round(x) - 1, 0, 3, h); g.fillRect(Math.round(x) - 6, 0, 13, 10); }
     label();
