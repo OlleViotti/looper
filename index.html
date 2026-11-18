@@ -454,6 +454,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 .loopv{padding:8px 10px 2px}
 .loopv output{display:block;font-size:13px;color:var(--mut);text-align:center;padding-top:4px;font-variant-numeric:tabular-nums}
 .loopc{display:block;width:100%;height:72px;border-radius:8px;background:var(--desk);touch-action:none;cursor:ew-resize}
+.qseg button{padding:0 2px;font-size:13px}
 .finew{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 10px 2px}
 .finev output{display:block;font-size:13px;color:var(--mut);text-align:center;padding-top:4px;font-variant-numeric:tabular-nums}
 .finec{display:block;width:100%;height:64px;border-radius:8px;background:var(--desk);touch-action:none;cursor:ew-resize}
@@ -573,7 +574,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 13:40</p>
+  <p class="ver">Varv one, build 18 Nov 14:00</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -662,7 +663,7 @@ let scenes = Array(NSCN).fill(null);
 let tracks = [], trash = [], armedId = null, laneCount = 0, inkN = 0, uid = 0, selId = null, mode = 'play';
 /* The XY pad: what each axis, edge and corner controls (see xyPane). */
 const XY_DEF = { x: 'filter', y: 'rev', l: '', r: '', t: '', b: '', tl: '', tr: '', bl: '', br: '' };
-const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'chrom', tSpeed: 20, tAmt: 1, tMode: 'whole',
+const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute: false, solo: false, bars: null, oct: 0, semi: 0, cent: 0, tune: false, tKey: 0, tScale: 'chrom', tSpeed: 20, tAmt: 1, tMode: 'whole', quant: 0, qStr: 1,   // quant: notes per beat for a sampler's laps (0 off), qStr: how far
   sampler: false, padMode: null, kOct: null, kBase: null, kW: null, sGate: false,   // kW: the lowest key, counted in white keys from C0
   dist: false, dTyp: 'soft', dDrv: 0.5, dTon: 0.7, dMix: 1, dLvl: 1,
   speed: 1, tstop: false, trem: 0, tDep: 1, tShape: 'smooth', lofi: 0, ring: 0, rFreq: 0.5, gran: 0, gSize: 0.4, gScat: 0.3,
@@ -1888,6 +1889,13 @@ function setSample(t, raw) {
 }
 /* Notes are resampled from the processed sample (cubic interpolation), so a key plays the sample faster
    or slower, like a classic sampler. A tail that runs past the end of the loop comes round at its start. */
+/* Quantize: a note's start in the lap moved towards the nearest point of the grid (t.quant per beat: 1 quarter, 2 eighths,
+   3 eighth triplets, 4 sixteenths, 6 sixteenth triplets, 8 thirty-seconds), by qStr. Its length is kept. */
+function quantPos(t, pos, N) {
+  if (!t.quant || isFree()) return pos;
+  const g = barsLen(1) / st.beats / t.quant, q = Math.round(pos / g) * g;
+  return ((Math.round(pos + (q - pos) * t.qStr) % N) + N) % N;
+}
 function renderNotes(k) {
   const t = k.track, s = t.sample, N = k.len, N0 = len0Of(k), sc = N / N0, out = new Float32Array(N), d = clamp(latN(k.lat), 0, MAXLAT);   // sc: notes move with the tempo
   const lp = t.sGate && s && s.loop && s.lproc ? s.loop : null, y = lp ? s.lproc : s && s.proc, fade = Math.max(16, Math.round(envOf(t).r / 1000 * sr));
@@ -1895,7 +1903,7 @@ function renderNotes(k) {
   const LL = lp ? lp.e - lp.s : 0, at = lp ? i => i < lp.e ? y[i] : y[lp.s + (i - lp.s) % LL] : i => y[i];   // a Held note goes round its loop
   for (const e of k.notes) {
     const q = e.A - k.rawStart - d; if (q < 0 || q >= N0) continue;
-    const r = noteRatio(t, e.n), pos = Math.round(((((q - PRE) % N0) + N0) % N0) * sc) % N;
+    const r = noteRatio(t, e.n), pos = quantPos(t, Math.round(((((q - PRE) % N0) + N0) % N0) * sc) % N, N);
     let m = lp ? N : Math.min(Math.floor((y.length - 2) / r), N), g0 = Infinity;
     if (t.sGate && e.O != null) { g0 = Math.round(Math.max(0, e.O - e.A) * sc); m = Math.min(m, g0 + fade); }
     for (let j = 0; j < m; j++) {
@@ -2888,7 +2896,7 @@ const changedIn = {
   tune: t => !!t.tune,
   xy: t => JSON.stringify(t.xyMap) !== JSON.stringify(XY_DEF) || t.xyHold,
   tricks: t => ['ebrk', 'rbrk', 'frz', 'phone', 'radio', 'isoL', 'isoM', 'isoH', 'slice', 'rdly', 'ping'].some(k => t[k] > 0) || t.takes.some(k => k.reverse) || t.speed !== 1 || t.tstop || !!t.trem || t.lofi > 0 || t.ring > 0 || t.gran > 0,
-  takes: t => t.takes.some(k => k.off || k.solo || k.lat !== (k.notes ? prof().scr : prof().ms)),
+  takes: t => !!t.quant || t.takes.some(k => k.off || k.solo || k.lat !== (k.notes ? prof().scr : prof().ms)),
   eq: t => eqChanged(t, 'filt') || !near(t.pan, 0),
   dist: t => !!t.dist,
   track: t => t.bars != null
@@ -2935,7 +2943,7 @@ function trackPane(t) {
     if (ks.length) {
       const trk = el('div', 'trk'); t.pcv = el('canvas'); trk.append(t.pcv, el('i', 'ph'));
       const top = el('div', 'tktop'); top.append(trk);
-      return [card(top, ...takeCommon(t, ks), ...ks.map((k, i) => [k, i + 1]).reverse().map(([k, n]) => takeRow(k, n)))];
+      return [card(top, ...takeCommon(t, ks), ...(isSmp(t) ? quantRows(t) : []), ...ks.map((k, i) => [k, i + 1]).reverse().map(([k, n]) => takeRow(k, n)))];
     }
     return [card(el('p', 'cnote', isSmp(t) ? 'No laps yet. Tap the track’s record button on the play screen, or Rec lap on the pads.' : 'No recordings yet. Tap the track’s record button on the play screen, or its microphone button to record a sample.'))];
   }, changedIn.takes(t), t);
@@ -3371,6 +3379,17 @@ function takeRow(k, no) {
   row.append(ms, wv, rm); return row;
 }
 /* Latency and Reverse for all the takes of a track at once. */
+function quantRows(t) {
+  if (isFree()) return [];
+  const redo = () => { for (const k of t.takes) k.final = false; markDirty(); };
+  const sg = el('div', 'seg full qseg'), r = el('div', 'cr');
+  seg(sg, [[0, 'Off'], [1, '1/4'], [2, '1/8'], [3, '1/8T'], [4, '1/16'], [6, '1/16T'], [8, '1/32']], () => t.quant || 0, v => { t.quant = v; redo(); renderPane(); }, 0);
+  r.append(sg);
+  const rows = [el('p', 'csub', 'Quantize'), r];
+  if (t.quant) rows.push(sliderRow('Amount', 0, 1, 0.01, t.qStr, 1, pct, v => { t.qStr = v; clearTimeout(t.qT); t.qT = setTimeout(redo, 150); }),
+    el('p', 'cnote', 'Moves where each note starts towards the nearest ' + { 1: 'quarter', 2: 'eighth', 3: 'eighth triplet', 4: 'sixteenth', 6: 'sixteenth triplet', 8: 'thirty-second' }[t.quant] + ' note; a lower amount keeps some of the feel. What you played is kept, so Off brings it back.'));
+  return rows;
+}
 function takeCommon(t, ks) {
   const out = el('output'), use = el('button', 'tbtn'), notes = !!ks[0].notes, cur = () => notes ? prof().scr : prof().ms;
   const lat = () => ks[ks.length - 1].lat;
