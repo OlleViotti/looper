@@ -559,7 +559,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 10:00</p>
+  <p class="ver">Varv one, build 18 Nov 10:10</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -4020,6 +4020,7 @@ window.addEventListener('resize', () => { setShift(); setHH(); for (const t of t
 
 freshTracks(); dirty = false;
 buildRuler(); drawScenes(); ui(); requestAnimationFrame(frame);
+if (!ctx) setMode('audio');                        // the audio is not running yet: open on the audio page, with its Start audio button
 /* redraw the waveforms whenever the rows change height */
 if (window.ResizeObserver) new ResizeObserver(() => { for (const t of tracks) drawLane(t); }).observe($('#lanes'));
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
