@@ -448,6 +448,8 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 .quick{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom));width:min(540px,calc(100% - 20px));max-height:calc(100% - 160px);overflow-y:auto;z-index:41;background:var(--desk);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.6),0 0 0 1px var(--line);padding:4px 12px 10px}
 .qhead{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 4px}
 .qhead b{font-size:17px}
+.hback{flex:none;color:var(--amber);font-size:14px;margin-left:10px}
+.quick .cr.act{display:flex;justify-content:space-between;align-items:center}
 .alog{margin:0;padding:6px 14px 12px;font:12px/1.4 ui-monospace,Menlo,monospace;color:var(--mut);white-space:pre-wrap;max-height:220px;overflow:auto;-webkit-user-select:text;user-select:text}
 .loopv{padding:8px 10px 2px}
 .loopv output{display:block;font-size:13px;color:var(--mut);text-align:center;padding-top:4px;font-variant-numeric:tabular-nums}
@@ -475,7 +477,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div id="main">
     <main class="tape" id="tape">
       <div class="empty" id="empty">
-        <p><b>Varv is a looper:</b> what you record repeats in time with the click, layer by layer. <b>Tap Record</b>: one bar of count-in, then it records lap after lap, each into the next empty track, until you tap Record again. <b>Hold Record</b> to start or stop without recording. A track's <b>mic</b> button records a sample to play on keys.</p>
+        <p><b>Varv is a looper:</b> what you record repeats in time with the click, layer by layer. <b>Tap Record</b>: one bar of count-in, then it records lap after lap, each into the next empty track, until you tap Record again. <b>Hold Record</b> for its options, <b>hold Undo</b> for what can be brought back. A track's <b>mic</b> button records a sample to play on keys.</p>
         <p><b>Headphones lag,</b> so Varv moves each recording back to land on the beat. Measure the delay once on the audio page (tap the in and out meters at the top): <b>Measure exactly</b> for the headphones, <b>Measure by tapping</b> for the keys.</p>
       </div>
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
@@ -571,7 +573,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 12:40</p>
+  <p class="ver">Varv one, build 18 Nov 13:10</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -1053,7 +1055,7 @@ const targetName = () => { const t = targetTrack(); return t ? t.name : 'a new t
    Passes are counted from the epoch, so a 4-bar track records on 4-bar boundaries and a 1-bar track on any bar. */
 function plan(from) {
   const t = targetTrack(), len = t ? trackLen(t) : loopFrames();
-  return { tid: t ? t.id : null, len, k: Math.max(0, Math.ceil(from / len - 1e-9)), cont: true, last: false };   // the Record button keeps going lap after lap
+  return { tid: t ? t.id : null, len, k: Math.max(0, Math.ceil(from / len - 1e-9)), cont: !st.recOne, last: false };   // the Record button keeps going lap after lap (unless set to one lap)
 }
 const inTail = p => recTail && p >= recTail.start && p < recTail.end;
 const taken = r => { const t = tracks.find(x => x.id === r.tid); return t && t.takes.some(x => x.run === runId && x.k === r.k && x.len === r.len); };
@@ -1071,7 +1073,7 @@ async function toggleRec() {
   if (padT && isFree() && !freeL) { toast('Record the first loop with the microphone, then play the sampler.'); return; }
   if (isFree() && !freeL) { if (defining) endDefine(); else beginDefine(); return; }
   if (!running) {
-    if (!(await start(true))) return;
+    if (!(await start(st.countIn !== false))) return;
     if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
     rec = plan(isFree() ? L : 0); ui(); return;            // free mode: hear the loop once, then record
   }
@@ -1089,6 +1091,22 @@ async function toggleRec() {
   rec = r; ui();
 }
 
+function openRecOpts() {
+  openPanel('Record', host => {
+    const tg = el('div', 'seg full'), tr = el('div', 'cr');
+    seg(tg, [[null, 'Next']].concat(tracks.map((t, i) => [t.id, String(i + 1)])), () => tracks.some(t => t.id === armedId) ? armedId : null,
+      v => { armedId = v; drawHeads(); ui(); }, null);
+    tr.append(tg);
+    host.append(card(
+      crow('Overdub', swtch(el('div'), () => st.overdub, v => { st.overdub = v; save(); drawOverdubSw(); }, false)),
+      el('p', 'cnote', 'On, a lap recorded onto a track that already has one plays on top of it; off, it replaces it.'),
+      crow('Count-in', swtch(el('div'), () => st.countIn !== false, v => { st.countIn = v; save(); }, true)),
+      el('p', 'cnote', 'One bar of clicks before a recording that starts the loop.'),
+      crow('Lap after lap', swtch(el('div'), () => !st.recOne, v => { st.recOne = !v; save(); }, true)),
+      el('p', 'cnote', 'On, Record keeps recording lap after lap until you tap it again; off, it records one lap.'),
+      el('p', 'csub', 'Into'), tr, el('p', 'cnote', 'Next is the next empty track; a number records into that track, once.')));
+  });
+}
 function capturePrev() {
   hintDone('undo');
   if (!running || !micOK) { toast('Start first, then there is a lap to capture.'); return; }
@@ -2628,8 +2646,9 @@ function clearTrack(t, reset) {
   }
   trash.push(it); changed(t); renderPane();
 }
-function restoreLast() {
-  const it = trash.pop(); if (!it) return;
+const restoreLast = () => restoreAt(trash.length - 1);
+function restoreAt(i) {
+  const it = trash.splice(i, 1)[0]; if (!it) return;
   const t = it.track;
   if (it.clear) {
     if (it.reset) { Object.assign(t, it.settings); if (it.sample && !t.sample) { t.sample = it.sample; it.sample.gen = 0; prepSample(t); } applyTrack(t); }
@@ -2652,6 +2671,20 @@ function drawTrash() {
   const it = trash[trash.length - 1];
   $('#undoTxt').textContent = trash.length > 1 ? trash.length + ' items removed'
     : it.clear ? it.track.name + (it.reset ? ' reset' : ' emptied') : it.take ? (it.idx >= 0 ? it.track.name + ' removed' : 'Removed a take from ' + it.track.name) : it.track.name + ' deleted';
+}
+/* The undo history: everything removed, newest first; tap one to bring it back (not only the latest). */
+const trashLabel = it => it.clear ? it.track.name + (it.reset ? ' reset' : ' emptied')
+  : it.take ? (it.take.notes ? 'Lap' : 'Take') + ' on ' + it.track.name + (it.idx >= 0 ? ', with its track' : '') : it.track.name + ' deleted';
+function openHistory() {
+  openPanel('Undo history', host => {
+    if (!trash.length) { host.append(card(el('p', 'cnote', 'Nothing removed yet. Undo takes away the latest recording; what it and Delete, Reset or Empty remove is listed here, to bring back.'))); return; }
+    const rows = trash.map((it, i) => [it, i]).reverse().map(([it, i]) => {
+      const b = el('button', 'cr act'); b.append(el('span', '', trashLabel(it)), el('span', 'hback', 'Bring back'));
+      b.addEventListener('click', () => { restoreAt(i); refillQuick(); });
+      return b;
+    });
+    host.append(card(...rows), el('p', 'cnote', 'Newest first. Tap Undo to take away the latest recording.'));
+  });
 }
 function undoLast() {
   hintDone('undo');
@@ -4090,8 +4123,8 @@ setHH();
 $('#masterName').addEventListener('click', () => selectTrack('master'));
 $('#playBtn').addEventListener('click', () => { if (running) stop(); else start(false); });
 const startStop = () => { if (running || defining) stop(); else start(false); };
-pressable($('#recBtn'), toggleRec, startStop, true);
-$('#undoBtn').addEventListener('click', undoLast);
+pressable($('#recBtn'), toggleRec, openRecOpts, true);   // hold: the record options (a key or pedal held still starts or stops)
+pressable($('#undoBtn'), undoLast, openHistory, true);
 $('#capBtn').addEventListener('click', capturePrev);
 /* Click: tap turns it on or off; hold opens Loop and click (tempo, beats, bars, click) right here, over whatever is on
    screen, the pads included. The settings are the same ones as in Settings, moved over while the panel is open. */
@@ -4100,13 +4133,22 @@ $('#clickBtn').addEventListener('pointerdown', () => { clickHeld = false; clearT
 for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) $('#clickBtn').addEventListener(ev, () => clearTimeout(clickHT));
 $('#clickBtn').addEventListener('click', () => { if (clickHeld) { clickHeld = false; return; } setClick(!st.clickOn); });
 $('#clickBtn').addEventListener('contextmenu', e => e.preventDefault());
-function openQuick() {
-  $('#quickIn').append($('#loopBox')); $('#quick').hidden = false; $('#qBack').hidden = false; ui();
+/* A panel above the transport bar, over whatever is on screen: Loop and click (hold Click), the record options (hold
+   Record) and the undo history (hold Undo). The transport stays usable; a tap outside or Done closes it. */
+let quickClose = null, quickFill = null;
+function openPanel(title, fill, onClose) {
+  closeQuick();
+  $('#quick .qhead b').textContent = title; quickFill = fill; quickClose = onClose || null;
+  $('#quickIn').textContent = ''; fill($('#quickIn'));
+  $('#quick').hidden = false; $('#qBack').hidden = false; ui();
 }
+const refillQuick = () => { if (!$('#quick').hidden && quickFill) { $('#quickIn').textContent = ''; quickFill($('#quickIn')); } };
 function closeQuick() {
   if ($('#quick').hidden) return;
-  $('#loopHome').append($('#loopBox')); $('#quick').hidden = true; $('#qBack').hidden = true;
+  if (quickClose) quickClose(); quickClose = quickFill = null;
+  $('#quick').hidden = true; $('#qBack').hidden = true;
 }
+const openQuick = () => openPanel('Loop and click', host => host.append($('#loopBox')), () => $('#loopHome').append($('#loopBox')));
 $('#quickDone').addEventListener('click', closeQuick); $('#qBack').addEventListener('click', closeQuick);
 for (const [id, n] of [['hTrack', 'track'], ['hSwipe', 'swipe'], ['hUndo', 'undo'], ['hScenes', 'scenes']]) $('#' + id).addEventListener('click', () => hintDone(n));   // tap a hint to put it away
 $('#hMeasure').addEventListener('click', () => { st.hints.measureH = st.hints.measureS = 1; save(); ui(); });
@@ -4157,7 +4199,8 @@ $('#tapPad').addEventListener('pointerdown', e => {
 $('#tapUse').addEventListener('click', () => { if (!tapOut) return; prof().scr = tapOut.ms; save(); $('#tapUse').hidden = true; ui(); toast('New laps on the sampler shift by ' + tapOut.ms + ' ms.'); });
 
 $('#clickVolRow').append(sliderRow('Volume', 0, 1, 0.01, st.clickVol, 0.6, pct, v => { st.clickVol = v; save(); if (ctx && running && st.clickOn && nowF() >= epoch) clickGain.gain.setTargetAtTime(v, ctx.currentTime, 0.01); }));
-swtch($('#overdubSw'), () => st.overdub, v => { st.overdub = v; save(); }, false);
+const drawOverdubSw = () => swtch($('#overdubSw'), () => st.overdub, v => { st.overdub = v; save(); }, false);
+drawOverdubSw();
 swtch($('#autoLvlSw'), () => st.autoLevel, v => { st.autoLevel = v; save(); }, false);
 swtch($('#perfMicSw'), () => st.perfMic, v => { st.perfMic = v; save(); }, true);
 $('#perfBtn').addEventListener('click', togglePerf);
