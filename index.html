@@ -449,6 +449,9 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 .qhead{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 4px}
 .qhead b{font-size:17px}
 .alog{margin:0;padding:6px 14px 12px;font:12px/1.4 ui-monospace,Menlo,monospace;color:var(--mut);white-space:pre-wrap;max-height:220px;overflow:auto;-webkit-user-select:text;user-select:text}
+.loopv{padding:8px 10px 2px}
+.loopv output{display:block;font-size:13px;color:var(--mut);text-align:center;padding-top:4px;font-variant-numeric:tabular-nums}
+.loopc{display:block;width:100%;height:72px;border-radius:8px;background:var(--desk);touch-action:none;cursor:ew-resize}
 .finew{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 10px 2px}
 .finev output{display:block;font-size:13px;color:var(--mut);text-align:center;padding-top:4px;font-variant-numeric:tabular-nums}
 .finec{display:block;width:100%;height:64px;border-radius:8px;background:var(--desk);touch-action:none;cursor:ew-resize}
@@ -568,7 +571,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 12:00</p>
+  <p class="ver">Varv one, build 18 Nov 12:30</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -1773,41 +1776,64 @@ function applyEnv(t) {
   if (envFlat(e)) s.proc = y;
   else { const z = new Float32Array(y.length); for (let i = 0; i < y.length; i++) z[i] = y[i] * envGain(e, i); s.proc = z; }
   s.buf = ctx ? mkBuf(s.proc) : null;
-  s.loop = findLoop(s.proc, Math.round((e.a + e.d) / 1000 * sr));     // for Held notes: the tone goes on while the key is held
+  s.loop = findLoop(s.proc, Math.round((e.a + e.d) / 1000 * sr), s.loopF);   // for Held notes: the tone goes on while the key is held
   s.lproc = s.loop ? loopBake(s.proc, s.loop) : null; s.lbuf = s.lproc && ctx ? mkBuf(s.lproc) : null;
   for (const k of t.takes) k.final = false;
   if (s.onLoop) s.onLoop();
 }
-/* Sustain loop. In the steady part after the attack and decay, a stretch about 120 ms long is chosen that is a whole
-   number of the tone's own cycles (its period found by autocorrelation), placed where its end matches its start best;
-   the last ~15 ms before its end are crossfaded with what comes before its start, so the jump back is seamless. */
-function findLoop(y, from) {
-  const n = y.length, lo = Math.max(from + Math.round(0.02 * sr), Math.round(0.03 * sr)), hi = n - Math.round(0.03 * sr);
-  if (hi - lo < Math.round(0.06 * sr)) return null;
-  let per = 0;
-  { const W = Math.min(2048, (hi - lo) >> 1), c = (lo + hi - W) >> 1, minL = Math.floor(sr / 1000), maxL = Math.min(Math.floor(sr / 50), W >> 1);
-    let e0 = 0; for (let i = 0; i < W; i++) e0 += y[c + i] * y[c + i];
-    let best = 0;
-    if (e0 > 1e-8) for (let L = minL; L <= maxL; L++) {
-      let a = 0, e1 = 0; for (let i = 0; i < W - L; i++) { a += y[c + i] * y[c + i + L]; e1 += y[c + i + L] * y[c + i + L]; }
-      const r = a / Math.sqrt(e0 * e1 + 1e-12); if (r > best + 0.02) { best = r; per = L; }   // the first strong peak, not a multiple
-      else if (per && r < best - 0.3) break;
-    }
-    if (best < 0.6) per = 0; }
-  const room = hi - lo;
-  let L = per ? per * Math.max(1, Math.round(0.12 * sr / per)) : Math.round(0.12 * sr);
-  while (L > room * 0.7 && per && L > per) L -= per;
-  if (L > room * 0.7) L = Math.round(room * 0.7);
-  const X = Math.max(32, Math.min(Math.round(0.015 * sr), L >> 2)), s0 = Math.max(lo, X), s1 = hi - L;
-  if (s1 <= s0) return null;
-  const step = Math.max(1, Math.floor((s1 - s0) / 400)), M = Math.min(X, 256);
+/* Sustain loop. Chosen in the strong, steady part of the tone: after the attack and decay, and only where the level is
+   still at least half its peak, so a faint tail is never picked. Its length (about 250 ms, at most half that part) is a
+   whole number of the tone's own cycles (found by autocorrelation); its place is where the end matches the start best
+   and the level is the same at both, so it neither clicks nor pulses. The last ~15 ms before its end are crossfaded
+   with what comes before its start. Set by hand (s.loopF, as fractions of the sample), the length is snapped to whole
+   cycles and the start nudged within a cycle to where it joins best. */
+function loopPeriod(y, lo, hi) {
+  const W = Math.min(2048, (hi - lo) >> 1); if (W < 256) return 0;
+  const c = (lo + hi - W) >> 1, minL = Math.floor(sr / 1000), maxL = Math.min(Math.floor(sr / 50), W >> 1);
+  let e0 = 0; for (let i = 0; i < W; i++) e0 += y[c + i] * y[c + i];
+  if (e0 < 1e-8) return 0;
+  let best = 0, per = 0;
+  for (let L = minL; L <= maxL; L++) {
+    let a = 0, e1 = 0; for (let i = 0; i < W - L; i++) { a += y[c + i] * y[c + i + L]; e1 += y[c + i + L] * y[c + i + L]; }
+    const r = a / Math.sqrt(e0 * e1 + 1e-12); if (r > best + 0.02) { best = r; per = L; } else if (per && r < best - 0.3) break;   // the first strong peak, not a multiple
+  }
+  return best < 0.6 ? 0 : per;
+}
+function findLoop(y, from, user) {
+  const n = y.length, hop = Math.max(1, Math.round(0.005 * sr)), win = Math.round(0.02 * sr), nb = Math.floor(n / hop);
+  const rms = new Float32Array(nb);
+  for (let b = 0; b < nb; b++) { let e = 0, c = 0; for (let i = b * hop; i < Math.min(n, b * hop + win); i++) { e += y[i] * y[i]; c++; } rms[b] = Math.sqrt(e / Math.max(1, c)); }
+  const R = i => rms[clamp(Math.floor(i / hop), 0, nb - 1)];
+  const lo0 = Math.max(from + Math.round(0.02 * sr), Math.round(0.03 * sr));
+  let pk = 0; for (let b = Math.floor(lo0 / hop); b < nb; b++) pk = Math.max(pk, rms[b]);
+  if (pk < 1e-5) return null;
+  let lo = lo0, hi = 0;
+  for (const th of [0.5, 0.3, 0.15]) {                // the part still at least half as loud as the peak (or less, if that is too short)
+    let last = -1; for (let b = Math.floor(lo0 / hop); b < nb; b++) if (rms[b] >= th * pk) last = b;
+    hi = Math.min(n - Math.round(0.03 * sr), (last + 1) * hop);
+    if (hi - lo >= Math.round(0.06 * sr)) break;
+  }
+  if (user) { lo = Math.round(0.01 * sr); hi = n - Math.round(0.01 * sr); }
+  if (hi - lo < Math.round(0.05 * sr)) return null;
+  const per = loopPeriod(y, lo, hi), room = hi - lo, snap = L => per ? Math.max(per, Math.round(L / per) * per) : L;
+  let L = user ? snap(Math.round((user[1] - user[0]) * n)) : snap(Math.min(Math.round(0.25 * sr), Math.round(room * 0.5)));
+  while (L > room - 64 && per && L > per) L -= per;
+  if (L > room - 64) L = room - 64;
+  if (L < Math.round(0.02 * sr)) return null;
+  const X = Math.max(32, Math.min(Math.round(0.015 * sr), L >> 2)), M = Math.min(X, 256);
+  let s0 = Math.max(lo, X), s1 = hi - L;
+  if (user) { const c = clamp(Math.round(user[0] * n), s0, s1), d = per || Math.round(0.005 * sr); s0 = Math.max(s0, c - d); s1 = Math.min(s1, c + d); }
+  if (s1 < s0) return null;
+  const step = Math.max(1, Math.floor((s1 - s0) / 400));
   let bs = s0, be = Infinity;
   for (let st0 = s0; st0 <= s1; st0 += step) {
     let d = 0, en = 1e-9;
     for (let i = 0; i < M; i++) { const a = y[st0 - M + i], b = y[st0 + L - M + i]; d += (a - b) * (a - b); en += a * a + b * b; }
-    const v = d / en; if (v < be) { be = v; bs = st0; }
+    const ra = R(st0), rb = R(st0 + L);
+    const v = d / en + (user ? 0 : 1.5 * (1 - Math.min(ra, rb) / pk) + 2 * Math.abs(ra - rb) / pk);   // a good join, loud, and as loud at both ends
+    if (v < be) { be = v; bs = st0; }
   }
-  return { s: bs, e: bs + L, x: X };
+  return { s: bs, e: bs + L, x: X, per };
 }
 function loopBake(y, lp) {
   const z = y.slice(), { s, e, x } = lp;
@@ -2980,10 +3006,65 @@ function sampleMain(t) {
   const syncFine = () => { fa.draw(); fb.draw(); };
   const fine = el('div', 'finew'); fine.append(fa, fb);
   trim.onEnd = syncFine;                              // dragging the trim view moves the fine sliders' window with it
-  s.hk.main = () => { trim.draw(); syncFine(); const w = $('.envw', $('#epane')); if (w) w.draw(); };
+  const lv = loopView(t); s.onLoop = () => { lv.draw(); trim.draw(); };
+  s.hk.main = () => { trim.draw(); syncFine(); lv.draw(); const w = $('.envw', $('#epane')); if (w) w.draw(); };
   return [card(trim, fine, el('p', 'cnote', 'Start and End show each edge close up: drag to move it finely, double-tap for where Auto trim puts it.'), acts, crow('Reverse', swtch(el('div'), () => s.rev, v => { s.rev = v; sampleEdited(t, false, 0); }, false))),
+    el('h3', '', 'Sustain loop'), card(lv, el('p', 'cnote', 'Held notes repeat this part for as long as the key is held. Drag the band or its edges; double-tap for the automatic choice.')),
     el('h3', '', 'Envelope'), card(envWidget(t),
       sliderRow('Punch', 0, 1, 0.01, envOf(t).p, 0, v => v ? '+' + (20 * Math.log10(1 + 2 * v)).toFixed(1) + ' dB' : 'off', v => { s.env = Object.assign(envOf(t), { p: v }); envChanged(t); const w = $('.envw', $('#epane')); if (w) w.draw(); }))];
+}
+/* The sustain loop, over the sample as it sounds: drag the band to move it, its edges to resize it; double-tap for the
+   automatic choice. Let go, and the length is snapped to whole cycles and the start to where it joins best. */
+function relLoop(t) {
+  const s = t.sample; if (!s || !s.proc) return;
+  const e = envOf(t); s.loop = findLoop(s.proc, Math.round((e.a + e.d) / 1000 * sr), s.loopF);
+  s.lproc = s.loop ? loopBake(s.proc, s.loop) : null; s.lbuf = s.lproc && ctx ? mkBuf(s.lproc) : null;
+  for (const k of t.takes) k.final = false;
+  markDirty(); if (s.onLoop) s.onLoop();
+}
+function loopView(t) {
+  const s = t.sample, box = el('div', 'loopv'), cv = el('canvas', 'loopc'), out = el('output');
+  box.append(cv, out);
+  let drag = null, f = null, lastTap = 0;
+  const n = () => (s.proc ? s.proc.length : 1);
+  function draw() {
+    const { g, w, h } = sizeCanvas(cv); if (!w || !s.proc) return;
+    const y = s.proc, N = y.length, mid = h / 2; let top = 1e-4;
+    const pk = new Float32Array(w); for (let x = 0; x < w; x++) { const a = Math.floor(x / w * N), b = Math.max(a + 1, Math.floor((x + 1) / w * N)); let m = 0; for (let i = a; i < b; i++) m = Math.max(m, Math.abs(y[i])); pk[x] = m; top = Math.max(top, m); }
+    const fr = f || (s.loop ? [s.loop.s / N, s.loop.e / N] : null);
+    for (let x = 0; x < w; x++) { const hh = Math.max(0.6, pk[x] / top * (mid - 4)); g.fillStyle = fr && x >= fr[0] * w && x <= fr[1] * w ? '#ece5d0' : 'rgba(160,168,192,.4)'; g.fillRect(x, mid - hh, 1, hh * 2); }
+    if (fr) {
+      const xa = fr[0] * w, xb = fr[1] * w;
+      g.fillStyle = 'rgba(255,178,36,.28)'; g.fillRect(xa, 0, xb - xa, h);
+      g.fillStyle = '#ffb224'; for (const x of [xa, xb]) { g.fillRect(Math.round(x) - 1, 0, 3, h); g.fillRect(Math.round(x) - 5, h / 2 - 9, 11, 18); }
+      out.textContent = 'Loop ' + (fr[0] * N / sr).toFixed(2) + '–' + (fr[1] * N / sr).toFixed(2) + ' s, ' + Math.round((fr[1] - fr[0]) * N / sr * 1000) + ' ms' + (s.loopF ? ', set by hand' : ', chosen by itself') + '.';
+    } else out.textContent = 'Too short for a loop: Held notes stop at the end of the sample.';
+  }
+  const fx = e => { const r = cv.getBoundingClientRect(); return clamp((e.clientX - r.left) / r.width, 0, 1); };
+  cv.addEventListener('pointerdown', e => {
+    if (!s.loop || !s.proc) return;
+    const now = performance.now();
+    if (now - lastTap < 320) { lastTap = 0; s.loopF = null; drag = null; f = null; relLoop(t); draw(); return; }   // back to the automatic choice
+    lastTap = now;
+    const N = n(), w = cv.getBoundingClientRect().width, x = fx(e), a = s.loop.s / N, b = s.loop.e / N, near = 16 / w;
+    f = [a, b];
+    drag = Math.abs(x - a) < near ? 'a' : Math.abs(x - b) < near ? 'b' : { off: x - (x >= a && x <= b ? a : (x - (b - a) / 2)) };
+    if (drag.off != null && !(x >= a && x <= b)) { const d = b - a; f = [clamp(x - d / 2, 0, 1 - d), 0]; f[1] = f[0] + d; drag.off = x - f[0]; }
+    try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+    draw();
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const x = fx(e), N = n(), min = Math.max(0.02 * sr / N, 0.01);
+    if (drag === 'a') f[0] = clamp(x, 0, f[1] - min);
+    else if (drag === 'b') f[1] = clamp(x, f[0] + min, 1);
+    else { const d = f[1] - f[0]; f[0] = clamp(x - drag.off, 0, 1 - d); f[1] = f[0] + d; }
+    draw();
+  });
+  const up = () => { if (!drag) return; drag = null; s.loopF = f; f = null; relLoop(t); draw(); };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  box.draw = draw; requestAnimationFrame(draw);
+  return box;
 }
 function fineView(t, key, moved) {
   const s = t.sample, box = el('div', 'finev'), cv = el('canvas', 'finec'), out = el('output'), W = Math.round(0.15 * sr), gap = Math.round(0.02 * sr);
@@ -3057,7 +3138,7 @@ function compCard(t) {
 function copySampler(t) {
   const s = t.sample; if (!s) return;
   const u = newTrack(Object.assign({}, pick(t, TRACK_KEYS), { mute: false, solo: false }), tracks.indexOf(t) + 1);
-  u.sample = { key: rid(), raw: s.raw, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: Object.assign({}, s.env), comp: Object.assign({}, COMP_DEF, s.comp), proc: null, proc0: null, buf: null, tuned: null, savedTo: null, gen: 0 };
+  u.sample = { key: rid(), raw: s.raw, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: Object.assign({}, s.env), comp: Object.assign({}, COMP_DEF, s.comp), loopF: s.loopF ? s.loopF.slice() : null, proc: null, proc0: null, buf: null, tuned: null, savedTo: null, gen: 0 };
   u.auto = false; applyTrack(u); prepSample(u); drawHead(u); markDirty(); selectTrack(u.id); toast(u.name + ': the same sample, no laps.');
 }
 function sampleEdited(t, redetect, wait) {
@@ -3371,7 +3452,7 @@ let sw = null, eatClick = false;
 document.addEventListener('pointerdown', e => {
   sw = null;
   if (e.pointerType === 'mouse' && e.button !== 0) return;
-  if (e.target.closest('input,select,textarea,.eqc,.envc,.trimc,.finec,.tappad,.kb,.pbig,.etabs,.xyp')) return;
+  if (e.target.closest('input,select,textarea,.eqc,.envc,.trimc,.finec,.loopc,.tappad,.kb,.pbig,.etabs,.xyp')) return;
   const up = false;                                                                            // the pads open from a sampler's keys button
   const down = !!padT && !!e.target.closest('.pads');                                          // swipe down on the sheet: close it
   sw = { x: e.clientX, y: e.clientY, id: e.pointerId, horiz: false, vert: false, up, down };
@@ -3614,7 +3695,7 @@ async function saveProject() {
       sample: (s => {                                     // the sample's raw recording is stored like a take's
         if (!s) return null;
         keep.add(s.key); if (s.savedTo !== pid) { puts.push([pid + '/' + s.key, s.raw]); s.savedTo = pid; }
-        return { key: s.key, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: s.env, comp: s.comp };
+        return { key: s.key, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: s.env, comp: s.comp, loopF: s.loopF || null };
       })(t.sample),
       takes: t.takes.filter(k => k.full && k.started).map(k => {
         if (k.notes) return { key: k.key, lat: k.lat, off: !!k.off, pin: !!k.pin, solo: !!k.solo, bars: isFree() ? null : takeBars(k), bpm0: k.bpm0 || st.bpm, notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
@@ -3692,7 +3773,7 @@ async function openProject(id) {
       if (raw) {
         if (!same) raw = resample(raw, ratio);
         const sm = tm.sample, b = Math.min(raw.length, Math.round(sm.b * ratio)), a = clamp(Math.round(sm.a * ratio), 0, Math.max(0, b - 16));
-        t.sample = { key: sm.key, raw, a, b, det: sm.det == null ? null : sm.det, adj: sm.adj || 0, rev: !!sm.rev, env: Object.assign({}, ENV_DEF, sm.env), comp: Object.assign({}, COMP_DEF, sm.comp), proc: null, proc0: null, buf: null, tuned: null, savedTo: same ? id : null, gen: 0 };
+        t.sample = { key: sm.key, raw, a, b, det: sm.det == null ? null : sm.det, adj: sm.adj || 0, rev: !!sm.rev, env: Object.assign({}, ENV_DEF, sm.env), comp: Object.assign({}, COMP_DEF, sm.comp), loopF: sm.loopF || null, proc: null, proc0: null, buf: null, tuned: null, savedTo: same ? id : null, gen: 0 };
         prepSample(t);
       } else missing++;
     }
