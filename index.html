@@ -468,12 +468,12 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div id="main">
     <main class="tape" id="tape">
       <div class="empty" id="empty">
-        <p><b>Varv is a looper:</b> what you record repeats in time with the click, layer by layer. <b>Tap Record</b>: one bar of count-in, then it records lap after lap, each into the next empty track, until you tap Record again. <b>Hold Record</b> to start or stop without recording.</p>
-        <p><b>Bluetooth headphones lag,</b> so Varv moves each recording back to land on the beat. Measure the delay once: tap the in and out meters at the top, then Measure exactly.</p>
+        <p><b>Varv is a looper:</b> what you record repeats in time with the click, layer by layer. <b>Tap Record</b>: one bar of count-in, then it records lap after lap, each into the next empty track, until you tap Record again. <b>Hold Record</b> to start or stop without recording. A track's <b>mic</b> button records a sample to play on keys.</p>
+        <p><b>Headphones lag,</b> so Varv moves each recording back to land on the beat. Measure the delay once on the audio page (tap the in and out meters at the top): <b>Measure exactly</b> for the headphones, <b>Measure by tapping</b> for the keys.</p>
       </div>
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
-      <p class="hint" id="hTrack" hidden><b>M</b> mutes, <b>S</b> solos, <b>●</b> records a lap, <b>+●</b> adds one on top, the <b>mic</b> records a sample.</p>
+      <p class="hint" id="hTrack" hidden><b>M</b> mutes, <b>S</b> solos, <b>●</b> records a lap, <b>+●</b> adds one on top, the <b>mic</b> records a sample, the <b>keys</b> open its pads.</p>
       <p class="hint" id="hSwipe" hidden><b>Swipe right</b> on a track to edit it, <b>left</b> for settings.</p>
       <p class="hint" id="hUndo" hidden><b>Undo</b> takes back a recording, <b>Capture last</b> keeps the lap just played.</p>
       <div class="row"><button class="addtrk nmcol" id="addTrk" aria-label="Add a track">+</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
@@ -561,12 +561,12 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 11:10</p>
+  <p class="ver">Varv one, build 18 Nov 11:20</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
   <div class="sp-head"><h2>Audio</h2><button class="tbtn" id="apDone">Done</button></div>
-  <p class="hint" id="hMeasure" hidden><b>Start here:</b> with your headphones on, measure the latency once under Latency, Measure exactly. Do it again if you change headphones.</p>
+  <p class="hint" id="hMeasure" hidden></p>
   <div id="apIn"></div>
   <button class="fh sfh" data-fold="aLat" data-def="1">Latency</button>
   <div class="sfb">
@@ -584,7 +584,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card">
     <button class="cr act" id="restartBtn"><span>Restart audio<small>Closes the sound and the microphone and starts them again, as when the app opens. Try it if the delay grows or the sound goes to the wrong place.</small></span></button>
     <div class="cr"><span>Auto level recordings</span><div id="autoLvlSw"></div></div>
-    <p class="cnote" id="diag">Audio starts the first time you tap Start, Record or Measure.</p>
+    <p class="cnote" id="diag">The audio starts with Start audio, at the top, or the first time you tap Start, Record or Measure.</p>
     <p class="csub">Audio log</p>
     <pre class="alog" id="alog"></pre>
   </div>
@@ -1975,7 +1975,7 @@ function drawPads() {
   }
   const trk = el('div', 'trk'); t.kcv = el('canvas'); trk.append(t.kcv, el('i', 'ph'));
   host.append(trk);
-  if (!st.hints.pads) { const h = el('p', 'pnote'); h.innerHTML = 'Play to try the sound. <b>Rec lap</b> records the next lap. While a recording is on, framed in red, the pads are silent: what you play is heard in time from the next lap on.'; host.append(h); }
+  if (!st.hints.pads) { const h = el('p', 'pnote'); h.innerHTML = 'Play to try the sound. <b>Rec lap</b> records the next lap in place of the last, <b>+ Overdub</b> on top of it. While a recording is on, framed in red, the pads are silent: what you play is heard in time from the next lap on. <b>Held</b> notes last as long as you hold the key.'; host.append(h); }
   /* Octaves 0 to 4, and the lowest one. Changing them redraws only the playing area: the big pad at 0, else the keys. */
   const s = t.sample, rootTxt = s.det != null || s.adj ? midiName(sRoot(t)) : 'no pitch';
   const ro = el('output'), bo = el('output'), o1 = el('div'), o2 = el('div'), opt = el('div', 'popt');
@@ -2056,7 +2056,7 @@ function noTouchDefaults(node) {
    is the time from the click leaving the app until your touch reaches it: the headphones plus the screen. */
 let tapMeas = null, tapOut = null;
 async function measureTap() {
-  hintDone('measure');
+  hintDone('measureS');
   if (measuring) return;
   if (running) stop();
   const ok = await initAudio(); if (!ok) return;
@@ -3492,7 +3492,7 @@ function setBeat(j) { for (let i = 0; i < beatEls.length; i++) beatEls[i].classL
 const MEAS_HZ = 2000, MEAS_DECAY = 0.004, MEAS_LEN = 0.02;
 let measOut = null;
 async function measure() {
-  hintDone('measure');
+  hintDone('measureH');
   if (measuring) return;
   if (running) stop();
   const ok = await initAudio();
@@ -3755,7 +3755,9 @@ function ui() {
   const bottom = want.hScenes ? 'hScenes' : null;
   $('#hScenes').hidden = !bottom;
   $('#hintBar').hidden = !bottom;
-  $('#hMeasure').hidden = !!h.measure;
+  { const hd = !!(h.measureH || h.measure), sd = !!h.measureS, n = $('#hMeasure'); n.hidden = hd && sd;   // the three steps, each ticked once done
+    if (!n.hidden) n.innerHTML = '<b>Start here,</b> with your headphones on: ' + [[!!ctx, '<b>Start audio</b>'], [hd, '<b>Measure exactly</b>, for the headphones'], [sd, '<b>Measure by tapping</b>, for the keys']]
+      .map(([d, x], i) => (d ? '✓ ' : (i + 1) + '. ') + x).join(', ') + '. Measure again if you change headphones.'; }
   if (allTakes().length) $('#cont').hidden = true;
   drawPadRec();
   $('#perfInd').hidden = !perf; $('#perfBtn').firstChild.textContent = perf ? 'Stop recording performance' : 'Record performance'; $('#perfBtn').classList.toggle('on', !!perf);
@@ -3850,7 +3852,7 @@ async function drawAudio() {
   const host = $('#apIn'); host.textContent = '';
   if (!ctx) {
     const go = el('button', 'cr act'); go.append(el('span', '', 'Start audio'));
-    go.addEventListener('click', async () => { await initAudio(); drawAudio(); });
+    go.addEventListener('click', async () => { await initAudio(); drawAudio(); ui(); });
     host.append(card(go, el('p', 'cnote', 'Starts the microphone and the sound, so they can be chosen and checked here.'))); return;
   }
   const mrow = (label, id) => { const r = el('div', 'mrow'), m = el('i', 'mtr big'); m.id = id; m.append(el('b')); r.append(el('span', '', label), m); return r; };
@@ -3967,6 +3969,7 @@ $('#undoBtn').addEventListener('click', undoLast);
 $('#capBtn').addEventListener('click', capturePrev);
 $('#clickBtn').addEventListener('click', () => setClick(!st.clickOn));
 for (const [id, n] of [['hTrack', 'track'], ['hSwipe', 'swipe'], ['hUndo', 'undo'], ['hScenes', 'scenes']]) $('#' + id).addEventListener('click', () => hintDone(n));   // tap a hint to put it away
+$('#hMeasure').addEventListener('click', () => { st.hints.measureH = st.hints.measureS = 1; save(); ui(); });
 $('#addTrk').addEventListener('click', () => { const t = newTrack(); touched(t); ui(); if (mode === 'edit') selectTrack(t.id); t.row.scrollIntoView({ block: 'nearest' }); });
 $('#undoRestore').addEventListener('click', restoreLast);
 $('#undoClose').addEventListener('click', () => { trash = []; drawTrash(); releaseFree(); ui(); });

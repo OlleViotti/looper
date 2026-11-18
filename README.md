@@ -10,7 +10,7 @@
 
 ## Guide
 
-Short guide lines on the play screen, in edit mode and in settings explain each part when it first becomes relevant, one short line at a time on the play screen, and each one disappears for good once you have used what it describes, or when you tap it. Settings has a button to show them again.
+The audio page starts with the setup in three steps, each ticked once done: Start audio, Measure exactly (the headphones) and Measure by tapping (the keys). Short guide lines on the play screen, in edit mode and in settings explain each part when it first becomes relevant, one short line at a time on the play screen, and each one disappears for good once you have used what it describes, or when you tap it. Settings has a button to show them again.
 
 ## The play view, and what slides over it
 
