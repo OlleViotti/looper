@@ -559,7 +559,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 09:00</p>
+  <p class="ver">Varv one, build 18 Nov 09:30</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -765,7 +765,7 @@ function buildGraph() {
   mix = gn(1); mix.connect(pre);
   echoIn = gn(1); echoDelay = ctx.createDelay(3); const tone = bq('lowpass', Math.min(3200, OPEN_LP)); echoFbG = gn(st.echoFb); echoOut = gn(st.echoLvl);
   echoIn.connect(echoDelay); echoDelay.connect(tone); tone.connect(echoFbG); echoFbG.connect(echoDelay); tone.connect(echoOut); echoOut.connect(pre);
-  revIn = gn(1); conv = ctx.createConvolver(); conv.buffer = makeIR(st.revSize); revOut = gn(st.revLvl); revIn.connect(conv); conv.connect(revOut); revOut.connect(pre);
+  revIn = gn(1); conv = ctx.createConvolver(); conv.buffer = makeIR(st.revSize); revOut = gn(st.revLvl); revOut.connect(pre); revOn = false;   // connected by revSync while used
   gEchoSend = gn(0); mix.connect(gEchoSend); gEchoSend.connect(echoIn);
   gRevSend = gn(0); mix.connect(gRevSend); gRevSend.connect(revIn);
   clickGain = gn(0); clickGain.connect(clickComp);
@@ -785,6 +785,15 @@ function makeIR(len) {
   return b;
 }
 let irT = 0;
+/* The reverb is the heaviest part of the sound, so it is only connected while something sends to it, and taken away
+   once its tail has died out. */
+let revOn = false, revT = 0;
+function revSync() {
+  if (!conv) return;
+  const want = st.gRev > 0 || tracks.some(t => Math.max(t.rev || 0, (t.xyA || {}).rev || 0, liveAmt(t, 'rbrk')) > 0);
+  if (want) { clearTimeout(revT); revT = 0; if (!revOn) { revIn.connect(conv); conv.connect(revOut); revOn = true; } }
+  else if (revOn && !revT) revT = setTimeout(() => { revT = 0; if (!revOn) return; try { revIn.disconnect(conv); } catch (e) {} try { conv.disconnect(); } catch (e) {} revOn = false; }, (st.revSize + 1) * 1000);
+}
 function setRevSize() { clearTimeout(irT); irT = setTimeout(() => { if (ctx) conv.buffer = makeIR(st.revSize); }, 180); }
 
 function setFilter(lp, hp, v) {
@@ -798,7 +807,7 @@ function applyGlobalFx() {
   outGain.gain.setTargetAtTime(st.master, t, 0.01);
   setFilter(gLP, gHP, st.gFilter); setEq(mEq, st);
   gEchoSend.gain.setTargetAtTime(st.gEcho * 0.8, t, 0.01);
-  gRevSend.gain.setTargetAtTime(st.gRev, t, 0.01);
+  gRevSend.gain.setTargetAtTime(st.gRev, t, 0.01); revSync();
   echoDelay.delayTime.setTargetAtTime(echoSec(), t, 0.01);
   echoFbG.gain.setTargetAtTime(clamp(st.echoFb, 0, 0.92), t, 0.01);
   echoOut.gain.setTargetAtTime(st.echoLvl, t, 0.01);
@@ -1000,7 +1009,7 @@ function startSource(k, at) {
   s.start(at / sr, (((at - epoch) % n + n) % n) / sr);
   if (k.src) { try { k.src.stop(at / sr); } catch (e) {} }
   k.src = s;
-  if (k.rg && liveAmt(k.track, 'rdly') > 0) rdStart(k, at);                // the reverse delay runs alongside, in step
+  if (k.rg && liveAmt(k.track, 'rdly') > 0) rdStart(k, at); else if (k.rsrc) { try { k.rsrc.stop(); } catch (e) {} k.rsrc = null; }                // the reverse delay runs alongside, in step
 }
 
 /* heard position: the audio clock minus the current latency, i.e. where what you hear and play lands */
@@ -2075,31 +2084,36 @@ function applyDist(t) {
 }
 /* The XY pad's own live effects. */
 function applyLive(t, A) {
-  if (!t.rmOsc) return;
-  const tm = ctx.currentTime, rm = A.ring || 0, cr = A.crush || 0, tr = A.trem || 0;
-  t.rmOsc.frequency.setTargetAtTime(30 * Math.pow(60, A.ringF != null ? A.ringF : 0.5), tm, 0.02);   // 30 Hz to 1.8 kHz
-  t.rmDry.gain.setTargetAtTime(1 - rm, tm, 0.01); t.rmWet.gain.setTargetAtTime(rm, tm, 0.01);
-  const bits = cr > 0 ? Math.round(12 - cr * 10) : 0;
-  if (bits && bits !== t.crBits) {
-    const n = 4096, c = new Float32Array(n), q = Math.pow(2, bits - 1);
-    for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; c[i] = Math.round(x * q) / q; }
-    t.crSh.curve = c; t.crBits = bits;
+  if (!t.fxIn) return;
+  const tm = ctx.currentTime, amt = {
+    ring: A.ring || 0, crush: A.crush || 0, trem: A.trem || 0, band: Math.max(liveAmt(t, 'phone'), liveAmt(t, 'radio')),
+    iso: Math.max(liveAmt(t, 'isoL'), liveAmt(t, 'isoM'), liveAmt(t, 'isoH')), frz: liveAmt(t, 'frz'), ping: liveAmt(t, 'ping') };
+  syncFx(t, amt);
+  const F = t.fx;
+  if (F.ring) { F.ring.o.frequency.setTargetAtTime(30 * Math.pow(60, A.ringF != null ? A.ringF : 0.5), tm, 0.02); F.ring.dry.gain.setTargetAtTime(1 - amt.ring, tm, 0.01); F.ring.wet.gain.setTargetAtTime(amt.ring, tm, 0.01); }   // 30 Hz to 1.8 kHz
+  if (F.crush) {
+    const bits = Math.round(12 - amt.crush * 10);
+    if (bits !== F.crush.bits) {
+      const n = 4096, c = new Float32Array(n), q = Math.pow(2, bits - 1);
+      for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; c[i] = Math.round(x * q) / q; }
+      F.crush.sh.curve = c; F.crush.bits = bits;
+    }
+    F.crush.dry.gain.setTargetAtTime(1 - amt.crush, tm, 0.01); F.crush.wet.gain.setTargetAtTime(amt.crush, tm, 0.01);
   }
-  t.crDry.gain.setTargetAtTime(1 - cr, tm, 0.01); t.crWet.gain.setTargetAtTime(cr, tm, 0.01);
-  t.trOsc.frequency.setTargetAtTime(1 * Math.pow(16, A.tremF != null ? A.tremF : 0.4), tm, 0.02);    // 1 to 16 Hz
-  t.trG.gain.setTargetAtTime(1 - tr / 2, tm, 0.01); t.trDep.gain.setTargetAtTime(tr / 2, tm, 0.01);
-  const ph = liveAmt(t, 'phone'), ra = liveAmt(t, 'radio');
-  t.phDry.gain.setTargetAtTime(1 - Math.max(ph, ra), tm, 0.01); t.phWet.gain.setTargetAtTime(ph * 0.9, tm, 0.01); t.raWet.gain.setTargetAtTime(ra * 0.9, tm, 0.01);
-  const gL = 1 - liveAmt(t, 'isoL'), gM = 1 - liveAmt(t, 'isoM'), gH = 1 - liveAmt(t, 'isoH');
-  t.isoX.gain.setTargetAtTime(gM, tm, 0.01); t.isoLg.gain.setTargetAtTime(gL - gM, tm, 0.01); t.isoHg.gain.setTargetAtTime(gH - gM, tm, 0.01);
-  const fz = liveAmt(t, 'frz');
-  t.fzIn.gain.setTargetAtTime(fz > 0 ? 0 : 1, tm, 0.02); for (const fb of t.fzFb) fb.gain.setTargetAtTime(fz > 0 ? 0.998 : 0.82, tm, 0.02);
-  t.fzWet.gain.setTargetAtTime(fz * 0.5, tm, 0.02);
-  const pp = liveAmt(t, 'ping'), pt = Math.min(1.9, beatN() / sr * (t.pDiv || 0.5));
-  t.ppIn.gain.setTargetAtTime(pp, tm, 0.01); t.ppL.delayTime.setTargetAtTime(pt, tm, 0.05); t.ppR.delayTime.setTargetAtTime(pt, tm, 0.05);
+  if (F.trem) { F.trem.o.frequency.setTargetAtTime(Math.pow(16, A.tremF != null ? A.tremF : 0.4), tm, 0.02); F.trem.g.gain.setTargetAtTime(1 - amt.trem / 2, tm, 0.01); F.trem.dep.gain.setTargetAtTime(amt.trem / 2, tm, 0.01); }   // 1 to 16 Hz
+  if (F.band) { const ph = liveAmt(t, 'phone'), ra = liveAmt(t, 'radio'); F.band.dry.gain.setTargetAtTime(1 - Math.max(ph, ra), tm, 0.01); F.band.ph.gain.setTargetAtTime(ph * 0.6, tm, 0.01); F.band.ra.gain.setTargetAtTime(ra * 0.9, tm, 0.01); }
+  if (F.iso) { const gL = 1 - liveAmt(t, 'isoL'), gM = 1 - liveAmt(t, 'isoM'), gH = 1 - liveAmt(t, 'isoH'); F.iso.x.gain.setTargetAtTime(gM, tm, 0.01); F.iso.lo.gain.setTargetAtTime(gL - gM, tm, 0.01); F.iso.hi.gain.setTargetAtTime(gH - gM, tm, 0.01); }
+  if (F.frz) {                                       // freeze listens a moment when it starts, then holds what it heard
+    const held = performance.now() - F.frz.at > 300 && amt.frz > 0;
+    F.frz.in.gain.setTargetAtTime(held ? 0 : 1, tm, 0.02); for (const fb of F.frz.fb) fb.gain.setTargetAtTime(held ? 0.998 : 0.82, tm, 0.02);
+    F.frz.wet.gain.setTargetAtTime(amt.frz * 0.5, tm, 0.05);
+    if (!held && amt.frz > 0) { clearTimeout(F.frz.hT); F.frz.hT = setTimeout(() => { if (t.fx.frz === F.frz) applyTrack(t); }, 320); }
+  }
+  if (F.ping) { const pt = Math.min(1.9, beatN() / sr * (t.pDiv || 0.5)); F.ping.in.gain.setTargetAtTime(amt.ping, tm, 0.01); F.ping.l.delayTime.setTargetAtTime(pt, tm, 0.05); F.ping.r.delayTime.setTargetAtTime(pt, tm, 0.05); }
   const rd = liveAmt(t, 'rdly');
   t.rd.gain.setTargetAtTime(rd * 0.7, tm, 0.01);
   if (rd > 0 && running) for (const k of t.takes) if (k.rg && k.buf && (k.rdFor !== k.buf || !k.rsrc)) rdStart(k, nowF() + Math.round(SAFE_S * sr));
+  if (rd === 0) for (const k of t.takes) if (k.rsrc) { try { k.rsrc.stop(tm + 0.1); } catch (e) {} k.rsrc = null; }   // not left playing silently
   /* slice: loop a short piece of the loop, chosen by position and length, in place of the track */
   const slc = Math.max(liveAmt(t, 'slice'), A.slicePos != null || A.sliceLen != null ? 1 : 0);
   t.tk.gain.setTargetAtTime(1 - slc, tm, 0.005); t.sl.gain.setTargetAtTime(slc, tm, 0.005);
@@ -2114,6 +2128,82 @@ function applyLive(t, A) {
       s.connect(k.xg); s.start(tm, i * lenS); k.ssrc = s; k.slKey = key;
     }
   } else if (slc === 0) for (const k of t.takes) if (k.ssrc) { try { k.ssrc.stop(tm + 0.05); } catch (e) {} k.ssrc = null; k.slKey = null; }
+}
+/* Build the live effects that are turned up, and take away those back at zero: the ones in the chain at once (with a
+   short dip so the change does not click), freeze and ping-pong once their sound has died away. */
+const FX_CHAIN = ['ring', 'crush', 'trem', 'band', 'iso'];
+function makeFx(t, k) {
+  const f = { in: gn(1), out: gn(1), nodes: [], osc: [] };
+  const keep = (...ns) => { f.nodes.push(...ns); return ns[0]; };
+  const chain = (src, ...ns) => { let a = src; for (const n of ns) { keep(n); a.connect(n); a = n; } return a; };
+  const pk = (fr, g) => { const b = bq('peaking', fr); b.gain.value = g; b.Q.value = 0.8; return b; };
+  const osc = hz => { const o = ctx.createOscillator(); o.frequency.value = hz; o.start(); f.osc.push(o); return o; };
+  if (k === 'ring') {                                // multiplied by a sine
+    f.dry = keep(gn(1)); f.mul = keep(gn(0)); f.wet = keep(gn(0)); f.o = osc(300); f.o.connect(f.mul.gain);
+    f.in.connect(f.dry); f.in.connect(f.mul); f.mul.connect(f.wet); f.dry.connect(f.out); f.wet.connect(f.out);
+  } else if (k === 'crush') {                        // fewer bits, by a stepped curve
+    f.dry = keep(gn(1)); f.sh = keep(ctx.createWaveShaper()); f.wet = keep(gn(0)); f.bits = 0;
+    f.in.connect(f.dry); f.in.connect(f.sh); f.sh.connect(f.wet); f.dry.connect(f.out); f.wet.connect(f.out);
+  } else if (k === 'trem') {                         // the volume swung by a slow sine
+    f.g = keep(gn(1)); f.dep = keep(gn(0)); f.o = osc(4); f.o.connect(f.dep); f.dep.connect(f.g.gain);
+    f.in.connect(f.g); f.g.connect(f.out);
+  } else if (k === 'band') {                         // telephone and radio
+    f.dry = keep(gn(1)); f.ph = keep(gn(0)); f.ra = keep(gn(0));
+    f.in.connect(f.dry); f.dry.connect(f.out);
+    chain(f.in, bq('highpass', 380), bq('highpass', 380), bq('lowpass', 3000), bq('lowpass', 3000), pk(1200, 3)).connect(f.ph); f.ph.connect(f.out);
+    chain(f.in, bq('highpass', 650), bq('lowpass', 5200), pk(1800, 4)).connect(f.ra); f.ra.connect(f.out);
+  } else if (k === 'iso') {                          // low, mid and high cut by amount; at rest the three add up to the input
+    f.x = keep(gn(1)); f.lo = keep(gn(0)); f.hi = keep(gn(0));
+    f.in.connect(f.x); f.x.connect(f.out);
+    chain(f.in, bq('lowpass', 220), bq('lowpass', 220)).connect(f.lo); f.lo.connect(f.out);
+    chain(f.in, bq('highpass', 2800), bq('highpass', 2800)).connect(f.hi); f.hi.connect(f.out);
+  } else if (k === 'frz') {                          // four combs: a small reverb that, frozen, rings on
+    f.wet = keep(gn(0)); f.fb = []; f.at = performance.now();
+    for (const ms of [31, 37, 41, 47]) {
+      const d = keep(ctx.createDelay(0.1)), lp = keep(bq('lowpass', 6000)), fb = keep(gn(0.82)); d.delayTime.value = ms / 1000;
+      f.in.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); d.connect(f.wet); f.fb.push(fb);
+    }
+    f.wet.connect(f.out);
+  } else if (k === 'ping') {                         // left, then right, in time with the beat; never a zero delay in the loop
+    f.l = keep(ctx.createDelay(2)); f.r = keep(ctx.createDelay(2)); f.fb = keep(gn(0.55)); f.m = keep(ctx.createChannelMerger(2));
+    f.l.delayTime.value = f.r.delayTime.value = Math.min(1.9, beatN() / sr * (t.pDiv || 0.5));
+    f.in.gain.value = 0; f.in.connect(f.l); f.l.connect(f.r); f.r.connect(f.fb); f.fb.connect(f.l);
+    f.l.connect(f.m, 0, 0); f.r.connect(f.m, 0, 1); f.m.connect(f.out);
+  }
+  return f;
+}
+function dropFx(t, k) {
+  const f = t.fx[k]; if (!f) return;
+  clearTimeout(f.hT); clearTimeout(f.rmT);
+  for (const o of f.osc) try { o.stop(); } catch (e) {}
+  for (const n of [f.in, f.out, ...f.nodes, ...f.osc]) try { n.disconnect(); } catch (e) {}
+  delete t.fx[k];
+}
+function syncFx(t, amt) {
+  const tm = ctx.currentTime;
+  for (const k of ['frz', 'ping']) {                // in parallel, from the track's output into its sum
+    const f = t.fx[k];
+    if (amt[k] > 0) {
+      if (!f) { const n = t.fx[k] = makeFx(t, k); t.out.connect(n.in); n.out.connect(t.sum); }
+      else if (f.rmT) { clearTimeout(f.rmT); f.rmT = 0; }
+    } else if (f && !f.rmT) f.rmT = setTimeout(() => { if (t.fx[k] === f) dropFx(t, k); }, k === 'ping' ? 4000 : 1500);   // after the tail
+  }
+  const want = FX_CHAIN.filter(k => amt[k] > 0), order = want.join();
+  if (order === t.fxOrder) return;
+  t.fxOrder = order;
+  const g = t.fxOut.gain; g.cancelScheduledValues(tm); g.setTargetAtTime(0, tm, 0.003);   // a short dip while the chain changes
+  clearTimeout(t.fxT);
+  t.fxT = setTimeout(() => {
+    if (!t.fxIn || t.fxOrder !== order) return;
+    try { t.fxIn.disconnect(); } catch (e) {}
+    for (const k of FX_CHAIN) { const f = t.fx[k]; if (f) try { f.out.disconnect(); } catch (e) {} }
+    for (const k of FX_CHAIN) if (!want.includes(k)) dropFx(t, k);
+    let a = t.fxIn;
+    for (const k of want) { const f = t.fx[k] || (t.fx[k] = makeFx(t, k)); a.connect(f.in); a = f.out; }
+    a.connect(t.fxOut);
+    applyTrack(t);                                   // the new parts get their settings
+    const tt = ctx.currentTime; t.fxOut.gain.cancelScheduledValues(tt); t.fxOut.gain.setTargetAtTime(1, tt, 0.004);
+  }, 15);
 }
 const beatN = () => isFree() ? (freeL || L) / 4 : barsLen(1) / st.beats;
 const liveAmt = (t, key) => Math.max(t[key] || 0, (t.xyA || {})[key] || 0);       // a live trick: its setting, or more from the XY pad
@@ -2136,18 +2226,10 @@ function rdStart(k, at) {
    so all of Varv went quiet. Each track's output is cleaned here; if it happens, the track's own chain is built again. */
 let guardOK = false, guardAt = 0, masterAt = -1e9;
 function addGuard(t) {
-  if (!t.out || t.gd || !guardOK) return;
+  if (!t.sum || t.gd || !guardOK) return;
   let g; try { g = new AudioWorkletNode(ctx, 'varv-guard', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] }); } catch (e) { return; }
-  try { t.out.disconnect(t.post); } catch (e) {}
-  t.out.connect(g); g.connect(t.post); t.gd = g;
-  try {
-    const wg = new AudioWorkletNode(ctx, 'varv-guard', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
-    t.wet.disconnect(mix); t.wet.connect(wg); wg.connect(mix); t.wg = wg;
-    wg.port.onmessage = () => {
-      alog('track ' + (tracks.indexOf(t) + 1) + ': freeze or ping-pong went wrong (freeze ' + liveAmt(t, 'frz').toFixed(2) + ', ping-pong ' + liveAmt(t, 'ping').toFixed(2) + ')');
-      if (performance.now() - guardAt > 2000 && tracks.includes(t)) { guardAt = performance.now(); setTimeout(() => { if (tracks.includes(t) && ctx) { dropTrackNodes(t); buildTrackNodes(t); } }, 300); }
-    };
-  } catch (e) {}
+  try { t.sum.disconnect(t.post); } catch (e) {}
+  t.sum.connect(g); g.connect(t.post); t.gd = g;
   g.port.onmessage = () => {
     const on = ['speed', 'tstop', 'trem', 'lofi', 'ring', 'gran', 'dist', 'ebrk', 'rbrk', 'frz', 'phone', 'radio', 'isoL', 'isoM', 'isoH', 'slice', 'rdly', 'ping'].filter(k => k === 'speed' ? t.speed !== 1 : !!t[k]);
     alog('track ' + (tracks.indexOf(t) + 1) + ': invalid sound removed' + (on.length ? ' (' + on.join(', ') + ')' : '') + (t.xyA ? ' pad: ' + Object.keys(t.xyA).join(', ') : '') + (isSmp(t) ? ', sampler' : ''));
@@ -2164,42 +2246,14 @@ function buildTrackNodes(t) {
   t.inp.connect(t.dDryG); t.dDryG.connect(t.lp); t.dSh.connect(t.dLp); t.dLp.connect(t.dWetG); t.dWetG.connect(t.lp);   // in → clean + distorted → filter
   t.pn = ctx.createStereoPanner ? ctx.createStereoPanner() : null; t.es = gn(0); t.rs = gn(0);
   t.lp.connect(t.hp); t.hp.connect(t.eq[0]);
-  /* live stages for the XY pad, after the EQ: ring modulator, bit crusher, tremolo. At rest they pass the sound through. */
-  t.rmDry = gn(1); t.rmMul = gn(0); t.rmWet = gn(0); t.rmOsc = ctx.createOscillator(); t.rmOsc.frequency.value = 300; t.rmOsc.connect(t.rmMul.gain); t.rmOsc.start();
-  t.crIn = gn(1); t.crDry = gn(1); t.crSh = ctx.createWaveShaper(); t.crWet = gn(0); t.crBits = 0;
-  t.trG = gn(1); t.trDep = gn(0); t.trOsc = ctx.createOscillator(); t.trOsc.frequency.value = 4; t.trOsc.connect(t.trDep); t.trDep.connect(t.trG.gain); t.trOsc.start();
-  t.eq[2].connect(t.rmDry); t.eq[2].connect(t.rmMul); t.rmMul.connect(t.rmWet); t.rmDry.connect(t.crIn); t.rmWet.connect(t.crIn);
-  t.crIn.connect(t.crDry); t.crIn.connect(t.crSh); t.crSh.connect(t.crWet); t.crDry.connect(t.trG); t.crWet.connect(t.trG);
-  /* telephone and radio bands, then the isolator (low, mid and high, cut by amount; at rest it adds up to the input) */
-  t.phIn = gn(1); t.phDry = gn(1); t.phWet = gn(0); t.raWet = gn(0);
-  const chain = (src, ...ns) => { let a = src; for (const n of ns) { a.connect(n); a = n; } return a; };
-  const pk = (f, g) => { const b = bq('peaking', f); b.gain.value = g; b.Q.value = 0.8; return b; };
-  chain(t.phIn, bq('highpass', 380), bq('highpass', 380), bq('lowpass', 3000), bq('lowpass', 3000), pk(1200, 3), t.phWet);
-  chain(t.phIn, bq('highpass', 650), bq('lowpass', 5200), pk(1800, 4), t.raWet);
-  t.trG.connect(t.phIn); t.phIn.connect(t.phDry);
-  t.isoIn = gn(1); t.isoX = gn(1); t.isoLg = gn(0); t.isoHg = gn(0); t.isoOut = gn(1);
-  t.phDry.connect(t.isoIn); t.phWet.connect(t.isoIn); t.raWet.connect(t.isoIn);
-  t.isoIn.connect(t.isoX); t.isoX.connect(t.isoOut);
-  chain(t.isoIn, bq('lowpass', 220), bq('lowpass', 220), t.isoLg, t.isoOut);
-  chain(t.isoIn, bq('highpass', 2800), bq('highpass', 2800), t.isoHg, t.isoOut);
-  t.isoOut.connect(t.g);
+  /* The live effects (ring mod, bit crusher, tremolo, telephone and radio, isolator; freeze and ping-pong) are built
+     only while they are turned up, between fxIn and fxOut or from out into sum (see syncFx), so a track that does not use
+     them costs nothing for them. */
+  t.fxIn = gn(1); t.fxOut = gn(1); t.eq[2].connect(t.fxIn); t.fxIn.connect(t.fxOut); t.fxOut.connect(t.g); t.fx = {}; t.fxOrder = '';
   const out = t.pn || t.g; if (t.pn) t.g.connect(t.pn);
-  t.out = out; t.post = gn(1); out.connect(t.post); t.gd = null; if (guardOK) addGuard(t);   // all that leaves the track passes the guard
+  t.out = out; t.sum = gn(1); out.connect(t.sum); t.post = gn(1); t.sum.connect(t.post); t.gd = null; if (guardOK) addGuard(t);   // all that leaves the track passes the guard
   t.dry = gn(1); t.post.connect(t.dry); t.dry.connect(mix);                 // the breaks mute this while the sends go on
   t.post.connect(t.es); t.es.connect(echoIn); t.post.connect(t.rs); t.rs.connect(revIn);
-  /* freeze: four combs that sound like a small reverb; frozen, their input closes and they ring on */
-  t.fzIn = gn(1); t.fzWet = gn(0); t.fzFb = [];
-  for (const ms of [31, 37, 41, 47]) {
-    const d = ctx.createDelay(0.1), lp = bq('lowpass', 6000), fb = gn(0.82); d.delayTime.value = ms / 1000;
-    t.fzIn.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); d.connect(t.fzWet); t.fzFb.push(fb);
-  }
-  t.wet = gn(1); t.wet.connect(mix); t.wg = null;                       // freeze and ping-pong come back through their own guard
-  t.post.connect(t.fzIn); t.fzWet.connect(t.wet);
-  /* ping-pong delay, in time with the beat */
-  t.ppIn = gn(0); t.ppL = ctx.createDelay(2); t.ppR = ctx.createDelay(2); t.ppFb = gn(0.55); t.ppM = ctx.createChannelMerger(2);
-  t.post.connect(t.ppIn); t.ppIn.connect(t.ppL); t.ppL.connect(t.ppR); t.ppR.connect(t.ppFb); t.ppFb.connect(t.ppL);
-  t.ppL.connect(t.ppM, 0, 0); t.ppR.connect(t.ppM, 0, 1); t.ppM.connect(t.wet);
-  t.ppL.delayTime.value = t.ppR.delayTime.value = 0.25;                   // never zero inside the feedback loop
   t.an = ctx.createAnalyser(); t.an.fftSize = 2048; out.connect(t.an); t.lvS = 0;
   applyTrack(t);
   for (const k of t.takes) { attachTake(k); if (running) startSource(k, nowF() + Math.round(SAFE_S * sr)); }
@@ -2207,8 +2261,8 @@ function buildTrackNodes(t) {
 function dropTrackNodes(t) {
   for (const k of t.takes) detachTake(k);
   if (!t.lp) return;
-  for (const o of [t.rmOsc, t.trOsc]) if (o) try { o.stop(); } catch (e) {}
-  for (const n of [t.inp, t.dDryG, t.dWetG, t.dSh, t.dLp, t.lp, t.hp, t.eq[0], t.eq[1], t.eq[2], t.g, t.pn, t.es, t.rs, t.rmOsc, t.rmDry, t.rmMul, t.rmWet, t.crIn, t.crDry, t.crSh, t.crWet, t.trOsc, t.trDep, t.trG, t.tk, t.sl, t.rd, t.phIn, t.isoOut, t.post, t.gd, t.wet, t.wg, t.ppL, t.ppR, t.ppFb, t.dry, t.fzIn, t.fzWet, t.ppIn, t.ppM]) { if (n) try { n.disconnect(); } catch (e) {} }
+  for (const k of Object.keys(t.fx || {})) dropFx(t, k);
+  for (const n of [t.inp, t.dDryG, t.dWetG, t.dSh, t.dLp, t.lp, t.hp, t.eq[0], t.eq[1], t.eq[2], t.g, t.pn, t.es, t.rs, t.tk, t.sl, t.rd, t.fxIn, t.fxOut, t.sum, t.post, t.gd, t.dry]) { if (n) try { n.disconnect(); } catch (e) {} }
   t.lp = t.g = t.pn = t.an = t.inp = null; t.dOn = false; t.dKey = '';
 }
 /* `at` is an audio-clock time for the gain change, so mute and solo can land on the beat or bar. */
@@ -2224,7 +2278,7 @@ function applyTrack(t, at) {
   t.dry.gain.setTargetAtTime(1 - Math.max(eb, rb), tm, 0.01);           // a break mutes the track and leaves its echo or reverb
   t.es.gain.setTargetAtTime(Math.max(t.echo, A.echo || 0, eb) * 0.8, tm, 0.01);
   t.rs.gain.setTargetAtTime(Math.max(t.rev, A.rev || 0, rb), tm, 0.01);
-  applyDist(t); applyLive(t, A);
+  applyDist(t); applyLive(t, A); revSync();
 }
 function switchAt() {
   if (!ctx || !running || st.muteQ === 'now') return 0;
@@ -2762,7 +2816,7 @@ function trackPane(t) {
   }, changedIn.dist(t), t));
   if (!isSmp(t)) p.append(...fold('pitch', 'Pitch', () => [pitchCard(t)], changedIn.pitch(t), t), ...fold('tune', 'Autotune' + (t.tune ? ' · on' : ''), () => [tuneCard(t)], changedIn.tune(t), t));
   p.append(...fold('tricks', 'Sound tricks', () => {                          // the less usual edits: on a microphone track's takes, and live on any track
-    const mic = t.takes.filter(k => !k.notes), redo = () => { for (const k of mic) k.final = false; markDirty(); };
+    const mic = t.takes.filter(k => !k.notes), redo = () => { clearTimeout(t.trT); t.trT = setTimeout(() => { for (const k of mic) k.final = false; markDirty(); }, 200); };   // rendered again once the slider rests, not on every step
     const tr = k => v => { t[k] = v; redo(); };
     const sp = el('div', 'seg full'), spr = el('div', 'cr'); seg(sp, [[0.5, 'Half speed'], [1, 'Normal'], [2, 'Double']], () => t.speed, v => { t.speed = v; redo(); }, 1); spr.append(sp);
     const tsh = el('div', 'seg full'), tshr = el('div', 'cr'); seg(tsh, [['smooth', 'Smooth'], ['gate', 'Gate'], ['pump', 'Pump']], () => t.tShape, v => { t.tShape = v; redo(); }, 'smooth'); tshr.append(tsh);
