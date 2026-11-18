@@ -559,7 +559,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 10:50</p>
+  <p class="ver">Varv one, build 18 Nov 11:00</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -1992,12 +1992,12 @@ function drawPads() {
     if (n) buildKeys(t, area);
   };
   const setRows = v => { v = clamp(v, 0, 4); if (v === kOctOf(t)) return; t.kOct = v; markDirty(); show(); };
-  const setStart = v => { v = clamp(v, 0, 8 * 7); if (v === kStart(t)) return; t.kW = v; markDirty(); show(); };   // a white key at a time, or an octave with « »
+  /* the keyboard starts on a C or an F, so no black key is cut off at either edge; − and + go to the next one down or up */
+  const starts = w => { const o = Math.floor(w / 7) * 7; return [o - 4, o, o + 3, o + 7, o + 10]; };
+  const setStart = v => { v = clamp(v, 0, 8 * 7); if (v === kStart(t)) return; t.kW = v; markDirty(); show(); };
   dbl(bo, () => { t.kW = null; t.kBase = null; markDirty(); show(); });
-  const p1 = pill(ro, () => setRows(kOctOf(t) - 1), () => setRows(kOctOf(t) + 1)), p2 = pill(bo, () => setStart(kStart(t) - 1), () => setStart(kStart(t) + 1));
-  const oDn = el('button', 'sbtn oj', '«'), oUp = el('button', 'sbtn oj', '»'); oDn.setAttribute('aria-label', 'An octave down'); oUp.setAttribute('aria-label', 'An octave up');
-  oDn.addEventListener('click', () => setStart(kStart(t) - 7)); oUp.addEventListener('click', () => setStart(kStart(t) + 7));
-  p2.prepend(oDn); p2.append(oUp);
+  const p1 = pill(ro, () => setRows(kOctOf(t) - 1), () => setRows(kOctOf(t) + 1));
+  const p2 = pill(bo, () => { const c = kStart(t); setStart(Math.max(...starts(c).filter(w => w < c))); }, () => { const c = kStart(t); setStart(Math.min(...starts(c).filter(w => w > c))); });
   p1.classList.add('sm'); p2.classList.add('sm');
   o1.append(el('span', '', 'Octaves'), p1); o2.append(el('span', '', 'From'), p2); o2.classList.add('pfrom'); opt.append(o1, o2);
   host.append(opt); show();
