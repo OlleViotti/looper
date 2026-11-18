@@ -247,7 +247,9 @@ input[type=range].bi::-webkit-slider-runnable-track{background:linear-gradient(9
 .xyl.et{top:8px;left:50%;transform:translateX(-50%);text-align:center}.xyl.eb{bottom:8px;left:50%;transform:translateX(-50%);text-align:center}
 .xyl.el{left:8px;top:50%;transform:translateY(-50%)}.xyl.er{right:8px;top:50%;transform:translateY(-50%);text-align:right}
 .xyl.ctl{top:8px;left:8px}.xyl.ctr{top:8px;right:8px;text-align:right}.xyl.cbl{bottom:8px;left:8px}.xyl.cbr{bottom:8px;right:8px;text-align:right}
-.xyl.ax{bottom:28px;left:50%;transform:translateX(-50%);color:var(--ink);white-space:nowrap}.xyl.ay{left:8px;top:28%;transform:translate(-35%,-50%) rotate(-90deg);transform-origin:center;color:var(--ink);white-space:nowrap}
+.xyl.ax{bottom:28px;left:50%;transform:translateX(-50%);color:var(--ink);white-space:nowrap}.xyl.ay{left:8px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink);max-width:none}
+.xyl.ay i{font-style:normal}
+.xyl.ay span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap}
 .xysel{background:var(--raise);border:0;border-radius:8px;height:36px;padding:0 8px;color:var(--text);max-width:60%}
 .tktop{display:flex;align-items:center;gap:8px;padding:0 10px}
 .tktop .trk{flex:1;min-width:0;margin:6px 0}
@@ -559,7 +561,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 11:00</p>
+  <p class="ver">Varv one, build 18 Nov 11:10</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -3265,7 +3267,7 @@ function xyPane(t) {
   const pad = el('div', 'xyp'), dot = el('i', 'xydot'), map = t.xyMap || XY_DEF; pad.style.setProperty('--ink', t.ink);
   for (const [slot, cls] of [['t', 'et'], ['b', 'eb'], ['l', 'el'], ['r', 'er'], ['tl', 'ctl'], ['tr', 'ctr'], ['bl', 'cbl'], ['br', 'cbr']]) if (map[slot]) pad.append(el('span', 'xyl ' + cls, xyName(map[slot])));
   if (map.x) pad.append(el('span', 'xyl ax', '→ ' + xyName(map.x)));
-  if (map.y) pad.append(el('span', 'xyl ay', '↑ ' + xyName(map.y)));
+  if (map.y) { const l = el('span', 'xyl ay'); l.append(el('i', '', '↑'), el('span', '', xyName(map.y))); pad.append(l); }   // an upright arrow over text read from the bottom up
   pad.append(dot);
   const show = () => { const p = t.xyP; dot.hidden = !p; if (p) { dot.style.left = p[0] * 100 + '%'; dot.style.top = (1 - p[1]) * 100 + '%'; } rel.hidden = !(t.xyHold && t.xyP); };
   const at = e => { const r = pad.getBoundingClientRect(); return [clamp((e.clientX - r.left) / r.width, 0, 1), clamp(1 - (e.clientY - r.top) / r.height, 0, 1)]; };
