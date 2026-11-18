@@ -315,7 +315,7 @@ body.s-rec #recBtn{background:#fff;color:var(--rec)}
 .orow.on::after{border-color:var(--amber)}
 .mrow{display:flex;align-items:center;gap:12px;min-height:44px;padding:4px 14px;border-top:1px solid rgba(255,255,255,.06)}
 .mrow span{width:42px;color:var(--mut);font-size:15px}
-.sp-in{max-width:560px;margin:0 auto;padding:0 16px calc(28px + env(safe-area-inset-bottom))}
+.sp-in{max-width:560px;margin:0 auto;padding:0 16px calc(118px + env(safe-area-inset-bottom))}   /* room to scroll past the transport bar */
 .sp-head{display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--desk);padding:12px 0 8px;z-index:1}
 .spage h2{font-size:24px;font-weight:600}
 .spage h3,.epane h3{font-size:13px;font-weight:600;color:var(--mut);margin:22px 6px 6px;padding:0;border:0;letter-spacing:.02em}
@@ -571,15 +571,15 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 12:30</p>
+  <p class="ver">Varv one, build 18 Nov 12:40</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
   <div class="sp-head"><h2>Audio</h2><button class="tbtn" id="apDone">Done</button></div>
   <p class="hint" id="hMeasure" hidden></p>
   <div id="apIn"></div>
-  <button class="fh sfh" data-fold="aLat" data-def="1">Latency</button>
-  <div class="sfb">
+  <h3>Latency</h3>
+  <div>
   <div class="card">
     <div class="cr"><span>Headphones</span><div class="pill" id="latStep"><button class="sbtn" data-d="-1" aria-label="Shorter">−</button><output id="latVal"></output><button class="sbtn" data-d="1" aria-label="Longer">+</button></div></div>
     <button class="cr act" id="measLoop"><span>Measure exactly<small>Hold the phone's microphone against an earbud, volume up.</small></span></button>
@@ -589,8 +589,8 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
     <div class="cpad"><button class="tappad" id="tapPad" hidden>Tap on the clicks</button><div class="dots" id="tapDots" hidden></div><p id="tapRes" hidden></p><button class="btn on wide" id="tapUse" hidden></button></div>
   </div>
   </div>
-  <button class="fh sfh" data-fold="aMore">Restart and more</button>
-  <div class="sfb">
+  <h3>Restart and more</h3>
+  <div>
   <div class="card">
     <button class="cr act" id="restartBtn"><span>Restart audio<small>Closes the sound and the microphone and starts them again, as when the app opens. Try it if the delay grows or the sound goes to the wrong place.</small></span></button>
     <div class="cr"><span>Auto level recordings</span><div id="autoLvlSw"></div></div>
