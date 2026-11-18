@@ -295,7 +295,7 @@ select.txt{appearance:auto}
 .eqw output{display:block;font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums;min-height:20px;margin-top:4px}
 
 /* Transport */
-.bar{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:4px 10px calc(10px + env(safe-area-inset-bottom));background:var(--desk)}
+.bar{position:relative;z-index:42;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:4px 10px calc(10px + env(safe-area-inset-bottom));background:var(--desk)}
 .bar button{height:70px;border-radius:14px;background:var(--raise);font-weight:600;font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;line-height:1.05;padding:0 2px}
 .bar svg{width:22px;height:22px;fill:currentColor}
 #recBtn{background:var(--rec);color:#fff}
@@ -444,6 +444,10 @@ kbd{font:inherit;background:var(--raise);border-radius:4px;padding:1px 6px}
 body.s-rec .pads .kb,body.s-rec .pads .pbig,body.s-armed .pads .kb,body.s-armed .pads .pbig{outline:3px solid var(--rec);outline-offset:3px;border-radius:10px}
 body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 .trimw{padding:10px 14px 4px}
+.qback{position:fixed;inset:0;z-index:40;background:rgba(10,12,20,.35)}
+.quick{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom));width:min(540px,calc(100% - 20px));max-height:calc(100% - 160px);overflow-y:auto;z-index:41;background:var(--desk);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.6),0 0 0 1px var(--line);padding:4px 12px 10px}
+.qhead{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 4px}
+.qhead b{font-size:17px}
 .alog{margin:0;padding:6px 14px 12px;font:12px/1.4 ui-monospace,Menlo,monospace;color:var(--mut);white-space:pre-wrap;max-height:220px;overflow:auto;-webkit-user-select:text;user-select:text}
 .finew{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 10px 2px}
 .finev output{display:block;font-size:13px;color:var(--mut);text-align:center;padding-top:4px;font-variant-numeric:tabular-nums}
@@ -475,7 +479,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
       <div id="lanes"></div>
       <p class="hint" id="hTrack" hidden><b>M</b> mutes, <b>S</b> solos, <b>●</b> records a lap, <b>+●</b> adds one on top, the <b>mic</b> records a sample, the <b>keys</b> open its pads.</p>
       <p class="hint" id="hSwipe" hidden><b>Swipe right</b> on a track to edit it, <b>left</b> for settings.</p>
-      <p class="hint" id="hUndo" hidden><b>Undo</b> takes back a recording, <b>Capture last</b> keeps the lap just played.</p>
+      <p class="hint" id="hUndo" hidden><b>Undo</b> takes back a recording, <b>Capture last</b> keeps the lap just played, <b>hold Click</b> for the tempo.</p>
       <div class="row"><button class="addtrk nmcol" id="addTrk" aria-label="Add a track">+</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
       <div class="row masterrow" id="masterRow"><button class="tname nmcol" id="masterName"><b>Master</b><small>effects</small></button><div></div></div>
     </main>
@@ -489,6 +493,8 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
     <p class="hint" id="hScenes" hidden><b>Scenes:</b> hold to store which tracks are muted, tap to bring it back.</p>
   </div>
   <div class="scenes" id="sceneRow"><div class="scn" id="scn" aria-label="Scenes"></div></div>
+  <div class="qback" id="qBack" hidden></div>
+  <section class="quick" id="quick" hidden aria-label="Loop and click"><div class="qhead"><b>Loop and click</b><button class="tbtn" id="quickDone">Done</button></div><div id="quickIn"></div></section>
   <footer class="bar">
     <button id="playBtn"><svg viewBox="0 0 24 24" id="playIco"><path d="M7 4l13 8-13 8z"/></svg><span id="playLbl">Start</span></button>
     <button id="undoBtn"><svg viewBox="0 0 24 24"><path d="M9 5L3 11l6 6v-4h5a4 4 0 010 8h-3v2h3a6 6 0 000-12H9z"/></svg><span>Undo</span></button>
@@ -505,7 +511,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="toAudio"><span>Audio settings<small>Microphone, output and latency. Also opens from the in and out meters at the top.</small></span></button></div>
 
   <h3>Loop and click</h3>
-  <div>
+  <div id="loopHome"><div id="loopBox">
   <div class="card">
     <div class="cr"><span>Length</span><div class="seg" id="lenSeg"></div></div>
     <div id="barsBox">
@@ -515,13 +521,14 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
       <div class="cr"><span>Bars per lap</span><div class="pill" id="barsStep"><button class="sbtn" data-d="-1" aria-label="Fewer">−</button><output id="barsVal"></output><button class="sbtn" data-d="1" aria-label="More">+</button></div></div>
     </div>
     <p class="cnote" id="freeNote" hidden></p>
-    <p class="cnote warn" id="tempoLock" hidden>Locked while there are recordings. Start a new project to change it.</p>
+    <p class="cnote warn" id="tempoWarn" hidden></p>
+    <p class="cnote" id="tempoLock" hidden>Beats per bar, bars per lap and the length are fixed while there are recordings.</p>
   </div>
   <div class="card">
     <div class="cr"><span>Click</span><div id="clickSw"></div></div>
     <div id="clickVolRow"></div>
   </div>
-  </div>
+  </div></div>
 
   <button class="fh sfh" data-fold="sFiles">Projects and files</button>
   <div class="sfb">
@@ -561,7 +568,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 11:20</p>
+  <p class="ver">Varv one, build 18 Nov 12:00</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -678,6 +685,9 @@ const latN = ms => Math.round(ms / 1000 * sr);
    in free mode every track has the length set by the first recording. */
 const isFree = () => st.lenMode === 'free';
 const barsLen = b => Math.round(b * st.beats * 60 / st.bpm * sr);
+/* A take keeps the length and tempo it was recorded at (len0, bpm0); at another tempo it is stretched to k.len. */
+const len0Of = k => k.len0 || k.len;
+const takeBars = k => Math.max(1, Math.round(len0Of(k) / (st.beats * 60 / (k.bpm0 || st.bpm) * sr)));
 const loopFrames = () => isFree() ? freeL : barsLen(st.bars);
 const trackBars = t => t.bars || st.bars;
 const trackLen = t => isFree() ? freeL : barsLen(trackBars(t));
@@ -1094,7 +1104,7 @@ function addTake(r, auto, lat) {
   t.takes.push({ id: ++uid, key: rid(), k: r.k, len: r.len, run: runId, F0, rawStart: F0 - PRE, raw: ev ? null : new Float32Array(r.len + XF + MAXLAT + 8), filled: 0,
     notes: ev ? [] : null, span: r.len + MAXLAT + 8, sig: '',
     lat: lat == null ? (ev ? prof().scr : prof().ms) : lat, reverse: false, norm: ev ? 1 : null, peak: 0, peaks: null, buf: null, src: null, tg: null,
-    final: false, started: false, full: false, auto, track: t, savedTo: null, od: r.od != null ? !!r.od : !!st.overdub });   // the big Record button follows Overdub in Settings
+    final: false, started: false, full: false, auto, track: t, savedTo: null, od: r.od != null ? !!r.od : !!st.overdub, len0: r.len, bpm0: st.bpm });   // the big Record button follows Overdub in Settings
   if (armedId === t.id) { armedId = null; drawHeads(); }        // armed for one recording
   touched(t); drawHead(t); ensureProject();
   return t;
@@ -1136,7 +1146,7 @@ function fillRaw(k) {
    The seam sits PRE before the downbeat so an early hit on the one is kept whole,
    and XF crossfades the seam. Two consecutive laps then sum to exactly the original. */
 function render(k) {
-  const N0 = k.len; let out = k.notes ? renderNotes(k) : new Float32Array(N0);
+  const N0 = len0Of(k); let out = k.notes ? renderNotes(k) : new Float32Array(N0);
   if (!k.notes) {
     const d = clamp(latN(k.lat), 0, MAXLAT), raw = k.raw, filled = k.filled;
     const N = N0;
@@ -1147,6 +1157,7 @@ function render(k) {
       out[pos] += w * raw[ri];
     }
     if (k.reverse) out.reverse();
+    if (k.len !== N0) out = stretchLen(out, k.len);       // another tempo: slowed or sped up here, its pitch put back below
     out = tricks(k.track, out);
   }
   let pk = 0; const NB = 600, peaks = new Float32Array(NB), N = out.length;
@@ -1158,7 +1169,7 @@ function render(k) {
   k.peaks = peaks; k.peak = pk;
   if (k.norm == null) k.norm = st.autoLevel && pk > 0.003 ? clamp(0.6 / pk, 1, 12) : 1;
   if (k.notes) { k.pend = false; k.buf = mkBuf(out); return; }    // pitch and autotune are already in the sample
-  const gen = k.pgen = (k.pgen || 0) + 1, t = k.track, r = pitchRatio(t), tune = tuneOf(t);
+  const gen = k.pgen = (k.pgen || 0) + 1, t = k.track, r = pitchRatio(t) * (k.len / N0), tune = tuneOf(t);   // the tempo stretch changed the pitch by N0/len
   if (Math.abs(r - 1) < 1e-6 && !tune) { k.pend = false; k.buf = mkBuf(out); return; }
   k.pend = true;                                          // the transposed loop arrives from the worker; until then the old buffer keeps playing
   pvJob(out, r, tune).then(y => {
@@ -1222,6 +1233,15 @@ function tricks(t, x) {
     for (let i = 0; i < N; i++) { if (i % hold === 0) v = Math.round(x[i] * q) / q; x[i] = v; }
   }
   return x;
+}
+/* Resample a loop to a new length (cubic), which changes its speed and pitch; the pitch is then put back by the transposer. */
+function stretchLen(x, n) {
+  const N = x.length, y = new Float32Array(n), st0 = N / n;
+  for (let i = 0; i < n; i++) {
+    const p = i * st0, j = Math.floor(p), f = p - j, a = x[(j - 1 + N) % N], b = x[j % N], c = x[(j + 1) % N], d = x[(j + 2) % N];
+    y[i] = b + 0.5 * f * (c - a + f * (2 * a - 5 * b + 4 * c - d + f * (3 * (b - c) + d - a)));
+  }
+  return y;
 }
 function mkBuf(d) { const b = ctx.createBuffer(1, d.length, sr); if (b.copyToChannel) b.copyToChannel(d, 0); else b.getChannelData(0).set(d); return b; }
 
@@ -1823,15 +1843,15 @@ function setSample(t, raw) {
 /* Notes are resampled from the processed sample (cubic interpolation), so a key plays the sample faster
    or slower, like a classic sampler. A tail that runs past the end of the loop comes round at its start. */
 function renderNotes(k) {
-  const t = k.track, s = t.sample, N = k.len, out = new Float32Array(N), d = clamp(latN(k.lat), 0, MAXLAT);
+  const t = k.track, s = t.sample, N = k.len, N0 = len0Of(k), sc = N / N0, out = new Float32Array(N), d = clamp(latN(k.lat), 0, MAXLAT);   // sc: notes move with the tempo
   const lp = t.sGate && s && s.loop && s.lproc ? s.loop : null, y = lp ? s.lproc : s && s.proc, fade = Math.max(16, Math.round(envOf(t).r / 1000 * sr));
   if (!y) return out;
   const LL = lp ? lp.e - lp.s : 0, at = lp ? i => i < lp.e ? y[i] : y[lp.s + (i - lp.s) % LL] : i => y[i];   // a Held note goes round its loop
   for (const e of k.notes) {
-    const q = e.A - k.rawStart - d; if (q < 0 || q >= N) continue;
-    const r = noteRatio(t, e.n), pos = (((q - PRE) % N) + N) % N;
+    const q = e.A - k.rawStart - d; if (q < 0 || q >= N0) continue;
+    const r = noteRatio(t, e.n), pos = Math.round(((((q - PRE) % N0) + N0) % N0) * sc) % N;
     let m = lp ? N : Math.min(Math.floor((y.length - 2) / r), N), g0 = Infinity;
-    if (t.sGate && e.O != null) { g0 = Math.max(0, e.O - e.A); m = Math.min(m, g0 + fade); }
+    if (t.sGate && e.O != null) { g0 = Math.round(Math.max(0, e.O - e.A) * sc); m = Math.min(m, g0 + fade); }
     for (let j = 0; j < m; j++) {
       const x = j * r, i = x | 0, f = x - i, xm = i > 0 ? at(i - 1) : 0, x0 = at(i), x1 = at(i + 1) || 0, x2 = at(i + 2) || 0;
       let v = x0 + 0.5 * f * (x1 - xm + f * (2 * xm - 5 * x0 + 4 * x1 - x2 + f * (3 * (x0 - x1) + x2 - xm)));
@@ -3330,6 +3350,7 @@ function masterPane() {
 /* ---------- modes: play, edit (swipe right), settings (swipe left) ---------- */
 function setShift() { const tp = $('#tape'); tp.style.setProperty('--shift', Math.max(0, tp.clientWidth - 32 - parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nw'))) + 'px'); }
 function setMode(m) {
+  closeQuick();
   if (m === mode) return;
   if (m !== 'play') closePads();
   if (mode === 'edit' && !st.hints.edit) { st.hints.edit = 1; save(); }
@@ -3596,10 +3617,10 @@ async function saveProject() {
         return { key: s.key, a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev, env: s.env, comp: s.comp };
       })(t.sample),
       takes: t.takes.filter(k => k.full && k.started).map(k => {
-        if (k.notes) return { key: k.key, lat: k.lat, off: !!k.off, pin: !!k.pin, solo: !!k.solo, bars: isFree() ? null : Math.round(k.len / barsLen(1)), notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
+        if (k.notes) return { key: k.key, lat: k.lat, off: !!k.off, pin: !!k.pin, solo: !!k.solo, bars: isFree() ? null : takeBars(k), bpm0: k.bpm0 || st.bpm, notes: k.notes.map(e => [e.A - k.rawStart, e.n, e.O == null ? null : e.O - k.rawStart]) };
         keep.add(k.key);
         if (k.savedTo !== pid) { puts.push([pid + '/' + k.key, k.raw.slice(0, k.filled)]); k.savedTo = pid; }
-        return { key: k.key, lat: k.lat, off: !!k.off, pin: !!k.pin, solo: !!k.solo, od: !!k.od, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : Math.round(k.len / barsLen(1)) };
+        return { key: k.key, lat: k.lat, off: !!k.off, pin: !!k.pin, solo: !!k.solo, od: !!k.od, reverse: k.reverse, norm: k.norm, bars: isFree() ? null : takeBars(k), bpm0: k.bpm0 || st.bpm };
       }) })) };
   const prev = saving;
   const job = (async () => {
@@ -3678,8 +3699,8 @@ async function openProject(id) {
     for (const km of tm.takes || []) {
       if (km.notes) {                                     // a lap of notes: rendered from the sample once it is ready
         if (!t.sample || (isFree() && !freeL)) { missing++; continue; }
-        const len = isFree() ? freeL : barsLen(km.bars || tm.bars || meta.bars);
-        t.takes.push({ id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw: null, span: len + MAXLAT + 8, sig: '', off: !!km.off, pin: !!km.pin, solo: !!km.solo,
+        const nb = km.bars || tm.bars || meta.bars, b0 = km.bpm0 || meta.bpm, len = isFree() ? freeL : barsLen(nb), len0 = isFree() ? freeL : Math.round(nb * st.beats * 60 / b0 * sr);
+        t.takes.push({ id: ++uid, key: km.key, k: -1, len, len0, bpm0: b0, run: -1, F0: 0, rawStart: 0, raw: null, span: len + MAXLAT + 8, sig: '', off: !!km.off, pin: !!km.pin, solo: !!km.solo,
           notes: km.notes.map(([p, n, o]) => ({ A: Math.round(p * ratio), n, O: o == null ? null : Math.round(o * ratio), tid: t.id })),
           filled: 0, lat: km.lat, reverse: false, norm: 1, peak: 0, peaks: null, buf: null, src: null, tg: null,
           final: false, started: true, full: true, auto: false, track: t, savedTo: same ? id : null });
@@ -3688,8 +3709,8 @@ async function openProject(id) {
       let raw = null; try { raw = await dbGet('audio', id + '/' + km.key); } catch (e) {}
       if (!raw || (isFree() && !freeL)) { missing++; continue; }
       if (!same) raw = resample(raw, ratio);
-      const len = isFree() ? freeL : barsLen(km.bars || tm.bars || meta.bars);
-      const k = { id: ++uid, key: km.key, k: -1, len, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, off: !!km.off, pin: !!km.pin, solo: !!km.solo, od: !!km.od, reverse: !!km.reverse,
+      const nb = km.bars || tm.bars || meta.bars, b0 = km.bpm0 || meta.bpm, len = isFree() ? freeL : barsLen(nb), len0 = isFree() ? freeL : Math.round(nb * st.beats * 60 / b0 * sr);
+      const k = { id: ++uid, key: km.key, k: -1, len, len0, bpm0: b0, run: -1, F0: 0, rawStart: 0, raw, filled: raw.length, lat: km.lat, off: !!km.off, pin: !!km.pin, solo: !!km.solo, od: !!km.od, reverse: !!km.reverse,
         norm: km.norm == null ? null : km.norm, peak: 0, peaks: null, buf: null, src: null, tg: null,
         final: true, started: true, full: true, auto: false, track: t, savedTo: same ? id : null };
       render(k); t.takes.push(k); attachTake(k);
@@ -3763,7 +3784,9 @@ function ui() {
   $('#perfInd').hidden = !perf; $('#perfBtn').firstChild.textContent = perf ? 'Stop recording performance' : 'Record performance'; $('#perfBtn').classList.toggle('on', !!perf);
   $('#projName').textContent = project ? project.name : hasContent() ? 'unsaved' : '';
   const lk = locked(); $('#tempoLock').hidden = !lk;
-  for (const b of document.querySelectorAll('#bpmStep .sbtn, #beatsStep .sbtn, #barsStep .sbtn, #tapBtn, #lenSeg button')) b.disabled = lk;
+  for (const b of document.querySelectorAll('#beatsStep .sbtn, #barsStep .sbtn, #lenSeg button')) b.disabled = lk;
+  { const au = allTakes().filter(k => !k.notes), w = $('#tempoWarn'); w.hidden = !au.length;   // the tempo stays free; a word on what it costs audio
+    if (au.length) { const b0 = [...new Set(au.map(k => k.bpm0 || st.bpm))]; w.textContent = 'Audio recordings are time-stretched to the tempo, which costs some sound quality, more the further it is from where they were recorded (' + b0.join(', ') + ' bpm); past about 10 % it smears, most on sharp attacks. Sampler laps keep their sound.'; } }
   $('#barsBox').hidden = isFree(); $('#freeNote').hidden = !isFree();
   $('#freeNote').textContent = freeL ? 'The loop is ' + (freeL / sr).toFixed(2) + ' s long, set by the first recording.' : 'Tap Record, play, and tap End loop. That sets the length of every track. No click in this mode.';
   $('#beatsVal').textContent = st.beats; $('#barsVal').textContent = st.bars;
@@ -3920,10 +3943,32 @@ async function wake(on) {
   } catch (e) {}
 }
 
+/* The tempo can change at any time. The number follows each step at once; the loops are rebuilt for it only when
+   the steps have rested a moment, since that means stretching every recording again. Sampler laps simply move their
+   notes; audio takes are slowed or sped up and given back their pitch. */
+let tempoT = 0, tempoAt = null;
 function setTempo(fn) {
-  if (locked()) return;
-  fn(); st.bpm = clamp(Math.round(st.bpm), 40, 240); save(); buildRuler(); applyGlobalFx(); ui(); markDirty();
-  if (running) { stop(); start(false); }
+  if (rec || defining || measuring || srec) { toast('Change the tempo when nothing is recording.'); return; }
+  if (tempoAt == null) tempoAt = st.bpm;
+  fn(); st.bpm = clamp(Math.round(st.bpm), 40, 240); save(); ui();
+  clearTimeout(tempoT); tempoT = setTimeout(applyTempo, 700);
+}
+function applyTempo() {
+  const from = tempoAt; tempoAt = null;
+  if (from == null || from === st.bpm) return;
+  const was = running; if (running) stop();
+  L = loopFrames(); if (ctx) ensureRing(); buildRuler(); if (ctx) applyGlobalFx(); markDirty();
+  const ks = allTakes().concat(...trash.map(it => it.take ? [it.take] : it.takes || (it.track ? it.track.takes : [])));
+  let audio = 0, far = 0;
+  for (const k of new Set(ks)) {
+    if (!k.bpm0) { k.bpm0 = from; k.len0 = k.len; }          // a take from before: recorded at the earlier tempo
+    k.len = isFree() ? freeL : barsLen(takeBars(k)); k.final = false;
+    if (!k.notes) { audio++; far = Math.max(far, Math.abs(st.bpm / k.bpm0 - 1)); k.buf = null; }   // silent until it is stretched anew
+  }
+  for (const t of tracks) drawLane(t);
+  if (audio && far > 0.12) toast('Recordings stretched ' + Math.round(far * 100) + ' % from their tempo: expect some smearing, most on sharp attacks.');
+  if (was) start(false);
+  ui();
 }
 
 function setClick(v) {
@@ -3967,7 +4012,21 @@ const startStop = () => { if (running || defining) stop(); else start(false); };
 pressable($('#recBtn'), toggleRec, startStop, true);
 $('#undoBtn').addEventListener('click', undoLast);
 $('#capBtn').addEventListener('click', capturePrev);
-$('#clickBtn').addEventListener('click', () => setClick(!st.clickOn));
+/* Click: tap turns it on or off; hold opens Loop and click (tempo, beats, bars, click) right here, over whatever is on
+   screen, the pads included. The settings are the same ones as in Settings, moved over while the panel is open. */
+let clickHeld = false, clickHT = 0;
+$('#clickBtn').addEventListener('pointerdown', () => { clickHeld = false; clearTimeout(clickHT); clickHT = setTimeout(() => { clickHeld = true; openQuick(); }, 450); });
+for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) $('#clickBtn').addEventListener(ev, () => clearTimeout(clickHT));
+$('#clickBtn').addEventListener('click', () => { if (clickHeld) { clickHeld = false; return; } setClick(!st.clickOn); });
+$('#clickBtn').addEventListener('contextmenu', e => e.preventDefault());
+function openQuick() {
+  $('#quickIn').append($('#loopBox')); $('#quick').hidden = false; $('#qBack').hidden = false; ui();
+}
+function closeQuick() {
+  if ($('#quick').hidden) return;
+  $('#loopHome').append($('#loopBox')); $('#quick').hidden = true; $('#qBack').hidden = true;
+}
+$('#quickDone').addEventListener('click', closeQuick); $('#qBack').addEventListener('click', closeQuick);
 for (const [id, n] of [['hTrack', 'track'], ['hSwipe', 'swipe'], ['hUndo', 'undo'], ['hScenes', 'scenes']]) $('#' + id).addEventListener('click', () => hintDone(n));   // tap a hint to put it away
 $('#hMeasure').addEventListener('click', () => { st.hints.measureH = st.hints.measureS = 1; save(); ui(); });
 $('#addTrk').addEventListener('click', () => { const t = newTrack(); touched(t); ui(); if (mode === 'edit') selectTrack(t.id); t.row.scrollIntoView({ block: 'nearest' }); });
@@ -3982,8 +4041,14 @@ $('#tapBtn').addEventListener('pointerdown', () => {
   taps.push(t); if (taps.length > 5) taps.shift();
   if (taps.length >= 2) setTempo(() => { st.bpm = 60000 / ((taps[taps.length - 1] - taps[0]) / (taps.length - 1)); });
 });
-for (const b of document.querySelectorAll('#beatsStep .sbtn')) hold(b, () => setTempo(() => { st.beats = clamp(st.beats + +b.dataset.d, 1, 16); }));
-for (const b of document.querySelectorAll('#barsStep .sbtn')) hold(b, () => setTempo(() => { st.bars = clamp(st.bars + +b.dataset.d, 1, 32); }));
+/* beats per bar and bars per lap: fixed while there are recordings */
+function setBarsBeats(fn) {
+  if (locked()) return;
+  fn(); save(); L = loopFrames(); buildRuler(); if (ctx) applyGlobalFx(); ui(); markDirty();
+  if (running) { stop(); start(false); }
+}
+for (const b of document.querySelectorAll('#beatsStep .sbtn')) hold(b, () => setBarsBeats(() => { st.beats = clamp(st.beats + +b.dataset.d, 1, 16); }));
+for (const b of document.querySelectorAll('#barsStep .sbtn')) hold(b, () => setBarsBeats(() => { st.bars = clamp(st.bars + +b.dataset.d, 1, 32); }));
 function drawLenSeg() {
   seg($('#lenSeg'), [['bars', 'Bars'], ['free', 'Free']], () => st.lenMode, v => {
     if (locked()) { toast('Start a new project to change this.'); drawLenSeg(); return; }
@@ -3993,8 +4058,8 @@ function drawLenSeg() {
 drawLenSeg();
 
 dbl($('#bpmVal'), () => setTempo(() => { st.bpm = 100; }));
-dbl($('#beatsVal'), () => setTempo(() => { st.beats = 4; }));
-dbl($('#barsVal'), () => setTempo(() => { st.bars = 2; }));
+dbl($('#beatsVal'), () => setBarsBeats(() => { st.beats = 4; }));
+dbl($('#barsVal'), () => setBarsBeats(() => { st.bars = 2; }));
 dbl($('#latVal'), () => { prof().ms = LAT_DEF; save(); ui(); });
 for (const b of document.querySelectorAll('#latStep .sbtn')) hold(b, () => { const p = prof(); p.ms = clamp(p.ms + +b.dataset.d, 0, MAXLAT_MS); p.guess = false; save(); ui(); });
 $('#measLoop').addEventListener('click', measure);
