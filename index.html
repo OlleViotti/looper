@@ -42,8 +42,8 @@ h1,h2,h3,p{margin:0}
 .mtr.mo b{transform-origin:right}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 #stateText{font-size:22px;font-weight:600;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.ring{width:80px;height:80px;flex:none;display:block}
-.bar #loopBtn{background:#0d0f17;padding:0;height:84px;margin-top:-12px;border-radius:20px;align-self:end}   /* a little larger than the buttons, rising above the bar */   /* the mark, as the app icon, in the middle of the bar */
+.ring{width:100px;height:100px;flex:none;display:block;margin:-15px 0}
+.bar #loopBtn{background:transparent;padding:0;overflow:visible}   /* the circle itself a little larger than the buttons, out above and below them */   /* a little larger than the buttons, rising above the bar */   /* the mark, as the app icon, in the middle of the bar */
 .mtr{display:block;height:5px;border-radius:3px;background:var(--raise);overflow:hidden}
 .mtr b{display:block;height:100%;background:var(--tape);transform-origin:left;transform:scaleX(0)}
 .mtr.hot b{background:var(--amber)}
@@ -309,12 +309,14 @@ select.txt{appearance:auto}
 .eqw output{display:block;font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums;min-height:20px;margin-top:4px}
 
 /* Transport */
-.bar{position:relative;z-index:42;display:grid;grid-template-columns:1fr 1fr 1.22fr 1fr 1fr;align-items:end;gap:6px;padding:16px 10px calc(10px + env(safe-area-inset-bottom));background:var(--desk)}
+.bar{position:relative;z-index:42;display:grid;grid-template-columns:1fr 1fr 1.3fr 1fr 1fr;align-items:end;gap:6px;padding:14px 10px calc(10px + env(safe-area-inset-bottom));background:var(--desk)}
 .bar button{height:70px;border-radius:14px;background:var(--raise);font-weight:600;font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;line-height:1.05;padding:0 2px}
 .bar svg{width:22px;height:22px;fill:currentColor}
 #recBtn{background:var(--rec);color:#fff}
 body.s-armed #recBtn{background:var(--raise);box-shadow:inset 0 0 0 3px var(--rec);animation:blink .5s steps(2,jump-none) infinite}
 body.s-rec #recBtn{background:#fff;color:var(--rec)}
+@keyframes glow{50%{box-shadow:inset 0 0 0 2px rgba(255,178,36,.25),0 0 0 4px rgba(255,178,36,.12)}}
+.glow{box-shadow:inset 0 0 0 2px var(--amber),0 0 0 4px rgba(255,178,36,.28);border-radius:12px;animation:glow 1.6s ease-in-out infinite}
 @keyframes blink{50%{box-shadow:inset 0 0 0 3px transparent}}
 
 /* Settings page */
@@ -458,7 +460,7 @@ body.s-rec .pads .kb,body.s-rec .pads .pbig,body.s-armed .pads .kb,body.s-armed 
 body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 .trimw{padding:10px 14px 4px}
 .qback{position:fixed;inset:0;z-index:40;background:rgba(10,12,20,.35)}
-.quick{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(112px + env(safe-area-inset-bottom));width:min(540px,calc(100% - 20px));max-height:calc(100% - 160px);overflow-y:auto;z-index:41;background:var(--desk);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.6),0 0 0 1px var(--line);padding:4px 12px 10px}
+.quick{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(108px + env(safe-area-inset-bottom));width:min(540px,calc(100% - 20px));max-height:calc(100% - 160px);overflow-y:auto;z-index:41;background:var(--desk);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.6),0 0 0 1px var(--line);padding:4px 12px 10px}
 .qhead{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 4px}
 .qhead b{font-size:17px}
 .hback{flex:none;color:var(--amber);font-size:14px;margin-left:10px}
@@ -609,7 +611,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 16:10</p>
+  <p class="ver">Varv one, build 19 Nov 16:30</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -3747,7 +3749,7 @@ function setMode(m) {
   if (m !== 'play') closePads();
   if (mode === 'edit' && !st.hints.edit) { st.hints.edit = 1; save(); }
   if (mode === 'edit' && paneFor != null) { memLeave(paneFor, $('#epane').scrollTop); paneFor = null; }   // leaving: remembered for 30 s
-  if (mode === 'set') memLeave('settings', $('#spage').scrollTop);
+  if (mode === 'set') { memLeave('settings', $('#spage').scrollTop); guideOff(); }
   setShift(); setHH(); $('#tape').scrollLeft = 0; mode = m; document.body.dataset.mode = m;
   if (m === 'edit') {
     paneFor = null;
@@ -3921,10 +3923,10 @@ function drawMark(level) {
     for (let k = 0; k < MARK_N; k++) { const v = n ? mW(Math.abs(mbuf[Math.floor(k / MARK_N * n)]) * 3) : 0; markAmp[k] = markAmp[k] * 0.7 + v * 0.3; }
   }
   g.clearRect(0, 0, w, h);
-  const ink = '#ece5d0', S = R * 0.9, rc = S * 0.59;   // as in the app icon: each spoke swings both ways from a middle circle
-  g.lineCap = 'round'; g.lineWidth = Math.max(1, S * 0.05);
+  const ink = '#ece5d0', S = R, rc = S * 0.66;   // as in the app icon: each spoke swings both ways from a middle circle
+  g.lineCap = 'round'; g.lineWidth = Math.max(1.2, S * 0.045);
   for (let k = 0; k < MARK_N; k++) {
-    const a = -Math.PI / 2 + k / MARK_N * 2 * Math.PI, hl = S * (0.05 + 0.3 * markAmp[k]);
+    const a = -Math.PI / 2 + k / MARK_N * 2 * Math.PI, hl = S * (0.05 + 0.28 * markAmp[k]);
     const ahead = play && ((k - head + MARK_N) % MARK_N) > 0 && ((k - head + MARK_N) % MARK_N) <= 5;
     g.globalAlpha = ahead || (!play && !running) ? 0.32 + (play ? 0 : 0.5 * markAmp[k]) : 1; g.strokeStyle = ink;
     g.beginPath(); g.moveTo(cx + Math.cos(a) * (rc - hl), cy + Math.sin(a) * (rc - hl)); g.lineTo(cx + Math.cos(a) * (rc + hl), cy + Math.sin(a) * (rc + hl)); g.stroke();
@@ -3933,7 +3935,7 @@ function drawMark(level) {
   if (play) {                                        // the playhead, the icon's amber hand
     const a = -Math.PI / 2 + ringV * 2 * Math.PI;
     g.strokeStyle = '#ffb224'; g.lineWidth = Math.max(1.2, S * 0.055);
-    g.beginPath(); g.moveTo(cx + Math.cos(a) * S * 0.31, cy + Math.sin(a) * S * 0.31); g.lineTo(cx + Math.cos(a) * S * 0.88, cy + Math.sin(a) * S * 0.88); g.stroke();
+    g.beginPath(); g.moveTo(cx + Math.cos(a) * S * 0.31, cy + Math.sin(a) * S * 0.31); g.lineTo(cx + Math.cos(a) * S * 0.95, cy + Math.sin(a) * S * 0.95); g.stroke();
   }
   if (markCount != null) {                           // a count-in: the beats left, in the middle
     g.fillStyle = '#ff3d57'; g.font = '800 ' + Math.round(S * 0.62) + 'px ' + getComputedStyle(document.body).fontFamily;
@@ -4309,12 +4311,20 @@ function testTone() {
   for (let k = 0; k < 3; k++) { const s = ctx.createBufferSource(); s.buffer = b; s.connect(g); s.start(ctx.currentTime + 0.05 + k * 0.3); }
   setTimeout(() => { try { g.disconnect(); } catch (e) {} }, 1500);
 }
+/* The first steps on the audio page are marked as they come: Start audio, then the two measurements. The marks go out
+   as soon as you go elsewhere, and do not come back. */
+let audioGuide = null;
+function guideOff() { if (!audioGuide) return; audioGuide = null; for (const n of document.querySelectorAll('#spage .glow')) n.classList.remove('glow'); }
 async function drawAudio() {
   const host = $('#apIn'), sh = $('#apStart'); host.textContent = ''; sh.textContent = '';   // first Start audio, then Latency, then the microphone and output
+  const h = st.hints || {};
+  $('#measLoop').classList.toggle('glow', audioGuide === 'measure' && !(h.measureH || h.measure));   // what to do next is marked, until you go elsewhere
+  $('#measTap').classList.toggle('glow', audioGuide === 'measure' && !h.measureS);
   if (!ctx) {
     const go = el('button', 'cr act'); go.append(el('span', '', 'Start audio'));
-    go.addEventListener('click', async () => { await initAudio(); drawAudio(); ui(); });
-    sh.append(card(go, el('p', 'cnote', 'Starts the microphone and the sound, so they can be chosen and checked here.'))); return;
+    go.addEventListener('click', async () => { await initAudio(); if (audioGuide) audioGuide = 'measure'; drawAudio(); ui(); });
+    const c = card(go, el('p', 'cnote', 'Starts the microphone and the sound, so they can be chosen and checked here.')); if (audioGuide === 'start') c.classList.add('glow');
+    sh.append(c); return;
   }
   const mrow = (label, id) => { const r = el('div', 'mrow'), m = el('i', 'mtr big'); m.id = id; m.append(el('b')); r.append(el('span', '', label), m); return r; };
   // input
@@ -4439,7 +4449,7 @@ function drawSetFolds() {
   for (const f of setFoldShow) f();
   const m = memOf('settings'), cur = 'page' in m.f ? m.f.page : 'loop';
   const g = tileGrid([[null, [['audio', 'Audio'], ['loop', 'Loop'], ['rec', 'Behaviour'], ['files', 'Projects'], ['help', 'Help']]]], cur, {},
-    k => { m.f.page = k || cur; drawSetFolds(); $('#spage').scrollTop = 0; });
+    k => { if ((k || cur) !== 'audio') guideOff(); m.f.page = k || cur; drawSetFolds(); $('#spage').scrollTop = 0; });
   $('#setTiles').replaceChildren(g);
   for (const d of document.querySelectorAll('#spage .spg')) d.hidden = d.dataset.pg !== cur;
   if (cur === 'audio' && mode === 'set' && typeof drawAudio === 'function') drawAudio();
@@ -4462,7 +4472,7 @@ pressable($('#undoBtn'), undoLast, openHistory, true);
 $('#capBtn').addEventListener('click', capturePrev);
 /* Click: tap turns it on or off; hold opens Loop and click (tempo, beats, bars, click) right here, over whatever is on
    screen, the pads included. The settings are the same ones as in Settings, moved over while the panel is open. */
-$('#loopBtn').addEventListener('click', () => openQuick());   // the mark: loop and click, with the click switch
+$('#loopBtn').addEventListener('click', () => { if (!$('#quick').hidden && $('#quickIn').contains($('#loopBox'))) closeQuick(); else openQuick(); });   // the circle: loop and click, again to close
 /* A panel above the transport bar, over whatever is on screen: Loop and click (the circle in the bar), the record options (hold
    Record) and the undo history (hold Undo). The transport stays usable; a tap outside or Done closes it. */
 let quickClose = null, quickFill = null;
@@ -4593,6 +4603,7 @@ window.addEventListener('resize', () => { setShift(); setHH(); for (const t of t
 freshTracks(); dirty = false;
 buildRuler(); drawScenes(); ui(); requestAnimationFrame(frame);
 requestAnimationFrame(() => drawMark(0));
+if (!ctx) audioGuide = 'start';
 openAudio();                                       // Varv opens on the audio page in Settings, with Start audio at the top
 /* redraw the waveforms whenever the rows change height */
 if (window.ResizeObserver) new ResizeObserver(() => { for (const t of tracks) drawLane(t); }).observe($('#lanes'));
