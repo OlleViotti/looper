@@ -622,7 +622,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 14:00</p>
+  <p class="ver">Varv one, build 19 Nov 14:20</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -3062,8 +3062,8 @@ function tileGrid(rows, cur, on, pick) {          // rows: [label, [[key, name, 
   return box;
 }
 function tilePages(ink, rows, on, PAGES, fresh) {
-  const m = memOf(selId), cur = 'tile' in m.f ? m.f.tile : fresh;
-  if (fresh && !('tile' in m.f)) m.f.tile = fresh;          // stays open, also once the sample is gone
+  const m = memOf(selId), cur = 'tile' in m.f ? m.f.tile : fresh || 'mix';   // otherwise Mix, the first live page
+  if (!('tile' in m.f)) m.f.tile = cur;          // stays open, also once the sample is gone
   const box = tileGrid(rows, cur, on, k => { m.f.tile = k; renderPane(); $('#epane').scrollTop = 0; });
   box.style.setProperty('--ink', ink);
   return [box, ...(cur && PAGES[cur] ? PAGES[cur]() : [el('p', 'cnote tnone', 'Tap an icon to open it. A dot marks what is switched on.')])];
