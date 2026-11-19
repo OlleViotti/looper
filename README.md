@@ -14,7 +14,7 @@ Audio in Settings starts with the setup in three steps, each ticked once done: S
 
 ## The play view, and what slides over it
 
-The top bar is a single row: the bar and beat counter on the left, the Varv logo in the middle and the in and out meters on the right. Its bottom edge is amber while playing and the whole bar turns red while recording. Everything else slides over the play view and leaves a strip of it showing; tapping the strip, swiping back or tapping the logo returns to play.
+The top bar is a single row: on the left a small mark like the o in the logo, then the bar and beat counter. The mark's 40 spokes draw the output round the circle: while playing, each spoke is the level when the playhead (the amber hand) last passed it, so the lap's sound shows as a ring, and the spokes just ahead of the hand are faint; stopped, they follow the sound as it plays. Its dot is grey when stopped, amber when playing, red when recording and blinking red when armed. Then, the Varv logo in the middle and the in and out meters on the right. Its bottom edge is amber while playing and the whole bar turns red while recording. Everything else slides over the play view and leaves a strip of it showing; tapping the strip, swiping back or tapping the logo returns to play.
 
 - **Hold Record** to open the record options: Overdub (as Overdub with Record in Settings), Count-in, Lap after lap (off: Record records one lap) and Into, the next empty track or a chosen one for the next recording. A key or pedal held down still starts or stops without recording.
 - **Hold Undo** for the undo history: everything Undo, Delete, Reset or Empty removed, newest first, each with Bring back, so any of them can come back, not only the latest.
