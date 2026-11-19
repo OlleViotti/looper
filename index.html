@@ -575,7 +575,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 18 Nov 22:00</p>
+  <p class="ver">Varv one, build 19 Nov 08:30</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -681,7 +681,8 @@ const TRACK_DEF = Object.assign({ vol: 1, pan: 0, filt: 0, echo: 0, rev: 0, mute
   speed: 1, tstop: false, trem: 0, tDep: 1, tShape: 'smooth', lofi: 0, ring: 0, rFreq: 0.5, gran: 0, gSize: 0.4, gScat: 0.3,
   xyMap: XY_DEF, xyHold: false,
   ebrk: 0, rbrk: 0, frz: 0, phone: 0, radio: 0, isoL: 0, isoM: 0, isoH: 0, slice: 0, sPos: 0, sLen: 0.5, rdly: 0, ping: 0, pDiv: 0.5,
-  lCrush: 0, lRing: 0, lRingF: 0.5, lTrem: 0, lTremF: 0.4 }, EQ_DEF);   // the live bit crush, ring mod and tremolo (the XY pad's), set by hand   // live tricks   // sound tricks: speed (0.5, 1, 2), tape stop, tremolo (notes per beat, depth, gate), lo-fi   // distortion: on, type, drive, tone, mix, level   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
+  lCrush: 0, lRing: 0, lRingF: 0.5, lTrem: 0, lTremF: 0.4,
+  lComp: false, lcThr: -20, lcRatio: 4, lcAt: 5, lcRel: 120, lcGain: 0 }, EQ_DEF);   // a microphone track's compressor, live, after the EQ   // the live bit crush, ring mod and tremolo (the XY pad's), set by hand   // live tricks   // sound tricks: speed (0.5, 1, 2), tape stop, tremolo (notes per beat, depth, gate), lo-fi   // distortion: on, type, drive, tone, mix, level   // sampler: octaves shown (0 = one big pad), lowest octave, notes held or full length
 const TRACK_KEYS = Object.keys(TRACK_DEF);
 const isSmp = t => !!t.sample;                       // a sampler when it holds a sample, a microphone track when it holds recordings
 const OD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="14" r="6.5"/><path d="M19 2.5v8M15 6.5h8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
@@ -700,6 +701,8 @@ const audible = t => !t.mute && (!anySolo() || t.solo);
 
 const nowF = () => Math.round(ctx.currentTime * sr);
 const latN = ms => Math.round(ms / 1000 * sr);
+const COMP_LA = 6;                                   // ms: the look-ahead of the browser's compressor, which delays what goes through it
+const compLa = t => t && t.lComp && !t.sample ? COMP_LA : 0;
 /* Loop lengths. In bar mode each track can have its own number of bars (null follows the lap);
    in free mode every track has the length set by the first recording. */
 const isFree = () => st.lenMode === 'free';
@@ -1191,7 +1194,7 @@ function fillRaw(k) {
 function render(k) {
   const N0 = len0Of(k); let out = k.notes ? renderNotes(k) : new Float32Array(N0);
   if (!k.notes) {
-    const d = clamp(latN(k.lat), 0, MAXLAT), raw = k.raw, filled = k.filled;
+    const d = clamp(latN(k.lat + compLa(k.track)), 0, MAXLAT), raw = k.raw, filled = k.filled;   // with its compressor on, the track is played that much earlier
     const N = N0;
     for (let i = 0; i < N + XF; i++) {
       const ri = d + i; if (ri >= filled) break;
@@ -1525,7 +1528,7 @@ function serviceTake(k, now) {
   }
   fillRaw(k);
   if (!k.full && k.filled >= k.raw.length) { k.full = true; markDirty(); }
-  const need = Math.min(clamp(latN(k.lat), 0, MAXLAT) + k.len + XF, k.raw.length), end = k.F0 + k.len;
+  const need = Math.min(clamp(latN(k.lat + compLa(k.track)), 0, MAXLAT) + k.len + XF, k.raw.length), end = k.F0 + k.len;
   if (!k.final && k.filled >= need) { render(k); k.final = true; afterRender(k, now, end); }
   else if (!k.started && !k.pend && now >= end - LEAD_S * sr) { render(k); afterRender(k, now, end); }
 }
@@ -2242,10 +2245,12 @@ const o0 = v => v || 0;
 function applyLive(t, A) {
   if (!t.fxIn) return;
   const tm = ctx.currentTime, amt = {
+    comp: !t.master && !isSmp(t) && t.lComp ? 1 : 0,
     ring: Math.max(A.ring || 0, o0(t.lRing)), crush: Math.max(A.crush || 0, o0(t.lCrush)), trem: Math.max(A.trem || 0, o0(t.lTrem)), band: Math.max(liveAmt(t, 'phone'), liveAmt(t, 'radio')),
     iso: Math.max(liveAmt(t, 'isoL'), liveAmt(t, 'isoM'), liveAmt(t, 'isoH')), frz: liveAmt(t, 'frz'), ping: liveAmt(t, 'ping') };
   syncFx(t, amt);
   const F = t.fx;
+  if (F.comp) { const c = F.comp.c; sp(c.threshold, t.lcThr, 0.01); sp(c.ratio, Math.min(20, t.lcRatio), 0.01); sp(c.attack, t.lcAt / 1000, 0.01); sp(c.release, t.lcRel / 1000, 0.01); sp(F.comp.mk.gain, Math.pow(10, t.lcGain / 20), 0.01); }
   if (F.ring) { sp(F.ring.o.frequency, 30 * Math.pow(60, A.ringF != null ? A.ringF : t.lRingF != null ? t.lRingF : 0.5), 0.02); sp(F.ring.dry.gain, 1 - amt.ring, 0.01); sp(F.ring.wet.gain, amt.ring, 0.01); }   // 30 Hz to 1.8 kHz
   if (F.crush) {
     const bits = Math.round(12 - amt.crush * 10);
@@ -2290,14 +2295,17 @@ function applyLive(t, A) {
 }
 /* Build the live effects that are turned up, and take away those back at zero: the ones in the chain at once (with a
    short dip so the change does not click), freeze and ping-pong once their sound has died away. */
-const FX_CHAIN = ['ring', 'crush', 'trem', 'band', 'iso'];
+const FX_CHAIN = ['comp', 'ring', 'crush', 'trem', 'band', 'iso'];
 function makeFx(t, k) {
   const f = { in: gn(1), out: gn(1), nodes: [], osc: [] };
   const keep = (...ns) => { f.nodes.push(...ns); return ns[0]; };
   const chain = (src, ...ns) => { let a = src; for (const n of ns) { keep(n); a.connect(n); a = n; } return a; };
   const pk = (fr, g) => { const b = bq('peaking', fr); b.gain.value = g; b.Q.value = 0.8; return b; };
   const osc = hz => { const o = ctx.createOscillator(); o.frequency.value = hz; o.start(); f.osc.push(o); return o; };
-  if (k === 'ring') {                                // multiplied by a sine
+  if (k === 'comp') {                                // a compressor, then the gain after it
+    f.c = keep(ctx.createDynamicsCompressor()); f.c.knee.value = 6; f.mk = keep(gn(1));
+    f.in.connect(f.c); f.c.connect(f.mk); f.mk.connect(f.out);
+  } else if (k === 'ring') {                         // multiplied by a sine
     f.dry = keep(gn(1)); f.mul = keep(gn(0)); f.wet = keep(gn(0)); f.o = osc(300); f.o.connect(f.mul.gain);
     f.in.connect(f.dry); f.in.connect(f.mul); f.mul.connect(f.wet); f.dry.connect(f.out); f.wet.connect(f.out);
   } else if (k === 'crush') {                        // fewer bits, by a stepped curve
@@ -2928,6 +2936,7 @@ const eqChanged = (o, fk) => Object.keys(EQ_DEF).some(k => !near(o[k], EQ_DEF[k]
 const changedIn = {
   sample: t => { const s = t.sample; if (!s) return false; const e = envOf(t), [a, b] = autoTrim(s.raw); return s.rev || s.a !== a || s.b !== b || Object.keys(ENV_DEF).some(k => !near(e[k], ENV_DEF[k])); },
   comp: t => compOf(t).on,
+  lcomp: t => !!t.lComp,
   spitch: t => !!(t.oct || t.semi || t.cent || (t.sample && t.sample.adj)),
   pitch: t => !!(t.oct || t.semi || t.cent),
   tune: t => !!t.tune,
@@ -3019,7 +3028,7 @@ function trackPane(t) {
     if (t.sample) p.append(...fold('comp', 'Compressor', () => [compCard(t)], changedIn.comp(t), t),
       ...fold('spitch', 'Pitch', () => [samplePitch(t)], changedIn.spitch(t), t), ...fold('tune', 'Autotune', () => [tuneCard(t)], changedIn.tune(t), t));
   }
-  if (!isSmp(t)) p.append(...takesFold());
+  if (!isSmp(t)) p.append(...takesFold(), ...fold('lcomp', 'Compressor', () => [liveCompCard(t)], !!t.lComp, t));
   p.append(...fold('eq', 'EQ and pan', () => [card(eqWidget(t, 'filt', () => { applyTrack(t); markDirty(); }), filterRow(), sliderRow('Pan', -1, 1, 0.01, t.pan, 0, panTxt, ap('pan')))], changedIn.eq(t), t));
   p.append(...fold('dist', 'Distortion', () => {
     const ad = k => v => { t[k] = v; applyDist(t); markDirty(); };
@@ -3225,6 +3234,27 @@ function compCard(t) {
     sliderRow('Release', 10, 1000, 5, c.rel, 120, v => Math.round(v) + ' ms', v => set('rel', Math.round(v))),
     sliderRow('Gain', -12, 24, 0.5, c.gain, 0, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + ' dB', v => set('gain', v)),
     res, el('p', 'cnote', 'It looks ahead, so nothing slips through: Attack is how smoothly it pulls down before a loud part, Release how fast it lets go. For a harder attack, use Punch in the envelope. Gain adds to or takes away from the level after compressing.'));
+}
+/* A microphone track's compressor: live, on everything the track plays, after the EQ. */
+function liveCompCard(t) {
+  const set = k => v => { t[k] = v; applyTrack(t); markDirty(); };
+  const on = crow('On', swtch(el('div'), () => t.lComp, v => { t.lComp = v; for (const k of t.takes) k.final = false; applyTrack(t); markDirty(); renderPane(); }, false));
+  if (!t.lComp) return card(on, el('p', 'cnote', 'Evens out the track: loud parts are pulled down, so quieter ones come forward. After the EQ, on all its takes.'));
+  const gr = el('p', 'cnote');
+  const tick = () => {                               // how much it is pulling down right now
+    if (!gr.isConnected) return;
+    const f = t.fx.comp, r = f ? f.c.reduction : 0, v = typeof r === 'number' ? r : r && r.value || 0;
+    gr.textContent = v < -0.1 ? 'Pulling down ' + (-v).toFixed(1) + ' dB now.' : 'Not compressing now.';
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  return card(on,
+    sliderRow('Threshold', -50, 0, 1, t.lcThr, -20, v => '−' + Math.abs(Math.round(v)) + ' dB', set('lcThr')),
+    sliderRow('Ratio', 1, 20, 0.1, t.lcRatio, 4, v => v >= 19.95 ? '20:1' : v.toFixed(1) + ':1', set('lcRatio')),
+    sliderRow('Attack', 0.1, 100, 0.1, t.lcAt, 5, v => (v < 10 ? v.toFixed(1) : Math.round(v)) + ' ms', set('lcAt')),
+    sliderRow('Release', 10, 1000, 5, t.lcRel, 120, v => Math.round(v) + ' ms', set('lcRel')),
+    sliderRow('Gain', -12, 24, 0.5, t.lcGain, 0, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + ' dB', set('lcGain')),
+    gr, el('p', 'cnote', 'Attack is how fast it pulls down after a loud part starts, Release how fast it lets go. Gain adds to or takes away from the level after it.'));
 }
 /* A new track with the same sample and all its settings, but none of the laps. */
 function copySampler(t) {
