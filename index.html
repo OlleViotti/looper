@@ -42,8 +42,8 @@ h1,h2,h3,p{margin:0}
 .mtr.mo b{transform-origin:right}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 #stateText{font-size:22px;font-weight:600;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.ring{width:66px;height:66px;flex:none;display:block}
-.bar #loopBtn{background:#0d0f17;padding:0}   /* the mark, as the app icon, in the middle of the bar */
+.ring{width:80px;height:80px;flex:none;display:block}
+.bar #loopBtn{background:#0d0f17;padding:0;height:84px;margin-top:-12px;border-radius:20px;align-self:end}   /* a little larger than the buttons, rising above the bar */   /* the mark, as the app icon, in the middle of the bar */
 .mtr{display:block;height:5px;border-radius:3px;background:var(--raise);overflow:hidden}
 .mtr b{display:block;height:100%;background:var(--tape);transform-origin:left;transform:scaleX(0)}
 .mtr.hot b{background:var(--amber)}
@@ -309,7 +309,7 @@ select.txt{appearance:auto}
 .eqw output{display:block;font-size:14px;color:var(--mut);font-variant-numeric:tabular-nums;min-height:20px;margin-top:4px}
 
 /* Transport */
-.bar{position:relative;z-index:42;display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:4px 10px calc(10px + env(safe-area-inset-bottom));background:var(--desk)}
+.bar{position:relative;z-index:42;display:grid;grid-template-columns:1fr 1fr 1.22fr 1fr 1fr;align-items:end;gap:6px;padding:16px 10px calc(10px + env(safe-area-inset-bottom));background:var(--desk)}
 .bar button{height:70px;border-radius:14px;background:var(--raise);font-weight:600;font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;line-height:1.05;padding:0 2px}
 .bar svg{width:22px;height:22px;fill:currentColor}
 #recBtn{background:var(--rec);color:#fff}
@@ -458,7 +458,7 @@ body.s-rec .pads .kb,body.s-rec .pads .pbig,body.s-armed .pads .kb,body.s-armed 
 body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
 .trimw{padding:10px 14px 4px}
 .qback{position:fixed;inset:0;z-index:40;background:rgba(10,12,20,.35)}
-.quick{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom));width:min(540px,calc(100% - 20px));max-height:calc(100% - 160px);overflow-y:auto;z-index:41;background:var(--desk);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.6),0 0 0 1px var(--line);padding:4px 12px 10px}
+.quick{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(112px + env(safe-area-inset-bottom));width:min(540px,calc(100% - 20px));max-height:calc(100% - 160px);overflow-y:auto;z-index:41;background:var(--desk);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.6),0 0 0 1px var(--line);padding:4px 12px 10px}
 .qhead{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 4px}
 .qhead b{font-size:17px}
 .hback{flex:none;color:var(--amber);font-size:14px;margin-left:10px}
@@ -609,7 +609,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 16:00</p>
+  <p class="ver">Varv one, build 19 Nov 16:10</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
