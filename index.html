@@ -611,7 +611,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 19:00</p>
+  <p class="ver">Varv one, build 19 Nov 19:20</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -787,8 +787,7 @@ function initAudio() {
   PRE = latN(PRE_MS); XF = latN(XF_MS); MAXLAT = latN(MAXLAT_MS); OPEN_LP = Math.min(20000, sr * 0.45);
   buildGraph();
   for (const t of tracks) buildTrackNodes(t);          // tracks prepared before audio started
-  if (st.outId && ctx.setSinkId) setOutput(st.outId, true);               // the saved output, while this is still the tap that started the audio
-  else if (st.outId && 'setSinkId' in HTMLMediaElement.prototype) setOutput(st.outId, true).then(ok => { if (!ok) { st.outId = ''; save(); } });
+  if (st.outId) { st.outId = ''; save(); }          // choosing an output did not work on iPhone; Speaker does it instead
   initP = (async () => { await setupCapture(); if (!st.spk) await openMic(wantsBuiltin() ? '' : st.micId, true); diag(); return true; })();
   return initP;
 }
@@ -1123,7 +1122,7 @@ function finishRec(p) {
   if (p < rec.k * rec.len && inTail(p)) { rec = null; toast('Recording finished.'); return; }
   rec.last = !rec.last;
 }
-const noMicMsg = () => st.spk ? 'Speaker mode is on, so the microphone is off. Switch it off under Audio to record from the microphone.' : 'The microphone is not running, so nothing can be recorded.';
+const noMicMsg = () => st.spk ? 'Speaker is on (under Audio, Output), so the microphone is off. Switch it off to record from the microphone.' : 'The microphone is not running, so nothing can be recorded.';
 const nextIsSmp = () => { const r = plan(0), t = tracks.find(x => x.id === r.tid); return !!(t && t.sample); };   // a sampler records what is played on the screen, without the microphone
 async function toggleRec() {
   if (srec) { stopSampleRec(); return; }
@@ -4345,38 +4344,26 @@ function guideOff() { if (!audioGuide) return; audioGuide = null; for (const n o
 async function drawAudio() {
   const host = $('#apIn'), sh = $('#apStart'); host.textContent = ''; sh.textContent = '';   // first Start audio, then Latency, then the microphone and output
   const h = st.hints || {};
-  const spk = card(crow('Speaker mode', swtch(el('div'), () => !!st.spk, v => setSpeaker(v), false)),   // first, so a project can be played out loud at once
-    el('p', 'cnote', 'For playing a project out loud. While the microphone is on, an iPhone plays only to the earpiece or to headphones with a microphone (AirPods), as in a phone call. Speaker mode turns the microphone off, so the sound can go to the loudspeaker, a Bluetooth speaker or AirPlay. Sampler tracks still record what you play on the screen; to record from the microphone, switch it off again.'));
+
   $('#measLoop').classList.toggle('glow', audioGuide === 'measure' && !(h.measureH || h.measure));   // what to do next is marked, until you go elsewhere
   $('#measTap').classList.toggle('glow', audioGuide === 'measure' && !h.measureS);
   if (!ctx) {
     const go = el('button', 'cr act'); go.append(el('span', '', 'Start audio'));
     go.addEventListener('click', async () => { await initAudio(); if (audioGuide) audioGuide = 'measure'; drawAudio(); ui(); });
     const c = card(go, el('p', 'cnote', 'Starts the microphone and the sound, so they can be chosen and checked here.')); if (audioGuide === 'start') c.classList.add('glow');
-    sh.append(c, spk); return;
+    sh.append(c); return;
   }
-  sh.append(spk);
   const mrow = (label, id) => { const r = el('div', 'mrow'), m = el('i', 'mtr big'); m.id = id; m.append(el('b')); r.append(el('span', '', label), m); return r; };
   // input
   const msr = el('div', 'microws'); fillMicRows(msr);
   host.append(el('h3', '', 'Microphone'), card(msr, mrow('In', 'aIn'),
     sliderRow('Gain', -12, 30, 0.5, st.inGain, 0, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + ' dB', v => { st.inGain = v; save(); if (inG) inG.gain.setTargetAtTime(dbLin(v), ctx.currentTime, 0.02); }),
     crow('Low cut (80 Hz)', swtch(el('div'), () => st.lowCut, v => { st.lowCut = v; save(); if (inHP) inHP.frequency.setTargetAtTime(v ? 80 : 10, ctx.currentTime, 0.02); }, false)),
-    el('p', 'cnote', (micOK ? 'In use: ' + (micLabel || 'unknown') + '. ' : 'The microphone is not running. ') + 'Set the gain so loud hits reach the amber part of the meter; red means clipping.')));
+    el('p', 'cnote', (micOK ? 'In use: ' + (micLabel || 'unknown') + '. ' : st.spk ? 'Off while Speaker (under Output) is on. ' : 'The microphone is not running. ') + 'Set the gain so loud hits reach the amber part of the meter; red means clipping.')));
   // output
-  const outs = await listOutputs(), oc = [];
-  if (canPickOut() && outs.length) {
-    /* one row per output; tapping it switches at once */
-    const opts = [['', 'System default']].concat(outs.map((d, i) => [d.deviceId, d.label || 'Output ' + (i + 1)]));
-    for (const [id, label] of opts) {
-      const b = el('button', 'cr orow' + ((st.outId || '') === id ? ' on' : '')); b.append(el('span', '', label));
-      b.addEventListener('click', () => {
-        setOutput(id).then(ok => { if (ok) toast('Output: ' + label + '. Measure the latency again.'); drawAudio(); });
-      });
-      oc.push(b);
-    }
-    if (!ctx.setSinkId) oc.push(el('p', 'cnote', 'Without headphones, an iPhone plays through the earpiece while the microphone is on (that is how Safari records). Choose the speaker here to hear it out loud. A chosen output is reached through the phone’s media player, which adds a little delay; System default plays directly.'));
-  } else oc.push(el('p', 'cnote', 'This browser lets the system choose where the sound goes. On iPhone: open Control Center, press and hold the music controls and tap the AirPlay icon to choose the headphones or the phone’s speaker. (iOS 26 lets Varv choose it here.)'));
+  const oc = [crow('Speaker', swtch(el('div'), () => !!st.spk, v => setSpeaker(v), false)),
+    el('p', 'cnote' + (st.spk ? ' warn' : ''), st.spk ? 'The microphone is off while Speaker is on: nothing can be recorded from it. Sampler tracks still record what you play on the screen.'
+      : 'For playing a project out loud. While the microphone is on, an iPhone plays only to the earpiece or to headphones with a microphone (AirPods), as in a phone call. Speaker turns the microphone off, so the sound can go to the loudspeaker, a Bluetooth speaker or AirPlay. The microphone does not work while it is on.')];
   const tt = el('button', 'cr act'); tt.append(el('span', '', 'Play a test sound')); tt.addEventListener('click', testTone);
   host.append(el('h3', '', 'Output'), card(...oc, mrow('Out', 'aOut'), tt));
 }
@@ -4402,7 +4389,7 @@ function fillMics() {
 function diag() {
   if (!ctx) return;
   let t = Math.round(sr / 100) / 10 + ' kHz' + (capMode === 'worklet' ? '' : ', fallback capture with poorer timing') + '. ';
-  t += micOK ? 'In use: ' + (micLabel || 'unknown') + '. ' : 'The microphone is not running. ';
+  t += micOK ? 'In use: ' + (micLabel || 'unknown') + '. ' : st.spk ? 'Speaker is on, so the microphone is off. ' : 'The microphone is not running. ';
   if (sr < 32000) t += "The low sample rate means the phone was in its call mode when the audio started. Choose the phone's microphone above and tap Restart audio.";
   const n = $('#diag'); n.textContent = t; n.classList.toggle('warn', sr < 32000 || !micOK);
 }
