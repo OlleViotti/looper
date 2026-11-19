@@ -44,13 +44,14 @@ h1,h2,h3,p{margin:0}
 .hb{width:54px;height:54px;border-radius:12px;display:grid;place-items:center;color:var(--mut)}
 .hb svg{width:32px;height:32px;fill:currentColor}
 #stateText{font-size:22px;font-weight:600;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.posw{justify-self:start;display:flex;align-items:center;gap:8px;min-width:0}
-.ring{width:30px;height:30px;flex:none;transform:rotate(-90deg)}
+.posw,.meters{box-sizing:border-box;width:104px;height:46px;border-radius:12px;background:var(--panel)}   /* the two sides as matching tiles, either side of the logo */
+.posw{justify-self:start;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;padding:0 10px}
+.ring{width:26px;height:26px;flex:none;transform:rotate(-90deg)}
 .ring circle{fill:none;stroke:var(--raise);stroke-width:4}
 .ring #ringArc{stroke:var(--amber);stroke-linecap:round}
 body.s-rec .ring #ringArc{stroke:#fff}
-#pos{min-width:48px;font-size:32px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
-.meters{justify-self:end;display:grid;grid-template-columns:auto 1fr;gap:5px 5px;align-items:center;width:100px;font-size:11px;line-height:1;color:var(--mut)}
+#pos{min-width:36px;text-align:center;font-size:26px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.meters{justify-self:end;display:grid;grid-template-columns:auto 1fr;gap:7px 7px;align-content:center;align-items:center;padding:0 12px;font-size:11px;font-weight:600;line-height:1;color:var(--mut)}
 .mtr{display:block;height:5px;border-radius:3px;background:var(--raise);overflow:hidden}
 .mtr b{display:block;height:100%;background:var(--tape);transform-origin:left;transform:scaleX(0)}
 .mtr.hot b{background:var(--amber)}
@@ -63,6 +64,8 @@ body.s-rec .status{background:var(--rec);border-bottom-color:var(--rec)}
 body.s-rec .home,body.s-rec #pos{color:#fff}
 body.s-rec .meters,body.s-rec .perfind{color:#fff}
 body.s-rec .mtr{background:rgba(0,0,0,.25)}
+body.s-rec .posw,body.s-rec .meters{background:rgba(0,0,0,.18)}
+.status .home{padding:6px 4px}
 
 /* Play view: name block and tape strip per track */
 #main{position:relative;flex:1;min-height:0;display:flex;overflow:hidden}
@@ -329,7 +332,6 @@ body.s-rec #recBtn{background:#fff;color:var(--rec)}
 /* Settings page */
 .spage{position:fixed;inset:0;left:44px;top:var(--hh,0px);z-index:15;background:var(--desk);box-shadow:-8px 0 20px rgba(0,0,0,.45);overflow-y:auto;transform:translateX(110%);transition:transform .25s ease;visibility:hidden}
 [data-mode=set] #spage{transform:none;visibility:visible}
-.meters{padding:6px 0}
 .mtr.big{height:10px;border-radius:5px;flex:1}
 .orow{color:var(--text)}
 .orow::after{content:'';width:10px;height:18px;margin-right:6px;border-right:3px solid transparent;border-bottom:3px solid transparent;transform:rotate(45deg)}
@@ -619,7 +621,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 11:30</p>
+  <p class="ver">Varv one, build 19 Nov 12:00</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
