@@ -89,7 +89,10 @@ body.s-rec .mtr{background:rgba(0,0,0,.25)}
 .tb.sx.on{background:var(--rec);color:#fff;animation:blink .5s steps(2,jump-none) infinite}
 .tb.off{visibility:hidden}
 .row{display:grid;grid-template-columns:var(--nw) 1fr;column-gap:8px;margin-bottom:8px}
-.trk{position:relative;overflow:hidden}
+.trk{position:relative;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.trk .vlv{position:absolute;left:0;top:0;bottom:0;width:0;background:color-mix(in srgb,var(--ink) 28%,transparent);border-right:2px solid var(--ink);pointer-events:none;opacity:0;transition:opacity .15s}
+.trk .vtag{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:4px 10px;border-radius:999px;background:rgba(10,12,20,.8);color:#fff;font:700 14px/1.2 var(--ui);pointer-events:none;opacity:0;white-space:nowrap}
+.trk.vol .vlv,.trk.vol .vtag{opacity:1}
 .trk canvas{display:block;width:100%;height:100%}
 .ph{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;left:calc(var(--ph)*100%);background:var(--amber);display:none;pointer-events:none}
 .tape.run .ph,.epane.run .ph{display:block}
@@ -484,7 +487,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
       </div>
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
-      <p class="hint" id="hTrack" hidden><b>M</b> mutes, <b>S</b> solos, <b>●</b> records a lap, <b>+●</b> adds one on top, the <b>mic</b> records a sample, the <b>keys</b> open its pads.</p>
+      <p class="hint" id="hTrack" hidden><b>M</b> mutes, <b>S</b> solos, <b>●</b> records a lap, <b>+●</b> adds one on top, the <b>mic</b> records a sample, the <b>keys</b> open its pads. <b>Hold</b> a strip and slide for its volume.</p>
       <p class="hint" id="hSwipe" hidden><b>Swipe right</b> on a track to edit it, <b>left</b> for settings.</p>
       <p class="hint" id="hUndo" hidden><b>Undo</b> takes back a recording, <b>Capture last</b> keeps the lap just played, <b>hold Click</b> for the tempo.</p>
       <div class="row"><button class="addtrk nmcol" id="addTrk" aria-label="Add a track">+</button><div class="live slide"><div class="trk"><canvas id="liveCv"></canvas><i class="ph"></i><span>in</span></div></div></div>
@@ -575,7 +578,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 08:30</p>
+  <p class="ver">Varv one, build 19 Nov 08:50</p>
 </div></div>
 
 <div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
@@ -2566,6 +2569,7 @@ function mountTrack(t, idx) {
   t.bO = mk('rc od', 'Overdub a lap', OD_ICON, () => recordInto(t, true));    // on a recorded microphone track, in the sample button's place
   t.bR = mk('rc', 'Record a lap', '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>', () => recordInto(t));
   row.addEventListener('pointerdown', () => touched(t), true);       // a swipe right that starts on this track edits it
+  volGesture(t, trk);
   row.append(nb, trk, bs); t.row = row;
   const host = $('#lanes'); host.insertBefore(row, host.children[idx] || null);
   buildTrackNodes(t);
@@ -2577,6 +2581,37 @@ function unmountTrack(t) {
   t.row = null; t.cv = null; t.pcv = null;
   if (armedId === t.id) armedId = null;
   if (padT === t) closePads();
+}
+/* Hold the strip still, then slide up or down: the track's volume, 0 to 150 %, about 2 % per 4 px. */
+let volDrag = null;
+function volGesture(t, trk) {
+  const lvl = el('i', 'vlv'), tag = el('span', 'vtag'); trk.append(lvl, tag);
+  let timer = 0, pid = null, sx = 0, sy = 0;
+  const show = () => { const v = t.vol; lvl.style.width = (v / 1.5 * 100) + '%'; tag.textContent = 'Volume ' + Math.round(v * 100) + ' %'; };
+  const end = () => {
+    clearTimeout(timer); pid = null;
+    if (volDrag && volDrag.t === t) { volDrag = null; trk.classList.remove('vol'); markDirty(); if (mode === 'edit') renderPane(); eatClick = true; setTimeout(() => { eatClick = false; }, 350); }
+  };
+  trk.addEventListener('pointerdown', e => {
+    if (mode !== 'play' || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    pid = e.pointerId; sx = e.clientX; sy = e.clientY;
+    timer = setTimeout(() => {
+      volDrag = { t, y: sy, v: t.vol }; sw = null;     // no swipe to Edit or Settings from here on
+      try { trk.setPointerCapture(pid); } catch (x) {}
+      trk.classList.add('vol'); show();
+    }, HOLD_MS);
+  });
+  trk.addEventListener('pointermove', e => {
+    if (e.pointerId !== pid) return;
+    if (!volDrag) { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 10) { clearTimeout(timer); pid = null; } return; }
+    sw = null;
+    const v = Math.round(clamp(volDrag.v + (volDrag.y - e.clientY) / 200, 0, 1.5) * 100) / 100;
+    if (v !== t.vol) { t.vol = v; applyTrack(t); show(); }
+  });
+  trk.addEventListener('pointerup', e => { if (e.pointerId === pid) end(); });
+  trk.addEventListener('pointercancel', end);
+  trk.addEventListener('touchmove', e => { if (volDrag && volDrag.t === t) e.preventDefault(); }, { passive: false });   // the list does not scroll meanwhile
+  trk.addEventListener('contextmenu', e => e.preventDefault());
 }
 /* tap = short action, hold = long action; moving the finger cancels both, so scrolling and swiping never trigger them */
 function pressable(node, onTap, onHold, anyMode) {
