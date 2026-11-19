@@ -198,14 +198,13 @@ body[data-pads] #backT{display:block}
 .etab.mut{color:var(--mut)}
 .etab.tk{font-weight:700;color:var(--ink);box-shadow:inset 3px 0 0 var(--ink);border-radius:8px}
 .etab.tk.on{background:var(--ink);color:#1b1f2e}
+.etab.play{position:relative;color:rgba(27,31,46,.35)!important;min-width:52px}
+.etab.play svg{position:absolute;left:50%;top:50%;width:20px;height:20px;transform:translate(-40%,-50%);fill:#1b1f2e}
 .etab.tk.mut:not(.on){opacity:.45}
 .epane .etab,.pads .etab{border-radius:8px}
 .etab.add{background:transparent;border:1px dashed var(--line);color:var(--mut)}
 .ehead{position:sticky;top:54px;z-index:2;background:var(--panel);border-radius:14px;margin-bottom:8px;box-shadow:0 6px 12px -6px rgba(0,0,0,.6)}
 .ehead.tk{box-shadow:inset 4px 0 0 var(--ink),0 6px 12px -6px rgba(0,0,0,.6)}
-.tbtn.eplay{flex:0 0 36px;width:36px;height:36px;min-height:36px;border-radius:50%;background:var(--amber);color:#1b1f2e;display:grid;place-items:center;padding:0}
-.tbtn.eplay svg{width:18px;height:18px;fill:currentColor}
-.ehead .tbtn:not(.eplay){font-size:15px;padding:0 3px;min-height:36px;height:36px}
 .estick .ehead{min-height:0;padding-top:2px;padding-bottom:2px}
 .ename{flex:1;min-width:0;font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fh.sub{margin:10px 0 0;min-height:40px;font-size:14px}
@@ -382,9 +381,6 @@ select.txt.bare{width:100%;color:var(--text)}
 /* text buttons */
 .tbtn{min-height:40px;padding:0 4px;color:var(--amber);font-weight:600;flex:none}
 .tbtn.danger,.cr.act.danger{color:#ff8b9a}
-.tlab.wpl{display:flex;justify-content:space-between;align-items:center}
-.tlab .tbtn.eplay{flex:0 0 30px;width:30px;height:30px;min-height:30px;margin:-4px 2px -2px 0}
-.tlab .tbtn.eplay svg{width:14px;height:14px}
 .estick.tk{box-shadow:inset 0 -1px 0 rgba(255,255,255,.04)}
 .tbtn.on{background:var(--amber);color:#1b1f2e;border-radius:999px;padding:0 12px}
 .card .prow{background:transparent;border-radius:0;border-top:1px solid rgba(255,255,255,.06);padding:6px 10px 6px 14px}
@@ -625,7 +621,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 13:10</p>
+  <p class="ver">Varv one, build 19 Nov 13:40</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -2951,7 +2947,13 @@ function renderPane() {
   for (const x of tracks) {
     const b = el('button', 'etab' + (x.id === selId ? ' on' : '') + (audible(x) ? '' : ' mut'), String(tracks.indexOf(x) + 1));
     b.classList.add('tk'); b.style.setProperty('--ink', x.ink);   // in the track's colour, as on the play screen
-    b.setAttribute('aria-label', x.name); b.addEventListener('click', () => selectTrack(x.id)); tabs.append(b);
+    b.setAttribute('aria-label', x.name);
+    if (x.id === selId && x.sample) {                 // the open sampler's tab plays its sample, with its edits
+      b.classList.add('play'); b.setAttribute('aria-label', x.name + ': play the sample');
+      b.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>');
+      b.addEventListener('click', () => playSampleOnce(x));
+    } else b.addEventListener('click', () => selectTrack(x.id));
+    tabs.append(b);
   }
   pane.append(tabs);
   if (!st.hints.edit) { const g = el('p', 'hint'); g.innerHTML = 'Tap a <b>tab</b> to edit that track, or <b>Master</b> for the whole mix. <b>Double-tap</b> any setting to reset it. Tap the strip on the right, or swipe left, to go back.'; pane.append(g); }
@@ -3076,14 +3078,12 @@ function memEnter(id) {
 function memLeave(id, scroll) { const m = paneMem[id]; if (m && !m.left) { m.left = performance.now(); m.scroll = scroll; } }
 const memOf = id => paneMem[id] || memEnter(id);
 const DIST_NOTE = 'Soft rounds the peaks like an overdriven tube, Hard clips them, Fuzz is rougher and uneven. Drive sets how hard it is pushed; the level is evened out, so more drive gives more grit rather than more volume. Tone darkens the result, Mix blends in the clean sound. It comes before the EQ, so the EQ can shape it.';
+async function playSampleOnce(t) {
+  await initAudio(); const v = playVoice(t, null);
+  if (v && t.sGate && t.sample) setTimeout(() => stopVoice(v, t), t.sample.proc.length / sr * 1000);   // a Held sample is let go after its own length
+}
 function trackPane(t) {
   const p = el('div'), ap = k => v => { t[k] = v; applyTrack(t); markDirty(); }, has = t.takes.length > 0;
-  let pl = null;
-  if (t.sample) {                                   // on a sampler, a small Play to hear an edit at once, by the first row of icons
-    pl = el('button', 'tbtn eplay'); pl.setAttribute('aria-label', 'Play the sample');
-    pl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>';
-    pl.addEventListener('click', async () => { await initAudio(); const v = playVoice(t, null); if (v && t.sGate && t.sample) setTimeout(() => stopVoice(v, t), t.sample.proc.length / sr * 1000); });   // a Held sample is let go after its own length
-  }
   const eqDraw = () => { const w = $('.eqw', $('#epane')); if (w) w.draw(); };
   /* the filter is under Mix and under EQ; moving either moves the other */
   const filterRow = () => { const r = sliderRow('Filter', -1, 1, 0.01, t.filt, 0, filtTxt, v => { t.filt = v; applyTrack(t); markDirty(); eqDraw(); for (const o of document.querySelectorAll('#epane .frow')) if (o !== r) o.set(v); }); r.classList.add('frow'); return r; };
@@ -3170,7 +3170,6 @@ function trackPane(t) {
     ['Sound edits: change the ' + (smp ? 'sample' : 'recordings'), [['source', 'Source', !smp && mic.length > 0], ['shape', 'Shape'], ['pitch', 'Pitch'], ['tricks', 'Tricks'], ['laps', 'Laps']]],
     ['Live effects: on what plays', [['mix', 'Mix'], ['eq', 'EQ'], ['drive', 'Drive'], ['fx', 'Effects'], ['xy', 'XY pad']]]],
     on, PAGES, smp && performance.now() - (t.sample.at || 0) < MEM_MS ? 'source' : null);
-  if (pl) { const lb = tb.querySelector('.tlab'); lb.classList.add('wpl'); lb.append(pl); }
   const stick = el('div', 'estick tk'); stick.style.setProperty('--ink', t.ink); stick.append(tb); p.append(stick, ...pg);
   return p;
 }
@@ -3237,7 +3236,7 @@ function loopView(t) {
     const y = s.proc, N = y.length, mid = h / 2; let top = 1e-4;
     const pk = new Float32Array(w); for (let x = 0; x < w; x++) { const a = Math.floor(x / w * N), b = Math.max(a + 1, Math.floor((x + 1) / w * N)); let m = 0; for (let i = a; i < b; i++) m = Math.max(m, Math.abs(y[i])); pk[x] = m; top = Math.max(top, m); }
     const fr = f || (s.loop ? [s.loop.s / N, s.loop.e / N] : null);
-    for (let x = 0; x < w; x++) { const hh = Math.max(0.6, pk[x] / top * (mid - 4)); g.fillStyle = fr && x >= fr[0] * w && x <= fr[1] * w ? '#ece5d0' : 'rgba(160,168,192,.4)'; g.fillRect(x, mid - hh, 1, hh * 2); }
+    for (let x = 0; x < w; x++) { const hh = Math.max(0.6, pk[x] / top * (h - 8)); g.fillStyle = fr && x >= fr[0] * w && x <= fr[1] * w ? '#ece5d0' : 'rgba(160,168,192,.4)'; g.fillRect(x, h - 4 - hh, 1, hh); }
     if (fr) {
       const xa = fr[0] * w, xb = fr[1] * w;
       g.fillStyle = 'rgba(255,178,36,.28)'; g.fillRect(xa, 0, xb - xa, h);
@@ -3280,12 +3279,12 @@ function fineView(t, key, moved) {
     const { g, w, h } = sizeCanvas(cv); if (!w) return;
     const a0 = c0 - W, mid = h / 2, per = 2 * W / w; let top = 1e-4;
     for (let i = Math.max(0, a0); i < Math.min(s.raw.length, a0 + 2 * W); i++) top = Math.max(top, Math.abs(s.raw[i]));
-    const sc = (mid - 4) / top;
+    const sc = (h - 8) / top;
     for (let x = 0; x < w; x++) {
       const i0 = Math.floor(a0 + x * per), i1 = Math.floor(a0 + (x + 1) * per); let lo = 0, hi = 0;
       for (let i = Math.max(0, i0); i < Math.min(s.raw.length, Math.max(i0 + 1, i1)); i++) { const v = s.raw[i]; if (v < lo) lo = v; if (v > hi) hi = v; }
       const inside = i0 >= s.a && i0 < s.b;
-      g.fillStyle = inside ? '#ece5d0' : 'rgba(160,168,192,.35)'; g.fillRect(x, mid - hi * sc, 1, Math.max(1, (hi - lo) * sc));
+      const m = Math.max(hi, -lo); g.fillStyle = inside ? '#ece5d0' : 'rgba(160,168,192,.35)'; g.fillRect(x, h - 4 - m * sc, 1, Math.max(1, m * sc));
     }
     const ex = Math.round((s[key] - a0) / per);
     g.fillStyle = '#ffb224'; g.fillRect(ex - 1, 0, 3, h); g.fillRect(ex - 6, key === 'a' ? 0 : h - 8, 13, 8);
@@ -3477,9 +3476,9 @@ function trimWidget(t) {
       for (let i = a; i < e; i++) { const v = Math.abs(s.raw[i]); if (v > m) m = v; }
       pk[x] = m; if (m > top) top = m;
     }
-    const xa = fx(s.a), xb = fx(s.b), sc = (mid - 6) / top;
+    const xa = fx(s.a), xb = fx(s.b), base = h - 4, sc = (h - 16) / top;   // the level from the bottom up, as in the envelope (both swings of the wave in one)
     g.fillStyle = 'rgba(236,229,208,.08)'; g.fillRect(xa, 0, xb - xa, h);
-    for (let x = 0; x < w; x++) { const hh = Math.max(0.6, pk[x] * sc); g.fillStyle = x >= xa && x <= xb ? '#ece5d0' : 'rgba(160,168,192,.35)'; g.fillRect(x, mid - hh, 1, hh * 2); }
+    for (let x = 0; x < w; x++) { const hh = Math.max(0.6, pk[x] * sc); g.fillStyle = x >= xa && x <= xb ? '#ece5d0' : 'rgba(160,168,192,.35)'; g.fillRect(x, base - hh, 1, hh); }
     if (t.sGate && s.loop) {                         // the sustain loop of Held notes, in the sample as it was recorded
       const r0 = s.rev ? s.a + (s.b - s.a) - s.loop.e : s.a + s.loop.s, r1 = r0 + (s.loop.e - s.loop.s);
       g.fillStyle = 'rgba(255,178,36,.35)'; g.fillRect(fx(r0), 0, fx(r1) - fx(r0), h);
