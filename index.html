@@ -381,7 +381,11 @@ select.txt.bare{width:100%;color:var(--text)}
 .sw.on i{transform:translateX(20px)}
 /* text buttons */
 .tbtn{min-height:40px;padding:0 4px;color:var(--amber);font-weight:600;flex:none}
-.tbtn.danger{color:#ff8b9a}
+.tbtn.danger,.cr.act.danger{color:#ff8b9a}
+.tlab.wpl{display:flex;justify-content:space-between;align-items:center}
+.tlab .tbtn.eplay{flex:0 0 30px;width:30px;height:30px;min-height:30px;margin:-4px 2px -2px 0}
+.tlab .tbtn.eplay svg{width:14px;height:14px}
+.estick.tk{box-shadow:inset 0 -1px 0 rgba(255,255,255,.04)}
 .tbtn.on{background:var(--amber);color:#1b1f2e;border-radius:999px;padding:0 12px}
 .card .prow{background:transparent;border-radius:0;border-top:1px solid rgba(255,255,255,.06);padding:6px 10px 6px 14px}
 .card .prow .btn{background:transparent;color:var(--amber);padding:0 6px}
@@ -621,7 +625,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 12:00</p>
+  <p class="ver">Varv one, build 19 Nov 12:40</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -2595,7 +2599,7 @@ function unmountTrack(t) {
   if (armedId === t.id) armedId = null;
   if (padT === t) closePads();
 }
-/* Hold the strip still, then slide up or down: the track's volume, 0 to 150 %, about 2 % per 4 px. */
+/* Hold the strip still, then slide right or left: the track's volume, 0 to 150 %, across about the strip's width. */
 let volDrag = null;
 function volGesture(t, trk) {
   const lvl = el('i', 'vlv'), tag = el('span', 'vtag'); trk.append(lvl, tag);
@@ -2609,7 +2613,7 @@ function volGesture(t, trk) {
     if (mode !== 'play' || (e.pointerType === 'mouse' && e.button !== 0)) return;
     pid = e.pointerId; sx = e.clientX; sy = e.clientY;
     timer = setTimeout(() => {
-      volDrag = { t, y: sy, v: t.vol }; sw = null;     // no swipe to Edit or Settings from here on
+      volDrag = { t, x: sx, v: t.vol, w: trk.getBoundingClientRect().width }; sw = null;     // no swipe to Edit or Settings from here on
       try { trk.setPointerCapture(pid); } catch (x) {}
       trk.classList.add('vol'); show();
     }, HOLD_MS);
@@ -2618,7 +2622,7 @@ function volGesture(t, trk) {
     if (e.pointerId !== pid) return;
     if (!volDrag) { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 10) { clearTimeout(timer); pid = null; } return; }
     sw = null;
-    const v = Math.round(clamp(volDrag.v + (volDrag.y - e.clientY) / 200, 0, 1.5) * 100) / 100;
+    const v = Math.round(clamp(volDrag.v + (e.clientX - volDrag.x) / volDrag.w * 1.5, 0, 1.5) * 100) / 100;
     if (v !== t.vol) { t.vol = v; applyTrack(t); show(); }
   });
   trk.addEventListener('pointerup', e => { if (e.pointerId === pid) end(); });
@@ -2727,12 +2731,12 @@ function clearTrack(t, reset) {
   if (armedId === t.id) armedId = null;
   for (const k of t.takes) { detachTake(k); k.savedTo = null; }
   t.takes = [];
-  if (reset) {
+  if (reset) {                                       // true: everything back as on a new track; 'sound': the sample goes too, the settings stay
     if (srec && srec.tid === t.id) srec = null;
     if (padT === t) closePads();
     if (t.sample) t.sample.onProc = null;
     t.sample = null; t.spare = null; t.sampler = false;
-    Object.assign(t, TRACK_DEF);
+    if (reset === true) Object.assign(t, TRACK_DEF);
     applyTrack(t);
   }
   trash.push(it); changed(t); renderPane();
@@ -2742,7 +2746,7 @@ function restoreAt(i) {
   const it = trash.splice(i, 1)[0]; if (!it) return;
   const t = it.track;
   if (it.clear) {
-    if (it.reset) { Object.assign(t, it.settings); if (it.sample && !t.sample) { t.sample = it.sample; it.sample.gen = 0; prepSample(t); } applyTrack(t); }
+    if (it.reset) { if (it.reset === true) Object.assign(t, it.settings); t.sampler = !!it.sample; if (it.sample && !t.sample) { t.sample = it.sample; it.sample.gen = 0; prepSample(t); } applyTrack(t); }
     for (const k of it.takes) { t.takes.push(k); k.final = false; }    // rebuilt and started on the next tick
     t.takes.sort((a, b) => a.id - b.id);
     changed(t); renderPane(); return;
@@ -2761,10 +2765,10 @@ function drawTrash() {
   if (!trash.length) return;
   const it = trash[trash.length - 1];
   $('#undoTxt').textContent = trash.length > 1 ? trash.length + ' items removed'
-    : it.clear ? it.track.name + (it.reset ? ' reset' : ' emptied') : it.take ? (it.idx >= 0 ? it.track.name + ' removed' : 'Removed a take from ' + it.track.name) : it.track.name + ' deleted';
+    : it.clear ? it.track.name + (it.reset === true ? ' reset' : ' emptied') : it.take ? (it.idx >= 0 ? it.track.name + ' removed' : 'Removed a take from ' + it.track.name) : it.track.name + ' deleted';
 }
 /* The undo history: everything removed, newest first; tap one to bring it back (not only the latest). */
-const trashLabel = it => it.clear ? it.track.name + (it.reset ? ' reset' : ' emptied')
+const trashLabel = it => it.clear ? it.track.name + (it.reset === true ? ' reset' : ' emptied')
   : it.take ? (it.take.notes ? 'Lap' : 'Take') + ' on ' + it.track.name + (it.idx >= 0 ? ', with its track' : '') : it.track.name + ' deleted';
 function openHistory() {
   openPanel('Undo history', host => {
@@ -3056,6 +3060,7 @@ function tileGrid(rows, cur, on, pick) {          // rows: [label, [[key, name, 
 }
 function tilePages(ink, rows, on, PAGES, fresh) {
   const m = memOf(selId), cur = 'tile' in m.f ? m.f.tile : fresh;
+  if (fresh && !('tile' in m.f)) m.f.tile = fresh;          // stays open, also once the sample is gone
   const box = tileGrid(rows, cur, on, k => { m.f.tile = k; renderPane(); $('#epane').scrollTop = 0; });
   box.style.setProperty('--ink', ink);
   return [box, ...(cur && PAGES[cur] ? PAGES[cur]() : [el('p', 'cnote tnone', 'Tap an icon to open it. A dot marks what is switched on.')])];
@@ -3073,29 +3078,11 @@ const memOf = id => paneMem[id] || memEnter(id);
 const DIST_NOTE = 'Soft rounds the peaks like an overdriven tube, Hard clips them, Fuzz is rougher and uneven. Drive sets how hard it is pushed; the level is evened out, so more drive gives more grit rather than more volume. Tone darkens the result, Mix blends in the clean sound. It comes before the EQ, so the EQ can shape it.';
 function trackPane(t) {
   const p = el('div'), ap = k => v => { t[k] = v; applyTrack(t); markDirty(); }, has = t.takes.length > 0;
-  const mb = el('button', 'tbtn' + (t.mute ? ' on' : ''), 'Mute'), sb = el('button', 'tbtn' + (t.solo ? ' on' : ''), 'Solo');
-  mb.addEventListener('click', () => { toggleMute(t); renderPane(); }); sb.addEventListener('click', () => { toggleSolo(t); renderPane(); });
-  /* Empty removes the recordings (or laps) and keeps every setting, and a sampler keeps its sample; Reset also
-     sets everything back as on a new track, the sample included. Both ask first, and the bar at the bottom can
-     bring back what they removed. */
-  const eb = el('button', 'tbtn danger'); twoTap(eb, 'Empty', 'Sure?', () => true, () => clearTrack(t, false));
-  const db = el('button', 'tbtn danger'); twoTap(db, 'Reset', 'Sure?', () => true, () => clearTrack(t, true));
-  const xb = el('button', 'tbtn danger'); twoTap(xb, 'Delete', 'Sure?', () => true, () => deleteTrack(t));   // removes the track itself
-  /* The header stays pinned under the tabs while the rest scrolls; on a sampler it has Play, to hear an edit at once. */
-  const head = el('div', 'cr ehead tk'); head.style.setProperty('--ink', t.ink);
-  const btns = el('div'); btns.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px 2px;flex:1;align-items:center;justify-content:space-between';
-  btns.append(xb, db, eb, mb, sb);
-  if (t.sample) {
-    const pl = el('button', 'tbtn eplay'); pl.setAttribute('aria-label', 'Play the sample');
+  let pl = null;
+  if (t.sample) {                                   // on a sampler, a small Play to hear an edit at once, by the first row of icons
+    pl = el('button', 'tbtn eplay'); pl.setAttribute('aria-label', 'Play the sample');
     pl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>';
     pl.addEventListener('click', async () => { await initAudio(); const v = playVoice(t, null); if (v && t.sGate && t.sample) setTimeout(() => stopVoice(v, t), t.sample.proc.length / sr * 1000); });   // a Held sample is let go after its own length
-    btns.append(pl);
-  }
-  head.append(btns);                                // the tab above shows which track this is
-  let cp = null;
-  if (t.sample) {                                   // a sampler: a new track with the same sample and every setting, without the laps
-    cp = el('button', 'cr act'); cp.append(el('span', '', 'New track with this sample'));
-    cp.firstChild.append(el('small', '', 'Same sample and all track settings, without the laps.')); cp.addEventListener('click', () => copySampler(t));
   }
   const eqDraw = () => { const w = $('.eqw', $('#epane')); if (w) w.draw(); };
   /* the filter is under Mix and under EQ; moving either moves the other */
@@ -3142,10 +3129,18 @@ function trackPane(t) {
       el('p', 'cnote', 'Breaks the sound into small grains and lays them out again, each taken from near its place, or with more scatter from anywhere in the ' + (smp ? 'sample' : 'loop') + ': a moving, flowing texture.'));
     return [card(...rows)];
   };
-  const PAGES = {
-    source: () => {
+  const srcPage = () => {
       if (smp) { const cp = el('button', 'cr act'); cp.append(el('span', '', 'New track with this sample')); cp.firstChild.append(el('small', '', 'Same sample and all track settings, without the laps.')); cp.addEventListener('click', () => copySampler(t)); return [...sampleMain(t), card(cp)]; }
       return mic.length ? [card(el('p', 'cnote', 'A microphone track has no sample: its sound is its takes, under Laps. An empty track can record a sample with its microphone button and become a sampler.'))] : [emptySampleCard(t)];
+  };
+  const PAGES = {
+    source: () => {
+      const eb = el('button', 'cr act danger'), xb = el('button', 'cr act danger');
+      const has0 = smp || t.takes.length > 0;
+      twoTap(eb, smp ? 'Remove the sample and laps' : 'Remove the recordings', 'Sure?', () => true, () => clearTrack(t, 'sound'));
+      twoTap(xb, 'Delete the track', 'Sure?', () => true, () => deleteTrack(t));
+      const tail = [el('h3', '', 'Track'), card(...(has0 ? [eb] : []), xb, el('p', 'cnote', (has0 ? 'Removing keeps every setting, so the track is ready for a new sound. ' : '') + 'The bar at the bottom can bring back what was removed.'))];
+      return srcPage().concat(tail);
     },
     shape: () => smp ? [el('h3', '', 'Envelope'), ...envCard(t), el('h3', '', 'Compressor'), compCard(t)] : [el('h3', '', 'Compressor'), compCard(t), el('p', 'cnote', 'The envelope is for samples.')],
     pitch: () => [smp ? samplePitch(t) : pitchCard(t), el('h3', '', 'Autotune'), tuneCard(t)],
@@ -3175,7 +3170,8 @@ function trackPane(t) {
     ['Sound edits: change the ' + (smp ? 'sample' : 'recordings'), [['source', 'Source', !smp && mic.length > 0], ['shape', 'Shape'], ['pitch', 'Pitch'], ['tricks', 'Tricks'], ['laps', 'Laps']]],
     ['Live effects: on what plays', [['mix', 'Mix'], ['eq', 'EQ'], ['drive', 'Drive'], ['fx', 'Effects'], ['xy', 'XY pad']]]],
     on, PAGES, smp && performance.now() - (t.sample.at || 0) < MEM_MS ? 'source' : null);
-  const stick = el('div', 'estick'); stick.append(head, tb); p.append(stick, ...pg);
+  if (pl) { const lb = tb.querySelector('.tlab'); lb.classList.add('wpl'); lb.append(pl); }
+  const stick = el('div', 'estick tk'); stick.style.setProperty('--ink', t.ink); stick.append(tb); p.append(stick, ...pg);
   return p;
 }
 /* Switching to the microphone keeps the sample aside, so switching back during the session brings it back. */
