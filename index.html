@@ -199,8 +199,8 @@ body[data-pads] #backT{display:block}
 .etab.tk{font-weight:700;color:var(--ink);box-shadow:inset 3px 0 0 var(--ink);border-radius:8px}
 .etab.tk.on{background:var(--ink);color:#1b1f2e}
 .etab.play{min-width:56px;padding:0 8px;display:grid;place-items:center}
-.etab.play svg{width:36px;height:36px;fill:none;stroke:#1b1f2e;stroke-width:1.5;stroke-linejoin:round}
-.etab.play svg text{fill:#1b1f2e;stroke:none;font:700 9.5px var(--ui)}
+.etab.play svg{width:34px;height:34px;fill:#1b1f2e;stroke:#1b1f2e;stroke-width:3;stroke-linejoin:round}   /* a filled play sign with soft corners */
+.etab.play svg text{fill:var(--ink);stroke:none;font:800 9px var(--ui)}
 .etab.tk.mut:not(.on){opacity:.45}
 .epane .etab,.pads .etab{border-radius:8px}
 .etab.add{background:transparent;border:1px dashed var(--line);color:var(--mut)}
@@ -622,7 +622,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 13:50</p>
+  <p class="ver">Varv one, build 19 Nov 14:00</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -2951,7 +2951,7 @@ function renderPane() {
     b.setAttribute('aria-label', x.name);
     if (x.id === selId && x.sample) {                 // the open sampler's tab plays its sample, with its edits
       b.classList.add('play'); b.setAttribute('aria-label', x.name + ': play the sample');
-      b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2.5l17 9.5-17 9.5z"/><text x="10.6" y="15.6" text-anchor="middle">' + (tracks.indexOf(x) + 1) + '</text></svg>';   // the number inside an open play sign
+      b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 4.2l13.6 7.8-13.6 7.8z"/><text x="11" y="15.4" text-anchor="middle">' + (tracks.indexOf(x) + 1) + '</text></svg>';   // the number inside an open play sign
       b.addEventListener('click', () => playSampleOnce(x));
     } else b.addEventListener('click', () => selectTrack(x.id));
     tabs.append(b);
