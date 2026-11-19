@@ -200,9 +200,10 @@ body[data-pads] #backT{display:block}
 .etab.add{background:transparent;border:1px dashed var(--line);color:var(--mut)}
 .ehead{position:sticky;top:54px;z-index:2;background:var(--panel);border-radius:14px;margin-bottom:8px;box-shadow:0 6px 12px -6px rgba(0,0,0,.6)}
 .ehead.tk{box-shadow:inset 4px 0 0 var(--ink),0 6px 12px -6px rgba(0,0,0,.6)}
-.tbtn.eplay{flex:1 0 100%;margin-top:4px;height:40px;min-height:40px;border-radius:999px;background:var(--amber);color:#1b1f2e;display:grid;place-items:center;padding:0}
+.tbtn.eplay{flex:0 0 36px;width:36px;height:36px;min-height:36px;border-radius:50%;background:var(--amber);color:#1b1f2e;display:grid;place-items:center;padding:0}
 .tbtn.eplay svg{width:18px;height:18px;fill:currentColor}
-.ehead .tbtn:not(.eplay){font-size:16px;padding:0 3px}
+.ehead .tbtn:not(.eplay){font-size:15px;padding:0 3px;min-height:36px;height:36px}
+.estick .ehead{min-height:0;padding-top:2px;padding-bottom:2px}
 .ename{flex:1;min-width:0;font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fh.sub{margin:10px 0 0;min-height:40px;font-size:14px}
 .csub2{margin:14px 6px 6px;font-size:13px;font-weight:600;color:var(--mut)}
@@ -210,22 +211,24 @@ body[data-pads] #backT{display:block}
 .sfb[hidden],.spg[hidden]{display:none}
 .sp-head.stk{flex-wrap:wrap}
 .sp-head.stk #setTiles{flex:1 0 100%;margin-top:8px}
-.sp-head.stk .tgrid{grid-template-columns:repeat(5,minmax(0,1fr))}
 .sfb>.card+.card{margin-top:8px}
 .spage .fh{margin-top:14px}
 #spage>.sp-in>h3{margin-top:18px}
 .estick{position:sticky;top:54px;z-index:2;background:var(--desk);padding-bottom:6px;margin-bottom:6px}
-.estick .ehead{position:static;margin-bottom:6px}
-.tiles .tlab{margin:6px 4px 3px;font-size:12px;font-weight:600;color:var(--mut)}
-.tgrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}
-.tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0 5px;border-radius:10px;background:var(--panel);color:var(--mut);font-size:11px;font-weight:600;min-width:0}
-.tile svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.estick .ehead{position:static;margin-bottom:2px}
+.tiles .tlab{margin:4px 4px 2px;font-size:11px;line-height:1.2;font-weight:600;color:var(--mut)}
+.tgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 0 3px;border-radius:10px;background:var(--panel);color:var(--mut);font-size:11px;font-weight:600;min-width:0}
+.tile svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tile svg .fl{fill:currentColor;stroke:none}
 .tile span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;padding:0 2px}
 .tile.sel{background:color-mix(in srgb,var(--ink,#ffb224) 22%,var(--panel));color:var(--ink,#ffb224);box-shadow:inset 0 0 0 1.5px var(--ink,#ffb224)}
 .tile.on::after{content:'';position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:#9db8ff}
 .tile.dim{opacity:.45}
 .tnone{text-align:center;margin-top:18px}
+.tunev{padding:10px 12px 0}
+.tunev canvas{display:block;width:100%;height:150px;border-radius:10px;background:#1e2232}
+.tunev .cnote{padding:6px 2px 0}
 .fh{display:flex;justify-content:space-between;align-items:center;width:100%;min-height:44px;margin:12px 0 2px;padding:0 10px;border-radius:10px;background:var(--panel);font-size:15px;font-weight:600;color:var(--mut)}
 .fh::after{content:'';width:8px;height:8px;margin-top:-4px;border-right:2px solid;border-bottom:2px solid;transform:rotate(45deg);transition:transform .15s}
 .fh .fon{margin-left:auto;margin-right:10px;padding:1px 8px;border-radius:999px;background:rgba(122,162,255,.2);color:#9db8ff;font-size:12px;font-weight:700;letter-spacing:.03em}
@@ -325,8 +328,8 @@ body.s-rec #recBtn{background:#fff;color:var(--rec)}
 
 /* Settings page */
 .spage{position:fixed;inset:0;left:44px;top:var(--hh,0px);z-index:15;background:var(--desk);box-shadow:-8px 0 20px rgba(0,0,0,.45);overflow-y:auto;transform:translateX(110%);transition:transform .25s ease;visibility:hidden}
-[data-mode=set] #spage,[data-mode=audio] #apage{transform:none;visibility:visible}
-.meters{cursor:pointer;padding:6px 0;border-radius:8px}
+[data-mode=set] #spage{transform:none;visibility:visible}
+.meters{padding:6px 0}
 .mtr.big{height:10px;border-radius:5px;flex:1}
 .orow{color:var(--text)}
 .orow::after{content:'';width:10px;height:18px;margin-right:6px;border-right:3px solid transparent;border-bottom:3px solid transparent;transform:rotate(45deg)}
@@ -490,7 +493,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <header class="status">
     <div class="posw"><svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15"/><circle id="ringArc" cx="18" cy="18" r="15" pathLength="100" stroke-dasharray="0 100"/></svg><div id="pos">–</div></div>
     <button class="home" id="homeBtn" aria-label="Varv one: back to the play view"><span>Varv</span><span class="one"><svg class="mk o" viewBox="0 0 512 512" aria-hidden="true"><g stroke="#ece5d0" stroke-width="13" stroke-linecap="round"><line x1="256.0" y1="150.0" x2="256.0" y2="58.0" opacity=".32"/><line x1="275.9" y1="130.2" x2="283.6" y2="81.6" opacity=".32"/><line x1="297.4" y1="128.5" x2="308.5" y2="94.3" opacity=".32"/><line x1="316.1" y1="138.0" x2="333.9" y2="103.1"/><line x1="335.1" y1="147.1" x2="355.6" y2="119.0"/><line x1="349.8" y1="162.2" x2="377.2" y2="134.8"/><line x1="355.9" y1="183.4" x2="402.0" y2="149.9"/><line x1="377.8" y1="193.9" x2="405.0" y2="180.1"/><line x1="381.9" y1="215.1" x2="419.2" y2="203.0"/><line x1="390.0" y1="234.8" x2="422.3" y2="229.7"/><line x1="388.9" y1="256.0" x2="427.1" y2="256.0"/><line x1="364.3" y1="273.2" x2="447.9" y2="286.4"/><line x1="379.0" y1="296.0" x2="422.1" y2="310.0"/><line x1="380.6" y1="319.5" x2="402.2" y2="330.5"/><line x1="366.7" y1="336.4" x2="391.3" y2="354.3"/><line x1="352.5" y1="352.5" x2="374.5" y2="374.5"/><line x1="339.9" y1="371.4" x2="350.8" y2="386.5"/><line x1="314.6" y1="370.9" x2="335.4" y2="411.9"/><line x1="299.2" y1="388.9" x2="306.8" y2="412.3"/><line x1="276.8" y1="387.0" x2="282.8" y2="425.2"/><line x1="256.0" y1="390.3" x2="256.0" y2="425.7"/><line x1="233.9" y1="395.3" x2="230.5" y2="417.0"/><line x1="214.6" y1="383.4" x2="203.5" y2="417.7"/><line x1="203.3" y1="359.5" x2="170.7" y2="423.4"/><line x1="177.9" y1="363.4" x2="155.4" y2="394.5"/><line x1="156.0" y1="356.0" x2="141.0" y2="371.0"/><line x1="140.5" y1="339.9" x2="125.6" y2="350.8"/><line x1="143.1" y1="313.5" x2="98.0" y2="336.5"/><line x1="124.3" y1="298.8" x2="98.6" y2="307.2"/><line x1="117.3" y1="278.0" x2="94.4" y2="281.6"/><line x1="124.0" y1="256.0" x2="84.0" y2="256.0"/><line x1="124.5" y1="235.2" x2="87.3" y2="229.3"/><line x1="149.1" y1="221.3" x2="73.8" y2="196.8"/><line x1="139.4" y1="196.6" x2="101.7" y2="177.4"/><line x1="145.3" y1="175.6" x2="120.8" y2="157.7"/><line x1="160.3" y1="160.3" x2="136.7" y2="136.7" opacity=".32"/><line x1="178.8" y1="149.8" x2="154.5" y2="116.3" opacity=".32"/><line x1="195.9" y1="138.0" x2="178.1" y2="103.1" opacity=".32"/><line x1="214.2" y1="127.4" x2="203.8" y2="95.4" opacity=".32"/><line x1="235.3" y1="125.5" x2="229.1" y2="86.2" opacity=".32"/></g><line x1="194.7" y1="204.6" x2="82.9" y2="110.7" stroke="#ffb224" stroke-width="14" stroke-linecap="round"/><circle cx="256" cy="256" r="46" fill="#ff3d57"/></svg>ne</span><span class="perfind" id="perfInd" hidden>●</span></button>
-    <button class="meters" id="metersBtn" aria-label="Audio setup: microphone and output"><span>in</span><i class="mtr" id="mIn" title="Microphone level"><b></b></i><span>out</span><i class="mtr" id="mOut" title="Output level"><b></b></i></button>
+    <div class="meters" id="metersBtn" aria-label="Microphone and output level"><span>in</span><i class="mtr" id="mIn" title="Microphone level"><b></b></i><span>out</span><i class="mtr" id="mOut" title="Output level"><b></b></i></div>
     <div class="sr" id="stateText" aria-live="polite">Stopped</div><span class="sr" id="projName"></span>
   </header>
 
@@ -498,7 +501,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
     <main class="tape" id="tape">
       <div class="empty" id="empty">
         <p><b>Varv is a looper:</b> what you record repeats in time with the click, layer by layer. <b>Tap Record</b>: one bar of count-in, then it records lap after lap, each into the next empty track, until you tap Record again. <b>Hold Record</b> for its options, <b>hold Undo</b> for what can be brought back. A track's <b>mic</b> button records a sample to play on keys.</p>
-        <p><b>Headphones lag,</b> so Varv moves each recording back to land on the beat. Measure the delay once on the audio page (tap the in and out meters at the top): <b>Measure exactly</b> for the headphones, <b>Measure by tapping</b> for the keys.</p>
+        <p><b>Headphones lag,</b> so Varv moves each recording back to land on the beat. Measure the delay once under Audio in Settings (swipe left): <b>Measure exactly</b> for the headphones, <b>Measure by tapping</b> for the keys.</p>
       </div>
       <div class="cont" id="cont" hidden><button class="btn on wide" id="contBtn"></button></div>
       <div id="lanes"></div>
@@ -533,6 +536,33 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="sp-head stk"><h2 id="hSet">Settings</h2><div id="setTiles"></div></div>
 
 
+
+  <div class="spg" data-pg="audio">
+  <p class="hint" id="hMeasure" hidden></p>
+  <div id="apStart"></div>
+  <h3>Latency</h3>
+  <div>
+  <div class="card">
+    <div class="cr"><span>Headphones</span><div class="pill" id="latStep"><button class="sbtn" data-d="-1" aria-label="Shorter">−</button><output id="latVal"></output><button class="sbtn" data-d="1" aria-label="Longer">+</button></div></div>
+    <button class="cr act" id="measLoop"><span>Measure exactly<small>Hold the phone's microphone against an earbud, volume up.</small></span></button>
+    <div class="cpad"><div class="dots" id="measDots" hidden></div><p id="measRes" hidden></p><button class="btn on wide" id="measUse" hidden></button></div>
+    <div class="cr"><span>Screen</span><div class="pill" id="scrStep"><button class="sbtn" data-d="-1" aria-label="Shorter">−</button><output id="scrVal"></output><button class="sbtn" data-d="1" aria-label="Longer">+</button></div></div>
+    <button class="cr act" id="measTap"><span>Measure by tapping<small>For the sampler. Headphones on, tap along with the clicks as you hear them.</small></span></button>
+    <div class="cpad"><button class="tappad" id="tapPad" hidden>Tap on the clicks</button><div class="dots" id="tapDots" hidden></div><p id="tapRes" hidden></p><button class="btn on wide" id="tapUse" hidden></button></div>
+  </div>
+  </div>
+  <div id="apIn"></div>
+  <h3>Restart and more</h3>
+  <div>
+  <div class="card">
+    <button class="cr act" id="restartBtn"><span>Restart audio<small>Closes the sound and the microphone and starts them again, as when the app opens. Try it if the delay grows or the sound goes to the wrong place.</small></span></button>
+    <div class="cr"><span>Auto level recordings</span><div id="autoLvlSw"></div></div>
+    <p class="cnote" id="diag">The audio starts with Start audio, at the top, or the first time you tap Start, Record or Measure.</p>
+    <p class="csub">Audio log</p>
+    <pre class="alog" id="alog"></pre>
+  </div>
+  </div>
+  </div>
 
   <div class="spg" data-pg="loop"><h3>Loop and click</h3>
   <div id="loopHome"><div id="loopBox">
@@ -572,7 +602,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   </div>
   </div>
 
-  <div class="spg" data-pg="rec"><h3>Recording, mute and scenes</h3>
+  <div class="spg" data-pg="rec"><h3>Behaviour</h3>
   <div class="card">
     <div class="cr"><span>Overdub with Record</span><div id="overdubSw"></div></div>
     <p class="cnote">For the big Record button: on, a lap recorded onto a track that already has one plays on top of it; off, it replaces it. A track's own buttons choose for themselves.</p>
@@ -589,36 +619,9 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 10:30</p>
+  <p class="ver">Varv one, build 19 Nov 11:30</p>
 </div></div>
 
-<div class="spage" id="apage" role="dialog" aria-label="Audio setup"><div class="sp-in">
-  <div class="sp-head"><h2>Audio</h2><button class="tbtn" id="apDone">Done</button></div>
-  <p class="hint" id="hMeasure" hidden></p>
-  <div id="apStart"></div>
-  <h3>Latency</h3>
-  <div>
-  <div class="card">
-    <div class="cr"><span>Headphones</span><div class="pill" id="latStep"><button class="sbtn" data-d="-1" aria-label="Shorter">−</button><output id="latVal"></output><button class="sbtn" data-d="1" aria-label="Longer">+</button></div></div>
-    <button class="cr act" id="measLoop"><span>Measure exactly<small>Hold the phone's microphone against an earbud, volume up.</small></span></button>
-    <div class="cpad"><div class="dots" id="measDots" hidden></div><p id="measRes" hidden></p><button class="btn on wide" id="measUse" hidden></button></div>
-    <div class="cr"><span>Screen</span><div class="pill" id="scrStep"><button class="sbtn" data-d="-1" aria-label="Shorter">−</button><output id="scrVal"></output><button class="sbtn" data-d="1" aria-label="Longer">+</button></div></div>
-    <button class="cr act" id="measTap"><span>Measure by tapping<small>For the sampler. Headphones on, tap along with the clicks as you hear them.</small></span></button>
-    <div class="cpad"><button class="tappad" id="tapPad" hidden>Tap on the clicks</button><div class="dots" id="tapDots" hidden></div><p id="tapRes" hidden></p><button class="btn on wide" id="tapUse" hidden></button></div>
-  </div>
-  </div>
-  <div id="apIn"></div>
-  <h3>Restart and more</h3>
-  <div>
-  <div class="card">
-    <button class="cr act" id="restartBtn"><span>Restart audio<small>Closes the sound and the microphone and starts them again, as when the app opens. Try it if the delay grows or the sound goes to the wrong place.</small></span></button>
-    <div class="cr"><span>Auto level recordings</span><div id="autoLvlSw"></div></div>
-    <p class="cnote" id="diag">The audio starts with Start audio, at the top, or the first time you tap Start, Record or Measure.</p>
-    <p class="csub">Audio log</p>
-    <pre class="alog" id="alog"></pre>
-  </div>
-  </div>
-</div></div>
 <div class="back" id="backL" aria-label="Back to play"></div>
 <div class="undo" id="undoBar" hidden><span id="undoTxt"></span><button id="undoRestore">Restore</button><button class="x" id="undoClose" aria-label="Dismiss and discard removed recordings">×</button></div>
 <div class="toast" id="toast" hidden><span id="toastTxt"></span></div>
@@ -774,7 +777,7 @@ async function restartAudio() {
   const ok = await initAudio();
   if (ok && keep && sr !== oldSr) await openProject(project.id);                  // a new rate: the project is read again and converted to it
   else for (const t of tracks) if (t.sample) prepSample(t);
-  ui(); if (mode === 'audio') drawAudio();
+  ui(); if (audioShown()) drawAudio();
   toast(ok ? 'Audio restarted. Measure the latency again if it still seems off.' : 'The audio could not start again. Close the app and open it again.');
   return ok;
 }
@@ -1507,7 +1510,7 @@ const KEYS = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B�
 const pitchTxt = t => { const a = []; if (t.oct) a.push((t.oct > 0 ? '+' : '−') + Math.abs(t.oct) + ' oct'); if (t.semi) a.push((t.semi > 0 ? '+' : '−') + Math.abs(t.semi) + ' st'); if (t.cent) a.push((t.cent > 0 ? '+' : '−') + Math.abs(t.cent) + ' ct'); if (t.tune) a.push('tuned'); return a.join(' '); };
 /* Pitch changes are applied a moment after the last touch, so dragging the fine tuner does not queue a render per step. */
 function pitchChanged(t) {
-  markDirty(); drawHead(t);
+  markDirty(); drawHead(t); if (t.tviz && t.tviz.isConnected) t.tviz.draw();
   clearTimeout(t.pT); t.pT = setTimeout(() => { if (t.sample) prepSample(t); else for (const k of t.takes) k.final = false; }, 180);
 }
 
@@ -3021,7 +3024,7 @@ const TILE_ICON = {
   mix: ICO('M6 3v18M12 3v18M18 3v18M4 15h4M10 8h4M16 12h4'),
   eq: ICO('M2 15c3 0 3-8 6-8s3 11 7 11 3-6 7-6'),
   drive: ICO('M12 2c1 4 6 6 6 12a6 6 0 01-12 0c0-3 2-5 2-7 2 1 3 4 3 4 1-3 1-6 1-9z'),
-  colour: ICO('M3 19h4v-4h4v-4h4V7h4V4'),
+  fx: ICO('M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1', '<circle cx="12" cy="12" r="3"/>'),
   space: ICO('M7 7a7 7 0 000 10M17 7a7 7 0 010 10M4 4a11 11 0 000 16M20 4a11 11 0 010 16', '<circle cx="12" cy="12" r="2"/>'),
   xy: ICO('M4 4h16v16H4zM12 4v16M4 12h16', '<circle cx="16" cy="8" r="2.2" class="fl"/>'),
   delay: ICO('', '<circle cx="5" cy="12" r="2.6"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="1.4"/><circle cx="22" cy="12" r=".8"/>'),
@@ -3160,16 +3163,15 @@ function trackPane(t) {
         sliderRow('Level', 0, 1.5, 0.01, t.dLvl, 1, pct, ad('dLvl')),
         el('p', 'cnote', DIST_NOTE))];
     },
-    colour: () => [liveCard(t, () => applyTrack(t), 'colour')],
-    space: () => [liveCard(t, () => applyTrack(t), 'space')],
+    fx: () => [el('h3', '', 'Colour'), liveCard(t, () => applyTrack(t), 'colour'), el('h3', '', 'Space'), liveCard(t, () => applyTrack(t), 'space')],
     xy: () => xyPane(t),
   };
   const on = {
     source: changedIn.source(t), shape: changedIn.shape(t), pitch: changedIn.spitch(t) || changedIn.tune(t), tricks: changedIn.edits(t), laps: changedIn.takes(t) || changedIn.track(t),
-    mix: changedIn.mix(t), eq: eqChanged(t, 'filt'), drive: !!t.dist, colour: changedIn.colour(t), space: changedIn.space(t), xy: changedIn.xy(t) };
+    mix: changedIn.mix(t), eq: eqChanged(t, 'filt'), drive: !!t.dist, fx: changedIn.colour(t) || changedIn.space(t), xy: changedIn.xy(t) };
   const [tb, ...pg] = tilePages(t.ink, [
     ['Sound edits: change the ' + (smp ? 'sample' : 'recordings'), [['source', 'Source', !smp && mic.length > 0], ['shape', 'Shape'], ['pitch', 'Pitch'], ['tricks', 'Tricks'], ['laps', 'Laps']]],
-    ['Live effects: on what plays', [['mix', 'Mix'], ['eq', 'EQ'], ['drive', 'Drive'], ['colour', 'Colour'], ['space', 'Space'], ['xy', 'XY pad']]]],
+    ['Live effects: on what plays', [['mix', 'Mix'], ['eq', 'EQ'], ['drive', 'Drive'], ['fx', 'Effects'], ['xy', 'XY pad']]]],
     on, PAGES, smp && performance.now() - (t.sample.at || 0) < MEM_MS ? 'source' : null);
   const stick = el('div', 'estick'); stick.append(head, tb); p.append(stick, ...pg);
   return p;
@@ -3490,10 +3492,67 @@ function pitchRows(t) {
     el('p', 'cnote', isSmp(t) ? 'Transposes the sample, not its length. The keys move with it.' : 'Changes the pitch of every recording on the track, not the tempo.')];
 }
 /* Autotune: snaps a single voice or instrument to the nearest note of a key and scale. */
+/* Intonation: the pitch of the sample, or of the newest take, over its length (grey, after any transposing) and
+   where autotune puts it (in the track's colour), over lines for the notes of the key (the key's own note brighter).
+   The pitch is measured once per sound and kept; moving a setting only works out the correction again. */
+function tuneSrc(t) {
+  if (t.sample) { const s = t.sample; return { key: s.key + ':' + s.a + ':' + s.b, x: s.raw.subarray(s.a, s.b) }; }
+  const k = t.takes.filter(k => !k.notes && k.raw && k.filled).pop(); if (!k) return null;
+  const d = clamp(latN(k.lat), 0, MAXLAT), n = Math.min(len0Of(k), k.filled - d); if (n < 2048) return null;
+  return { key: k.key + ':' + k.lat, x: k.raw.subarray(d, d + n) };
+}
+function tuneViz(t) {
+  const box = el('div', 'tunev'), cv = el('canvas'), out = el('p', 'cnote'); box.append(cv, out);
+  let pend = 0;
+  function draw() {
+    const src = tuneSrc(t);
+    if (!src) { out.textContent = t.sample ? '' : 'Record a take to see its intonation here.'; const { g, w, h } = sizeCanvas(cv); if (w) g.clearRect(0, 0, w, h); return; }
+    if (!t.ptr || t.ptr.key !== src.key) {             // measure the pitch, once per sound, a moment later so the page shows first
+      out.textContent = 'Measuring the pitch…';
+      clearTimeout(pend); pend = setTimeout(() => { const N = src.x.length, hop = Math.max(256, Math.floor(N / 400)); t.ptr = { key: src.key, hop, pc: pitchTrack(src.x, sr, hop) }; draw(); }, 30);
+      return;
+    }
+    const { pc, hop } = t.ptr, n = pc.length, base = 1200 * Math.log2(pitchRatio(t));
+    let corr = null;                                   // cents added at each frame, or one amount for the whole sample
+    if (t.tune) {
+      if (t.sample && t.tMode !== 'cont') { const u = sampleTune(t); corr = new Float32Array(n).fill((u.corr || 0) * 100); }
+      else corr = tuneCurve(pc, base, tuneOf(t), hop / sr * 1000);
+    }
+    const before = Array.from(pc, v => v === v ? 69 + (v + base) / 100 : NaN), after = corr ? before.map((m, j) => m === m ? m + corr[j] / 100 : NaN) : null;
+    const vals = before.concat(after || []).filter(m => m === m);
+    const { g, w, h } = sizeCanvas(cv); if (!w) return;
+    g.clearRect(0, 0, w, h);
+    if (!vals.length) { out.textContent = 'No clear pitch found.'; return; }
+    vals.sort((a, b) => a - b);
+    const lo0 = vals[Math.floor(vals.length * 0.02)], hi0 = vals[Math.floor(vals.length * 0.98)], mid = (lo0 + hi0) / 2, span = Math.max(7, hi0 - lo0 + 3);
+    const lo = mid - span / 2, hi = mid + span / 2, Y = m => h - 6 - (m - lo) / (hi - lo) * (h - 12), L = 30;
+    const sc = SCALES[t.tScale] || SCALES.chrom, inKey = q => sc.includes((((q - t.tKey) % 12) + 12) % 12);
+    g.font = '600 10px ' + getComputedStyle(document.body).fontFamily; g.textBaseline = 'middle';
+    for (let q = Math.ceil(lo); q <= Math.floor(hi); q++) {
+      const root = ((q - t.tKey) % 12 + 12) % 12 === 0, ink = t.tune ? inKey(q) : true;
+      g.fillStyle = root && t.tune ? 'rgba(255,178,36,.45)' : ink ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.04)';
+      g.fillRect(L, Math.round(Y(q)), w - L, 1);
+      if (ink && (span < 14 || inKey(q))) { g.fillStyle = root && t.tune ? '#ffb224' : 'rgba(200,206,226,.7)'; g.fillText(midiName(q), 2, Y(q)); }
+    }
+    const line = (arr, col, wd) => {
+      g.strokeStyle = col; g.lineWidth = wd; g.lineJoin = 'round'; g.beginPath(); let pen = false;
+      for (let j = 0; j < n; j++) { const m = arr[j]; if (m !== m) { pen = false; continue; } const x = L + j / (n - 1) * (w - L), y = Y(m); if (pen) g.lineTo(x, y); else g.moveTo(x, y); pen = true; }
+      g.stroke();
+    };
+    line(before, after ? 'rgba(200,206,226,.45)' : t.ink, after ? 1.2 : 1.8);
+    if (after) line(after, t.ink, 1.8);
+    let dev = 0, cnt = 0; for (const m of before) if (m === m) { dev += Math.abs(m - Math.round(m)); cnt++; }   // how far from the nearest semitone, on average
+    out.textContent = (t.sample ? 'The sample' : 'The newest take') + ' is on average ' + Math.round(dev / cnt * 100) + ' cents from the nearest semitone.'
+      + (after ? ' Grey: as played, colour: after autotune.' : ' Switch autotune on to see where it puts it.');
+  }
+  box.draw = draw; t.tviz = box; requestAnimationFrame(draw);
+  return box;
+}
 function tuneCard(t) {
   const mr0 = () => { const md = el('div', 'seg full'), mr = el('div', 'cr'); seg(md, [['whole', 'Whole sample'], ['cont', 'Continuous']], () => t.tMode || 'whole', v => { t.tMode = v; pitchChanged(t); renderPane(); }, 'whole'); mr.append(md); return mr; };
   const smp = isSmp(t), on = crow('On', swtch(el('div'), () => t.tune, v => { t.tune = v; pitchChanged(t); renderPane(); }, false));
-  if (!t.tune) return card(on, el('p', 'cnote', smp ? 'Moves the sample to the nearest note of a key: all of it by one amount, or each moment of it.' : 'Pulls a single voice or instrument to the nearest note in a key. Chords confuse it.'));
+  const viz = tuneViz(t);
+  if (!t.tune) return card(viz, on, el('p', 'cnote', smp ? 'Moves the sample to the nearest note of a key: all of it by one amount, or each moment of it.' : 'Pulls a single voice or instrument to the nearest note in a key. Chords confuse it.'));
   const res = el('p', 'cnote'), upd = () => {                  // on a sampler: what the one shift does
     if (!smp) return;
     const u = sampleTune(t);
@@ -3509,15 +3568,15 @@ function tuneCard(t) {
   seg(sg, [['major', 'Major'], ['minor', 'Minor'], ['pent', 'Penta'], ['chrom', 'All 12']], () => t.tScale, v => { t.tScale = v; upd(); pitchChanged(t); }, 'chrom');
   sr2.append(sg);
   if (smp) {
-    if (t.tMode === 'cont') return card(on, mr0(), crow('Key', kp), sr2,
+    if (t.tMode === 'cont') return card(viz, on, mr0(), crow('Key', kp), sr2,
       sliderRow('Speed', 0, 200, 1, t.tSpeed, 20, v => v < 1 ? 'hard' : Math.round(v) + ' ms', v => { v = Math.round(v); if (t.tSpeed !== v) { t.tSpeed = v; pitchChanged(t); } }),
       sliderRow('Amount', 0, 1, 0.01, t.tAmt, 1, pct, v => { if (t.tAmt !== v) { t.tAmt = v; upd(); pitchChanged(t); } }),
       el('p', 'cnote', 'Pulls each moment of the sample to the nearest note, so a note that wavers or slides is held in tune. Speed is how fast it is pulled in: hard gives the robotic effect, slower keeps some vibrato. The key is what you hear, after any transposing.'));
   }
-  if (smp) return card(on, mr0(), crow('Key', kp), sr2,
+  if (smp) return card(viz, on, mr0(), crow('Key', kp), sr2,
     sliderRow('Amount', 0, 1, 0.01, t.tAmt, 1, pct, v => { if (t.tAmt !== v) { t.tAmt = v; upd(); pitchChanged(t); } }), res,
     el('p', 'cnote', 'Listens to the whole sample once and moves all of it by one amount, so vibrato and slides stay as played. The key is what you hear, after any transposing. Penta is the major pentatonic; for minor pentatonic choose its relative major (A minor: C).'));
-  return card(on, crow('Key', kp), sr2,
+  return card(viz, on, crow('Key', kp), sr2,
     sliderRow('Speed', 0, 200, 1, t.tSpeed, 20, v => v < 1 ? 'hard' : Math.round(v) + ' ms', v => { v = Math.round(v); if (t.tSpeed !== v) { t.tSpeed = v; pitchChanged(t); } }),
     sliderRow('Amount', 0, 1, 0.01, t.tAmt, 1, pct, v => { if (t.tAmt !== v) { t.tAmt = v; pitchChanged(t); } }),
     el('p', 'cnote', 'The key is what you hear, after any transposing. Speed is how fast a note is pulled in: hard gives the robotic effect, slower keeps vibrato and slides. Penta is the major pentatonic; for minor pentatonic choose its relative major (A minor: C).'));
@@ -3651,16 +3710,15 @@ function masterPane() {
     reverb: () => [card(fx('revSize', 'Size', 0.4, 4, 0.1, 2, v => v.toFixed(1) + ' s'), fx('revLvl', 'Level', 0, 1.5, 0.01, 1, pct))],
     comp: () => [card(fx('compThr', 'Thresh.', -40, 0, 1, -18, v => (v < 0 ? '−' : '') + Math.abs(v) + ' dB'),
       fx('compAmt', 'Amount', 0, 1, 0.01, 0, v => v === 0 ? 'off' : (1 + v * 11).toFixed(1) + ':1'))],
-    colour: () => [liveCard(MT, applyMaster, 'colour')],
-    space: () => [liveCard(MT, applyMaster, 'space')],
+    fx: () => [el('h3', '', 'Colour'), liveCard(MT, applyMaster, 'colour'), el('h3', '', 'Space'), liveCard(MT, applyMaster, 'space')],
     xy: () => xyPane(MT),
   };
   const on = { mix: !near(st.master, 0.9) || !near(st.gFilter, 0) || st.gRev > 0 || st.gEcho > 0, eq: eqChanged(st, 'gFilter'),
     delay: !near(st.echoDiv === 'free' ? 1 : st.echoDiv, 0.75) || !near(st.echoFb, 0.42) || !near(st.echoLvl, 1), reverb: !near(st.revSize, 2) || !near(st.revLvl, 1),
-    comp: st.compAmt > 0, colour: changedIn.colour(MT), space: changedIn.space(MT), xy: changedIn.xy(MT) };
+    comp: st.compAmt > 0, fx: changedIn.colour(MT) || changedIn.space(MT), xy: changedIn.xy(MT) };
   const [tb, ...pg] = tilePages('#ffb224', [                 // the live row has its tiles where a track has them
     ['Master', [['mix', 'Mix'], ['eq', 'EQ'], ['delay', 'Delay'], ['reverb', 'Reverb'], ['comp', 'Comp.']]],
-    ['Live effects', [null, null, null, ['colour', 'Colour'], ['space', 'Space'], ['xy', 'XY pad']]]], on, PAGES, null);
+    ['Live effects', [null, null, null, ['fx', 'Effects'], ['xy', 'XY pad']]]], on, PAGES, null);
   const stick = el('div', 'estick'); stick.append(tb); p.append(stick, ...pg);
   return p;
 }
@@ -3684,7 +3742,6 @@ function setMode(m) {
   if (m !== 'play' && !(st.hints.start && st.hints.swipe)) { st.hints.start = st.hints.swipe = 1; save(); ui(); }   // the first swipe dismisses the instructions
   else renderPane();
   if (m === 'set') { drawProjects(); drawPerf(); const sm = memEnter('settings'); drawSetFolds(); $('#spage').scrollTop = sm.scroll; }
-  if (m === 'audio') { $('#apage').scrollTop = 0; drawAudio(); }
   drawHeads();
 }
 let sw = null, eatClick = false;
@@ -3709,7 +3766,7 @@ document.addEventListener('pointerup', e => {
   eatClick = true; setTimeout(() => { eatClick = false; }, 350);
   if (s.vert) { if (s.up && dy < -40) openPadSheet(); else if (s.down && dy > 60) closePads(); return; }
   if (Math.abs(dx) < 50) return;
-  if (dx > 0) setMode(mode === 'set' || mode === 'audio' ? 'play' : mode === 'play' ? 'edit' : mode);
+  if (dx > 0) setMode(mode === 'set' ? 'play' : mode === 'play' ? 'edit' : mode);
   else setMode(mode === 'edit' ? 'play' : mode === 'play' ? 'set' : mode);
 }, true);
 document.addEventListener('pointercancel', () => { sw = null; }, true);
@@ -3789,7 +3846,7 @@ function setMeter(node, pk, clipT) {
 function peakOf(an) { an.getFloatTimeDomainData(mbuf); let pk = 0; for (let i = 0; i < mbuf.length; i++) { const v = Math.abs(mbuf[i]); if (v > pk) pk = v; } return pk; }
 let outS = 0;
 function meters() {
-  const aIn = mode === 'audio' && $('#aIn'), aOut = mode === 'audio' && $('#aOut');
+  const aIn = audioShown() && $('#aIn'), aOut = audioShown() && $('#aOut');
   setMeter($('#mIn'), inPeak, clipIn); if (aIn) setMeter(aIn, inPeak, clipIn); inPeak *= 0.86;
   if (!mAn) return;
   outS = Math.max(peakOf(mAn), outS * 0.86);
@@ -4234,13 +4291,13 @@ function fillMicRows(host) {
     b.addEventListener('click', () => {
       if (!ctx) return;
       st.micId = id; save(); fillMics();
-      openMic(chosenMic(mics), wantsBuiltin()).then(() => { fillMics(); if (mode === 'audio') drawAudio(); });
+      openMic(chosenMic(mics), wantsBuiltin()).then(() => { fillMics(); if (audioShown()) drawAudio(); });
     });
     host.append(b);
   }
 }
 function fillMics() {
-  if (mode === 'audio') { const ms = $('#apage .microws'); if (ms) fillMicRows(ms); }
+  if (audioShown()) { const ms = $('#spage .microws'); if (ms) fillMicRows(ms); }
 }
 function diag() {
   if (!ctx) return;
@@ -4312,8 +4369,6 @@ function drawClick() {
 $('#homeBtn').addEventListener('click', () => { closePads(); setMode('play'); });
 $('#backR').addEventListener('click', () => setMode('play'));
 $('#backL').addEventListener('click', () => setMode('play'));
-$('#metersBtn').addEventListener('click', () => setMode(mode === 'audio' ? 'play' : 'audio'));
-$('#apDone').addEventListener('click', () => setMode('play'));
 /* Folds within a settings page (the saved projects), remembered as the pages are. */
 const setFoldShow = [];
 for (const h of document.querySelectorAll('.spage .sfh')) {
@@ -4327,11 +4382,15 @@ for (const h of document.querySelectorAll('.spage .sfh')) {
 function drawSetFolds() {
   for (const f of setFoldShow) f();
   const m = memOf('settings'), cur = 'page' in m.f ? m.f.page : 'loop';
-  const g = tileGrid([[null, [['audio', 'Audio'], ['loop', 'Loop'], ['files', 'Projects'], ['rec', 'Recording'], ['help', 'Help']]]], cur, {},
-    k => { if (k === 'audio') { setMode('audio'); return; } m.f.page = k; drawSetFolds(); $('#spage').scrollTop = 0; });
+  const g = tileGrid([[null, [['audio', 'Audio'], ['loop', 'Loop'], ['rec', 'Behaviour'], ['files', 'Projects'], ['help', 'Help']]]], cur, {},
+    k => { m.f.page = k || cur; drawSetFolds(); $('#spage').scrollTop = 0; });
   $('#setTiles').replaceChildren(g);
   for (const d of document.querySelectorAll('#spage .spg')) d.hidden = d.dataset.pg !== cur;
+  if (cur === 'audio' && mode === 'set' && typeof drawAudio === 'function') drawAudio();
 }
+function setPage() { const m = paneMem.settings; return m && 'page' in m.f ? m.f.page : 'loop'; }
+function audioShown() { return mode === 'set' && setPage() === 'audio'; }
+function openAudio() { memEnter('settings').f.page = 'audio'; if (mode === 'set') { drawSetFolds(); $('#spage').scrollTop = 0; } else setMode('set'); }
 drawSetFolds();
 $('#restartBtn').addEventListener('click', () => restartAudio());
 $('#backT').addEventListener('click', closePads);
@@ -4460,7 +4519,7 @@ document.addEventListener('keydown', e => {
   else if (k === 'k' || k === 'K') setClick(!st.clickOn);
   else if (k === 'e' || k === 'E') setMode(mode === 'edit' ? 'play' : 'edit');
   else if (k === 's' || k === 'S') setMode(mode === 'set' ? 'play' : 'set');
-  else if (k === 'a' || k === 'A') setMode(mode === 'audio' ? 'play' : 'audio');
+  else if (k === 'a' || k === 'A') { if (audioShown()) setMode('play'); else openAudio(); }
   else if (k === 'Escape') { closePads(); setMode('play'); }
   else if (/^Digit[1-9]$/.test(e.code)) { const t = tracks[+e.code.slice(5) - 1]; if (t) { if (e.shiftKey) toggleSolo(t); else toggleMute(t); } }
 });
@@ -4480,7 +4539,7 @@ window.addEventListener('resize', () => { setShift(); setHH(); for (const t of t
 
 freshTracks(); dirty = false;
 buildRuler(); drawScenes(); ui(); requestAnimationFrame(frame);
-if (!ctx) setMode('audio');                        // the audio is not running yet: open on the audio page, with its Start audio button
+openAudio();                                       // Varv opens on the audio page in Settings, with Start audio at the top
 /* redraw the waveforms whenever the rows change height */
 if (window.ResizeObserver) new ResizeObserver(() => { for (const t of tracks) drawLane(t); }).observe($('#lanes'));
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
