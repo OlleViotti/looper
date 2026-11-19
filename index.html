@@ -625,7 +625,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 12:40</p>
+  <p class="ver">Varv one, build 19 Nov 13:10</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -3142,7 +3142,7 @@ function trackPane(t) {
       const tail = [el('h3', '', 'Track'), card(...(has0 ? [eb] : []), xb, el('p', 'cnote', (has0 ? 'Removing keeps every setting, so the track is ready for a new sound. ' : '') + 'The bar at the bottom can bring back what was removed.'))];
       return srcPage().concat(tail);
     },
-    shape: () => smp ? [el('h3', '', 'Envelope'), ...envCard(t), el('h3', '', 'Compressor'), compCard(t)] : [el('h3', '', 'Compressor'), compCard(t), el('p', 'cnote', 'The envelope is for samples.')],
+    shape: () => smp ? [el('h3', '', 'Envelope'), ...envCard(t), el('h3', '', 'Compressor'), compCard(t)] : [card(compWave(t)), el('h3', '', 'Compressor'), compCard(t)],
     pitch: () => [smp ? samplePitch(t) : pitchCard(t), el('h3', '', 'Autotune'), tuneCard(t)],
     tricks: tricksPage,
     laps: lapsPage,
@@ -3356,6 +3356,39 @@ function sampleEdited(t, redetect, wait) {
 /* The envelope over the sample, drawn like the graphical EQ: A sets the attack, D the decay (sideways) and the
    sustain level (up and down), R in the box on the right the release of a Held note. Double-tap a handle to
    reset it. The faint waveform is the sample as it is, the bright one with the envelope. */
+/* A microphone track's newest take as a level from the bottom up, as the sample is shown above its envelope: faint as
+   recorded, bright after the compressor, with the threshold dashed. Worked out again when the compressor changes. */
+function compWave(t) {
+  const wrap = el('div', 'eqw envw'), cv = el('canvas', 'eqc envc'), out = el('output'); wrap.append(cv, out);
+  let memo = null;
+  function draw() {
+    const src = tuneSrc(t), c = compOf(t), { g, w, h } = sizeCanvas(cv); if (!w) return;
+    g.clearRect(0, 0, w, h);
+    if (!src) { out.textContent = 'Record a take to see it here.'; return; }
+    const key = src.key + JSON.stringify(c);
+    if (!memo || memo.key !== key) {
+      const x = src.x, M = x.length;
+      let y = x;
+      if (c.on) { const xx = new Float32Array(2 * M); xx.set(x); xx.set(x, M); y = compress(xx, c).subarray(M); }
+      memo = { key, x, y };
+    }
+    const { x, y } = memo, PAD = 12, n = Math.max(1, Math.floor(w - 2 * PAD)), base = h - PAD, full = h - 2 * PAD;
+    const pk = a => { const p = new Float32Array(n); for (let j = 0; j < n; j++) { const i0 = Math.floor(j / n * a.length), i1 = Math.max(i0 + 1, Math.floor((j + 1) / n * a.length)); let m = 0; for (let i = i0; i < i1; i++) { const v = Math.abs(a[i]); if (v > m) m = v; } p[j] = m; } return p; };
+    const pb = pk(x), pa = c.on ? pk(y) : pb; let top = 1e-4; for (let j = 0; j < n; j++) top = Math.max(top, pb[j], pa[j]);
+    for (let j = 0; j < n; j++) {
+      const h1 = pb[j] / top * full, h2 = pa[j] / top * full;
+      g.fillStyle = 'rgba(236,229,208,.14)'; g.fillRect(PAD + j, base - h1, 1, h1);
+      g.fillStyle = 'rgba(236,229,208,.55)'; g.fillRect(PAD + j, base - h2, 1, h2);
+    }
+    if (c.on) {
+      const ty = base - Math.min(1, Math.pow(10, c.thr / 20) / top) * full;
+      g.strokeStyle = '#ffb224'; g.setLineDash([4, 4]); g.lineWidth = 1; g.beginPath(); g.moveTo(PAD, Math.round(ty) + 0.5); g.lineTo(w - PAD, Math.round(ty) + 0.5); g.stroke(); g.setLineDash([]);
+    }
+    out.textContent = 'The newest take, ' + (x.length / sr).toFixed(2) + ' s' + (c.on ? ': faint as recorded, bright after the compressor; the dashed line is the threshold.' : '. Switch the compressor on to see what it does.');
+  }
+  wrap.draw = draw; requestAnimationFrame(draw);
+  return wrap;
+}
 function envWidget(t) {
   const s = t.sample, wrap = el('div', 'eqw envw'), cv = el('canvas', 'eqc envc'), out = el('output');
   cv.setAttribute('aria-label', 'Envelope: drag the handles');
