@@ -611,7 +611,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 16:30</p>
+  <p class="ver">Varv one, build 19 Nov 19:00</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -777,7 +777,7 @@ function initAudio() {
   if (ctx) { if (ctx.state !== 'running') ctx.resume().catch(() => {}); return initP; }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) { toast('This browser lacks the audio engine.'); return Promise.resolve(false); }
-  try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) {}
+  try { if (navigator.audioSession) navigator.audioSession.type = st.spk ? 'playback' : 'play-and-record'; } catch (e) {}
   /* The engine takes the phone's own rate. (Asking for a fixed 48 kHz made Safari play at the wrong speed when the phone
      changed its rate, going in or out of its call mode for a Bluetooth microphone.) */
   try { ctx = new AC({ latencyHint: 'interactive' }); } catch (e) { ctx = new AC(); }
@@ -789,7 +789,7 @@ function initAudio() {
   for (const t of tracks) buildTrackNodes(t);          // tracks prepared before audio started
   if (st.outId && ctx.setSinkId) setOutput(st.outId, true);               // the saved output, while this is still the tap that started the audio
   else if (st.outId && 'setSinkId' in HTMLMediaElement.prototype) setOutput(st.outId, true).then(ok => { if (!ok) { st.outId = ''; save(); } });
-  initP = (async () => { await setupCapture(); await openMic(wantsBuiltin() ? '' : st.micId, true); diag(); return true; })();
+  initP = (async () => { await setupCapture(); if (!st.spk) await openMic(wantsBuiltin() ? '' : st.micId, true); diag(); return true; })();
   return initP;
 }
 
@@ -954,6 +954,29 @@ const wantsBuiltin = () => !st.micId || st.micId === 'builtin';
 const builtinId = list => (list.find(m => BUILTIN.test(m.label)) || {}).deviceId || '';
 const chosenMic = list => wantsBuiltin() ? builtinId(list) : list.some(m => m.deviceId === st.micId) ? st.micId : builtinId(list);
 let autoRestartAt = -1e9, micDev = '', micOpenAt = 0, micList = '', keepT = 0, audioT0 = 0;
+/* Speaker mode. While the microphone is open, iOS treats the page like a phone call: the sound goes to the earpiece or
+   to headphones with a microphone, never to the loudspeaker or a Bluetooth speaker. With the microphone off it plays
+   like music again, anywhere. Sampler tracks still record what is played on the screen. */
+function closeMic() {
+  const s = micStream; micStream = null;
+  if (s) s.getTracks().forEach(t => t.stop());
+  if (micSrc) { try { micSrc.disconnect(); } catch (e) {} micSrc = null; }
+  micOK = false; micLabel = '';
+}
+async function setSpeaker(on) {
+  st.spk = on; save();
+  if (on) {
+    closeMic();
+    try { if (navigator.audioSession) { navigator.audioSession.type = 'playback'; navigator.audioSession.type = 'auto'; } } catch (e) {}
+    alog('speaker mode: microphone off');
+  } else {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) {}
+    if (ctx) await openMic(wantsBuiltin() ? '' : st.micId, true);
+    alog('speaker mode off: microphone on');
+  }
+  if (ctx) ctx.resume().catch(() => {});
+  diag(); ui(); if (audioShown()) drawAudio();
+}
 async function openMic(id, auto) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { micOK = false; toast('The microphone needs the page to be opened over https.'); return false; }
   const base = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 };
@@ -1003,6 +1026,7 @@ function reassertRoute() {
 }
 /* Holds on to the chosen microphone when headphones connect or the system changes the audio route. */
 function keepMic(force) {
+  if (st.spk) return;                                // speaker mode: the microphone stays off
   alog('microphone check' + (force ? ', reopening' : ''));
   clearTimeout(keepT);
   keepT = setTimeout(async () => {
@@ -1099,6 +1123,8 @@ function finishRec(p) {
   if (p < rec.k * rec.len && inTail(p)) { rec = null; toast('Recording finished.'); return; }
   rec.last = !rec.last;
 }
+const noMicMsg = () => st.spk ? 'Speaker mode is on, so the microphone is off. Switch it off under Audio to record from the microphone.' : 'The microphone is not running, so nothing can be recorded.';
+const nextIsSmp = () => { const r = plan(0), t = tracks.find(x => x.id === r.tid); return !!(t && t.sample); };   // a sampler records what is played on the screen, without the microphone
 async function toggleRec() {
   if (srec) { stopSampleRec(); return; }
   if (measuring) return;
@@ -1106,10 +1132,10 @@ async function toggleRec() {
   if (isFree() && !freeL) { if (defining) endDefine(); else beginDefine(); return; }
   if (!running) {
     if (!(await start(st.countIn !== false))) return;
-    if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
+    if (!micOK && !nextIsSmp()) { toast(noMicMsg()); return; }
     rec = plan(isFree() ? L : 0); ui(); return;            // free mode: hear the loop once, then record
   }
-  if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
+  if (!micOK && !nextIsSmp()) { toast(noMicMsg()); return; }
   const p = heardPos();
   if (rec) {
     if (p < rec.k * rec.len && !inTail(p)) rec = null;                     // was waiting: cancel
@@ -1139,8 +1165,9 @@ function recOptsCard() {                              // under Behaviour in Sett
 }
 function capturePrev() {
   hintDone('undo');
-  if (!running || !micOK) { toast('Start first, then there is a lap to capture.'); return; }
+  if (!running) { toast('Start first, then there is a lap to capture.'); return; }
   const r = plan(0), tt = tracks.find(x => x.id === r.tid);
+  if (!micOK && !(tt && tt.sample)) { toast(noMicMsg()); return; }
   r.k = Math.floor((tt && tt.sample ? nowF() - latN(prof().scr) - epoch : heardPos()) / r.len) - 1;
   if (r.k < 0) { toast('No full lap has passed yet.'); return; }
   if (taken(r)) { toast('That lap is already saved.'); return; }
@@ -1165,7 +1192,7 @@ function addTake(r, auto, lat) {
    Nothing is playing yet, so there is no output latency to correct and the take is not shifted. */
 async function beginDefine() {
   const ok = await initAudio(); if (!ok) return;
-  if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
+  if (!micOK) { toast(noMicMsg()); return; }
   if (running) stop();
   L = 0; ensureRing(Math.round((2 * FREE_MAX_S + 6) * sr));
   defining = { T0: nowF() }; wake(true); ui();
@@ -1954,7 +1981,7 @@ async function sampleRec(t) {
   if (srec) { if (srec.tid === t.id) stopSampleRec(); return; }
   if (measuring || defining) return;
   const ok = await initAudio(); if (!ok) return;
-  if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
+  if (!micOK) { toast(noMicMsg()); return; }
   ensureRing();
   srec = { tid: t.id, F: nowF() - Math.round(0.03 * sr) };
   refreshPane(t); if (padT === t) drawPads(); drawHead(t); ui();
@@ -2526,7 +2553,7 @@ async function recordInto(t, od) {          // od: overdub, on top of what the t
   if (isFree() && !freeL) { if (defining) return; defineInto = t.id; beginDefine(); return; }
   if (!running) {
     if (!(await start(true))) return;
-    if (!micOK) { toast('The microphone is not running, so nothing can be recorded.'); return; }
+    if (!micOK && !t.sample) { toast(noMicMsg()); return; }
     rec = { tid: t.id, len: trackLen(t), k: isFree() ? 1 : 0, cont: false, last: false, stay: true, od: !!od }; ui(); return;
   }
   const p = heardPos();
@@ -4318,14 +4345,17 @@ function guideOff() { if (!audioGuide) return; audioGuide = null; for (const n o
 async function drawAudio() {
   const host = $('#apIn'), sh = $('#apStart'); host.textContent = ''; sh.textContent = '';   // first Start audio, then Latency, then the microphone and output
   const h = st.hints || {};
+  const spk = card(crow('Speaker mode', swtch(el('div'), () => !!st.spk, v => setSpeaker(v), false)),   // first, so a project can be played out loud at once
+    el('p', 'cnote', 'For playing a project out loud. While the microphone is on, an iPhone plays only to the earpiece or to headphones with a microphone (AirPods), as in a phone call. Speaker mode turns the microphone off, so the sound can go to the loudspeaker, a Bluetooth speaker or AirPlay. Sampler tracks still record what you play on the screen; to record from the microphone, switch it off again.'));
   $('#measLoop').classList.toggle('glow', audioGuide === 'measure' && !(h.measureH || h.measure));   // what to do next is marked, until you go elsewhere
   $('#measTap').classList.toggle('glow', audioGuide === 'measure' && !h.measureS);
   if (!ctx) {
     const go = el('button', 'cr act'); go.append(el('span', '', 'Start audio'));
     go.addEventListener('click', async () => { await initAudio(); if (audioGuide) audioGuide = 'measure'; drawAudio(); ui(); });
     const c = card(go, el('p', 'cnote', 'Starts the microphone and the sound, so they can be chosen and checked here.')); if (audioGuide === 'start') c.classList.add('glow');
-    sh.append(c); return;
+    sh.append(c, spk); return;
   }
+  sh.append(spk);
   const mrow = (label, id) => { const r = el('div', 'mrow'), m = el('i', 'mtr big'); m.id = id; m.append(el('b')); r.append(el('span', '', label), m); return r; };
   // input
   const msr = el('div', 'microws'); fillMicRows(msr);
@@ -4610,7 +4640,7 @@ if (window.ResizeObserver) new ResizeObserver(() => { for (const t of tracks) dr
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* for debugging and tests */
-window.__varv = { st, MT, applyMaster, applyEnv, pv: (x, r, tune) => pvJob(x, r, tune), rebuild: t => { dropTrackNodes(t); buildTrackNodes(t); }, analyzeLoop, get ctx() { return ctx; }, applyTrackFor: t => applyTrack(t), get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
+window.__varv = { st, MT, applyMaster, applyEnv, setSpeaker, pv: (x, r, tune) => pvJob(x, r, tune), rebuild: t => { dropTrackNodes(t); buildTrackNodes(t); }, analyzeLoop, get ctx() { return ctx; }, applyTrackFor: t => applyTrack(t), get layers() { return allTakes(); }, get tracks() { return tracks; }, get trash() { return trash; }, get project() { return project; },
   ringPeak: sec => { let pk = 0; for (let f = Math.max(availStart(), capEnd - Math.round(sec * sr)); f < capEnd; f++) pk = Math.max(pk, Math.abs(ring[f % R])); return pk; },
   arm: i => toggleArm(tracks[i]),
   get scenes() { return scenes; }, get perf() { return perf; }, togglePerf, get inG() { return inG; },
