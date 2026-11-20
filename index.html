@@ -218,6 +218,9 @@ body[data-pads] #backT{display:block}
 .tile.on::after{content:'';position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:#9db8ff}
 .tile.dim{opacity:.45}
 .tnone{text-align:center;margin-top:18px}
+.librow{gap:6px}
+.libname{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;text-align:left;font-weight:600;font-size:16px;color:var(--text)}
+.libname small{font-size:12px;font-weight:500;color:var(--mut)}
 .tunev{padding:10px 12px 0}
 .tunev canvas{display:block;width:100%;height:150px;border-radius:10px;background:#1e2232}
 .tunev .cnote{padding:6px 2px 0}
@@ -611,7 +614,7 @@ body[data-pads] .scenes,body[data-pads] .hintbar{display:none!important}
   <div class="card"><button class="cr act" id="hintReset"><span>Show the guide again</span></button>
     <p class="cnote keys"><kbd>Space</kbd>, <kbd>R</kbd>, <kbd>Enter</kbd> or <kbd>→</kbd> work like the Record button: tap to record, hold to start or stop. <kbd>←</kbd> or <kbd>Backspace</kbd> undo. <kbd>C</kbd> capture last. <kbd>K</kbd> click. <kbd>1</kbd>–<kbd>9</kbd> mute a track, <kbd>Shift</kbd>+<kbd>1</kbd>–<kbd>9</kbd> solo it. <kbd>E</kbd> edit, <kbd>S</kbd> settings, <kbd>Esc</kbd> back to play. <kbd>P</kbd> record the performance. A Bluetooth pedal that sends any of the record keys works as a record pedal.</p></div>
   </div>
-  <p class="ver">Varv one, build 19 Nov 19:20</p>
+  <p class="ver">Varv one, build 20 Nov 15:50</p>
 </div></div>
 
 <div class="back" id="backL" aria-label="Back to play"></div>
@@ -3144,7 +3147,7 @@ function trackPane(t) {
     return [card(...rows)];
   };
   const srcPage = () => {
-      if (smp) { const cp = el('button', 'cr act'); cp.append(el('span', '', 'New track with this sample')); cp.firstChild.append(el('small', '', 'Same sample and all track settings, without the laps.')); cp.addEventListener('click', () => copySampler(t)); return [...sampleMain(t), card(cp)]; }
+      if (smp) { const cp = el('button', 'cr act'); cp.append(el('span', '', 'New track with this sample')); cp.firstChild.append(el('small', '', 'Same sample and all track settings, without the laps.')); cp.addEventListener('click', () => copySampler(t)); return [...sampleMain(t), el('h3', '', 'Sample library'), libSaveCard(t), card(cp)]; }
       return mic.length ? [card(el('p', 'cnote', 'A microphone track has no sample: its sound is its takes, under Laps. An empty track can record a sample with its microphone button and become a sampler.'))] : [emptySampleCard(t)];
   };
   const PAGES = {
@@ -3198,12 +3201,70 @@ function setKind(t, v) {
   }
   markDirty(); drawHead(t); renderPane();
 }
+/* ---------- sample library ----------
+   A sample can be saved under a name, with its trim, root, reverse, envelope, compressor and sustain loop, and loaded
+   into a track in any project. Kept in the 'samples' store, apart from the projects. */
+const libAll = async () => { try { const a = await req2p((await db()).transaction('samples').objectStore('samples').getAll()); return a.sort((x, y) => y.at - x.at); } catch (e) { return []; } };
+async function libSave(t, name) {
+  const s = t.sample; if (!s) return;
+  const it = { id: rid(), name: name || 'Sample', at: Date.now(), sr, raw: s.raw.slice(), a: s.a, b: s.b, det: s.det, adj: s.adj, rev: s.rev,
+    env: Object.assign({}, s.env), comp: Object.assign({}, s.comp), loopF: s.loopF ? s.loopF.slice() : null };
+  const tx = (await db()).transaction('samples', 'readwrite'); tx.objectStore('samples').put(it); await txDone(tx);
+  toast('Saved to the sample library: ' + it.name);
+}
+async function libDelete(id) { const tx = (await db()).transaction('samples', 'readwrite'); tx.objectStore('samples').delete(id); await txDone(tx); }
+function libRaw(it) {                                // in this engine's rate
+  if (!it.sr || it.sr === sr) return { raw: it.raw, k: 1 };
+  const k = sr / it.sr, n = Math.round(it.raw.length * k), y = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const p = i / k, j = Math.floor(p), f = p - j; y[i] = (it.raw[j] || 0) * (1 - f) + (it.raw[j + 1] || 0) * f; }
+  return { raw: y, k };
+}
+async function libLoad(t, it) {
+  if (!(await initAudio())) return;
+  const { raw, k } = libRaw(it);
+  setSample(t, raw);
+  const s = t.sample;
+  Object.assign(s, { a: Math.round(it.a * k), b: Math.min(raw.length, Math.round(it.b * k)), det: it.det, adj: it.adj || 0, rev: !!it.rev,
+    env: Object.assign({}, ENV_DEF, it.env), comp: Object.assign({}, COMP_DEF, it.comp), loopF: it.loopF ? it.loopF.slice() : null, libName: it.name });
+  prepSample(t); drawHead(t); markDirty(); refreshPane(t); if (padT === t) drawPads();
+  toast('Loaded ' + it.name + ' into track ' + (tracks.indexOf(t) + 1));
+}
+function libPlay(it) {
+  if (!ctx) return;
+  const { raw, k } = libRaw(it), a = Math.round(it.a * k), b = Math.round(it.b * k), x = raw.slice(a, b);
+  if (it.rev) x.reverse();
+  const src = ctx.createBufferSource(); src.buffer = mkBuf(x); src.connect(outGain); src.start();
+}
+/* The library as a panel: Load (into this track), the sample's own play button, and × to delete (twice). */
+function openLibrary(t) {
+  openPanel('Saved samples', async host => {
+    const list = await libAll(), c = el('div', 'card');
+    if (!list.length) c.append(el('p', 'cnote', 'No saved samples yet. Save one under Source on a sampler track.'));
+    for (const it of list) {
+      const r = el('div', 'cr librow'), nm = el('button', 'libname'); nm.append(el('span', '', it.name), el('small', '', ((it.b - it.a) / (it.sr || sr)).toFixed(2) + ' s'));
+      nm.addEventListener('click', () => { closeQuick(); libLoad(t, it); });
+      const pl = el('button', 'tbtn', '▶'); pl.setAttribute('aria-label', 'Play ' + it.name); pl.addEventListener('click', async () => { await initAudio(); libPlay(it); });
+      const del = el('button', 'tbtn danger'); twoTap(del, '×', 'Sure?', () => true, async () => { await libDelete(it.id); refillQuick(); });
+      r.append(nm, pl, del); c.append(r);
+    }
+    host.append(c, el('p', 'cnote', 'Tap a name to load it into track ' + (tracks.indexOf(t) + 1) + (t.sample ? ', in place of its sample.' : '.')));
+  });
+}
+function libSaveCard(t) {                             // on a sampler's Source page
+  const inp = el('input', 'txt bare'); inp.maxLength = 40; inp.placeholder = 'Name';
+  inp.value = t.sample.libName || 'Sample ' + new Date().toLocaleString('sv-SE', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const sv = el('button', 'tbtn', 'Save'); sv.addEventListener('click', async () => { await libSave(t, inp.value.trim()); t.sample.libName = inp.value.trim(); });
+  const ld = el('button', 'cr act'); ld.append(el('span', '', 'Load a saved sample')); ld.addEventListener('click', () => openLibrary(t));
+  const r = el('div', 'cr'); r.append(inp, sv);
+  return card(r, el('p', 'cnote', 'Saves the sample with its trim, root, envelope, compressor and loop, to use in any project.'), ld);
+}
 function emptySampleCard(t) {
   const on = srec && srec.tid === t.id, sb = el('button', 'cr act' + (on ? ' on' : ''));
   sb.append(el('span', '', on ? 'Stop the sample' : 'Record a sample'));
   sb.firstChild.append(el('small', '', on ? 'Or press Record. Stops by itself after 8 seconds.' : 'Play or sing one sound into the microphone. You then play it on the screen, from a pad or a keyboard.'));
   sb.addEventListener('click', () => sampleRec(t));
-  return card(sb);
+  const ld = el('button', 'cr act'); ld.append(el('span', '', 'Load a saved sample')); ld.addEventListener('click', () => openLibrary(t));
+  return card(sb, ld);
 }
 /* Source: the trim view with its actions and fine trimming, and the sustain loop. Full or Held is chosen on the pads. */
 function sampleMain(t) {
@@ -4049,12 +4110,13 @@ const req2p = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result)
 const txDone = tx => new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); });
 function db() {
   if (!dbP) dbP = new Promise((res, rej) => {
-    const r = indexedDB.open('varv', 2);
+    const r = indexedDB.open('varv', 3);
     r.onupgradeneeded = () => {
       const d = r.result, has = n => d.objectStoreNames.contains(n);
       if (!has('projects')) d.createObjectStore('projects', { keyPath: 'id' });
       if (!has('audio')) d.createObjectStore('audio');
       if (!has('perf')) d.createObjectStore('perf', { keyPath: 'id' });
+      if (!has('samples')) d.createObjectStore('samples', { keyPath: 'id' });   // the sample library, shared by all projects
     };
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   });
